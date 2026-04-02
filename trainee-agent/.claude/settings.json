@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git:*)",
+      "Bash(kubectl:*)",
+      "Bash(helm:*)",
+      "Bash(docker:*)",
+      "Bash(terraform:*)",
+      "Bash(ansible:*)",
+      "Bash(aws:*)"
+    ]
+  },
+  "env": {
+    "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1"
+  }
+}

@@ -1,0 +1,14 @@
+# MCP config — contains Notion and Linear API keys, never commit
+.claude/mcp.json
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor files
+.vscode/settings.json
+*.swp
+*.swo
+
+# Logs
+*.log
