@@ -1,0 +1,534 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Day 2 — Software App Fundamentals · ProOps2026</title>
+<style>
+:root {
+  --bg:#0b0d14; --surface:#13161f; --surface2:#1c2030; --border:#252a3a;
+  --accent:#6c8ef7; --accent2:#a78bfa;
+  --green:#34d399; --yellow:#fbbf24; --orange:#fb923c;
+  --red:#f87171; --teal:#22d3ee;
+  --text:#e8edf5; --muted:#7c87a0; --dim:#3a4258;
+}
+* { box-sizing:border-box; margin:0; padding:0; }
+body { background:var(--bg); color:var(--text); font-family:'Segoe UI',system-ui,sans-serif; font-size:15px; line-height:1.6; }
+
+nav { background:var(--surface);border-bottom:1px solid var(--border);padding:0 32px;height:50px;display:flex;align-items:center;gap:6px;position:sticky;top:0;z-index:200; }
+nav .brand { font-weight:800;font-size:14px;color:var(--accent);margin-right:12px; }
+nav a { color:var(--muted);text-decoration:none;font-size:12px;font-weight:600;padding:5px 12px;border-radius:6px;transition:all .15s;white-space:nowrap; }
+nav a:hover { color:var(--text);background:var(--surface2); }
+nav .spacer { flex:1; }
+nav .badge { background:rgba(52,211,153,.12);border:1px solid rgba(52,211,153,.25);color:var(--green);font-size:11px;font-weight:700;padding:3px 12px;border-radius:20px; }
+
+.layout { display:grid;grid-template-columns:1fr 260px;gap:32px;max-width:1100px;margin:0 auto;padding:40px 32px; }
+.main { min-width:0; }
+.sidebar { position:sticky;top:70px;height:fit-content;display:flex;flex-direction:column;gap:14px; }
+
+/* HEADER */
+.day-header { margin-bottom:32px; }
+.day-meta { display:flex;align-items:center;gap:10px;margin-bottom:12px; }
+.day-pill { font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;padding:3px 12px;border-radius:20px;background:rgba(108,142,247,.12);border:1px solid rgba(108,142,247,.25);color:var(--accent); }
+.day-tag { font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;padding:3px 12px;border-radius:20px;background:rgba(251,191,36,.08);border:1px solid rgba(251,191,36,.2);color:var(--yellow); }
+.day-title { font-size:26px;font-weight:800;letter-spacing:-.3px;margin-bottom:8px; }
+.day-question { font-size:15px;color:var(--teal);font-style:italic;border-left:3px solid var(--teal);padding-left:14px;margin-bottom:16px;line-height:1.6; }
+.day-why { font-size:13px;color:var(--muted);line-height:1.7;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:14px 16px; }
+.day-why strong { color:var(--text); }
+
+/* SECTIONS */
+.section-block { margin-bottom:32px; }
+.sec-label { font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:var(--dim);margin-bottom:14px;display:flex;align-items:center;gap:10px; }
+.sec-label::after { content:'';flex:1;height:1px;background:var(--border); }
+
+/* DISCOVERY CHAIN */
+.chain { display:flex;flex-direction:column;gap:10px; }
+.chain-item { display:grid;grid-template-columns:32px 1fr;gap:14px;padding:14px 16px;background:var(--surface);border:1px solid var(--border);border-radius:10px;cursor:pointer;transition:border-color .15s; }
+.chain-item:hover { border-color:rgba(108,142,247,.4); }
+.chain-item.done { border-color:rgba(52,211,153,.3);background:rgba(52,211,153,.03); }
+.chain-num { width:32px;height:32px;border-radius:50%;background:var(--surface2);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;color:var(--muted);flex-shrink:0;transition:all .15s; }
+.chain-item.done .chain-num { background:rgba(52,211,153,.15);border-color:rgba(52,211,153,.4);color:var(--green); }
+.chain-body {}
+.chain-q { font-size:13px;font-weight:600;margin-bottom:6px;line-height:1.5; }
+.chain-item.done .chain-q { color:var(--muted);text-decoration:line-through;text-decoration-color:var(--dim); }
+.chain-prompt { font-size:11px;font-family:'Cascadia Code','Fira Code',monospace;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:8px 12px;color:var(--accent2);line-height:1.6;margin-top:8px; }
+.chain-hint { font-size:11px;color:var(--dim);margin-top:6px;line-height:1.5; }
+
+/* ARTIFACT */
+.artifact-card { background:var(--surface);border:1px solid var(--border);border-radius:10px;overflow:hidden; }
+.artifact-head { padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:between;gap:10px; }
+.artifact-title { font-size:13px;font-weight:700;flex:1; }
+.artifact-file { font-family:'Cascadia Code','Fira Code',monospace;font-size:11px;color:var(--green);background:rgba(52,211,153,.08);border:1px solid rgba(52,211,153,.2);padding:2px 10px;border-radius:5px; }
+.artifact-body { padding:16px 18px; }
+.artifact-row { display:flex;gap:10px;margin-bottom:8px;font-size:12px;align-items:flex-start; }
+.artifact-row:last-child { margin-bottom:0; }
+.ar-dot { width:5px;height:5px;border-radius:50%;background:var(--accent);flex-shrink:0;margin-top:6px; }
+.ar-text { color:var(--muted);line-height:1.5; }
+.ar-text strong { color:var(--text); }
+.artifact-fail { margin-top:14px;padding:10px 14px;background:rgba(248,113,113,.06);border:1px solid rgba(248,113,113,.2);border-radius:7px;font-size:11px;color:var(--muted);line-height:1.6; }
+.artifact-fail strong { color:var(--red); }
+
+/* DONE CRITERIA */
+.criteria { display:flex;flex-direction:column;gap:8px; }
+.crit { display:flex;gap:10px;align-items:flex-start;padding:10px 14px;background:var(--surface);border:1px solid var(--border);border-radius:8px;font-size:12px;cursor:pointer;transition:border-color .15s; }
+.crit:hover { border-color:rgba(52,211,153,.3); }
+.crit.done { border-color:rgba(52,211,153,.35);background:rgba(52,211,153,.03); }
+.crit-box { width:16px;height:16px;border-radius:4px;border:1.5px solid var(--border);flex-shrink:0;margin-top:1px;display:flex;align-items:center;justify-content:center;transition:all .15s; }
+.crit.done .crit-box { background:var(--green);border-color:var(--green); }
+.crit-check { color:#0b0d14;font-size:10px;font-weight:900;display:none; }
+.crit.done .crit-check { display:block; }
+.crit-text { color:var(--muted);line-height:1.5; }
+.crit.done .crit-text { color:var(--dim); }
+
+/* SIDEBAR WIDGETS */
+.widget { background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px; }
+.widget-title { font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--dim);margin-bottom:12px; }
+
+.progress-wrap { margin-bottom:8px; }
+.progress-bar { height:5px;background:var(--surface2);border-radius:10px;overflow:hidden;margin-bottom:6px; }
+.progress-fill { height:100%;background:linear-gradient(90deg,var(--accent),var(--teal));border-radius:10px;transition:width .3s; }
+.progress-label { font-size:11px;color:var(--muted); }
+.progress-count { font-size:22px;font-weight:800;color:var(--text);margin-bottom:2px; }
+
+.artifact-status { display:flex;flex-direction:column;gap:6px; }
+.as-row { display:flex;align-items:center;gap:8px;font-size:11px; }
+.as-dot { width:7px;height:7px;border-radius:50%;background:var(--dim);flex-shrink:0; }
+.as-dot.done { background:var(--green); }
+.as-name { color:var(--muted);flex:1; }
+
+.connects { display:flex;flex-direction:column;gap:6px; }
+.conn-row { font-size:11px;color:var(--muted);display:flex;gap:8px;align-items:flex-start; }
+.conn-dir { color:var(--dim);flex-shrink:0;width:48px; }
+.conn-val { color:var(--muted); }
+.conn-val a { color:var(--accent);text-decoration:none; }
+
+.report-box { background:rgba(108,142,247,.06);border:1px solid rgba(108,142,247,.2);border-radius:10px;padding:14px 16px; }
+.report-title { font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--accent);margin-bottom:8px; }
+.report-step { font-size:11px;color:var(--muted);margin-bottom:6px;display:flex;gap:8px; }
+.report-step-num { color:var(--accent);font-weight:700;flex-shrink:0; }
+</style>
+</head>
+<body>
+
+<nav>
+  <span class="brand">ProOps2026</span>
+  <a href="#start">Start</a>
+  <a href="#chain">Discovery</a>
+  <a href="#flow-chart">How it builds</a>
+  <a href="#artifact">Artifact</a>
+  <a href="#done">Done?</a>
+  <div class="spacer"></div>
+  <span class="badge">Day 2 · Wed 02 Apr 2026</span>
+</nav>
+
+<div class="layout">
+<div class="main">
+
+  <!-- HEADER -->
+  <div class="day-header">
+    <div class="day-meta">
+      <span class="day-pill">Week 1 · Day 2</span>
+      <span class="day-tag">Theory</span>
+    </div>
+    <div class="day-title">Software App Fundamentals</div>
+    <div class="day-question">
+      When I receive an application to deploy, what is actually running — and why does the architecture shape everything I have to build around it?
+    </div>
+    <div class="day-why">
+      The tools you choose as a DevOps engineer — pipelines, orchestrators, monitoring strategy — are all <strong>downstream of the application's architecture</strong>. A monolith and a microservice system require fundamentally different operations stacks. You cannot design infrastructure for a system you don't understand. Every production incident you ever face will require you to trace a request through components you did not write.
+    </div>
+  </div>
+
+  <!-- START SESSION -->
+  <div class="section-block" id="start">
+    <div class="sec-label">Before you start — set up your session</div>
+
+    <div style="padding:12px 16px;background:rgba(108,142,247,.06);border:1px solid rgba(108,142,247,.2);border-radius:10px;margin-bottom:14px;font-size:12px;color:var(--muted);line-height:1.7;">
+      <strong style="color:var(--accent);">Quick reminder — what you built on Day 1:</strong><br>
+      You set up a <code style="font-size:11px;color:var(--accent2);">proops2026/</code> repo with a <code style="font-size:11px;color:var(--accent2);">CLAUDE.md</code> file that describes who you are and what you're learning.<br>
+      You also created a <strong style="color:var(--text);">Training Spec</strong> page in Notion — it contains your background, your weekly focus, and open questions.<br>
+      And you connected Claude to Notion using <strong style="color:var(--text);">MCP</strong> (the Notion integration you configured in Day 1).<br>
+      Today you'll see all three of those pieces working together.
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:4px;">
+
+      <div style="display:grid;grid-template-columns:28px 1fr;gap:12px;padding:12px 16px;background:var(--surface);border:1px solid var(--border);border-radius:10px;align-items:start;">
+        <div style="width:28px;height:28px;border-radius:50%;background:rgba(52,211,153,.12);border:1px solid rgba(52,211,153,.3);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:var(--green);flex-shrink:0;">1</div>
+        <div>
+          <div style="font-size:13px;font-weight:600;margin-bottom:3px;">Open Claude Code inside your <code style="font-size:11px;color:var(--accent2);">proops2026/</code> folder</div>
+          <div style="font-size:12px;color:var(--muted);line-height:1.6;">This is the same repo you created on Day 1 — the one with your <code style="font-size:11px;color:var(--accent2);">CLAUDE.md</code> file inside it.</div>
+          <div style="font-size:12px;color:var(--muted);line-height:1.6;margin-top:4px;"><strong style="color:var(--text);">Why this matters:</strong> When you open Claude Code in this folder, Claude automatically reads <code style="font-size:11px;color:var(--accent2);">CLAUDE.md</code> at the start of every session. This file tells Claude your background, your skill level, and how to talk to you. You never have to explain who you are — Claude already knows. This is your <strong style="color:var(--teal);">Role</strong>.</div>
+        </div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:28px 1fr;gap:12px;padding:12px 16px;background:var(--surface);border:1px solid var(--border);border-radius:10px;align-items:start;">
+        <div style="width:28px;height:28px;border-radius:50%;background:rgba(52,211,153,.12);border:1px solid rgba(52,211,153,.3);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:var(--green);flex-shrink:0;">2</div>
+        <div>
+          <div style="font-size:13px;font-weight:600;margin-bottom:3px;">Verify your Role loaded</div>
+          <div style="font-size:12px;color:var(--muted);line-height:1.6;">Type this into Claude and press Enter:</div>
+          <div style="font-family:'Cascadia Code','Fira Code',monospace;font-size:11px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:8px 12px;color:var(--accent2);margin-top:6px;">"Based on my CLAUDE.md, what is my background and what am I training for?"</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px;">
+            <div style="padding:8px 10px;border-radius:6px;border:1px solid rgba(52,211,153,.2);background:rgba(52,211,153,.04);font-size:11px;line-height:1.5;">
+              <strong style="color:var(--green);font-size:10px;display:block;margin-bottom:2px;">GOOD — Role loaded</strong>
+              <span style="color:var(--muted);">Claude mentions your specific name, background (e.g. "junior dev" or "QA"), and that you're in the ProOps2026 program</span>
+            </div>
+            <div style="padding:8px 10px;border-radius:6px;border:1px solid rgba(248,113,113,.2);background:rgba(248,113,113,.04);font-size:11px;line-height:1.5;">
+              <strong style="color:var(--red);font-size:10px;display:block;margin-bottom:2px;">PROBLEM — wrong folder</strong>
+              <span style="color:var(--muted);">Claude gives a generic answer or says it doesn't have a CLAUDE.md. Fix: make sure you opened Claude Code from inside your proops2026/ folder, not a parent or different directory</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:28px 1fr;gap:12px;padding:12px 16px;background:var(--surface);border:1px solid var(--border);border-radius:10px;align-items:start;">
+        <div style="width:28px;height:28px;border-radius:50%;background:rgba(52,211,153,.12);border:1px solid rgba(52,211,153,.3);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:var(--green);flex-shrink:0;">3</div>
+        <div>
+          <div style="font-size:13px;font-weight:600;margin-bottom:3px;">Verify your Context loaded</div>
+          <div style="font-size:12px;color:var(--muted);line-height:1.6;"><strong style="color:var(--text);">What is "Context" here?</strong> Your <strong style="color:var(--teal);">Training Spec</strong> is the Notion page you created on Day 1. It contains your weekly focus, what you already know, and your open questions. Because you set up MCP (the Notion connection) on Day 1, Claude can read this page directly — you don't need to copy-paste anything.</div>
+          <div style="font-size:12px;color:var(--muted);line-height:1.6;margin-top:4px;">Type this into Claude:</div>
+          <div style="font-family:'Cascadia Code','Fira Code',monospace;font-size:11px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:8px 12px;color:var(--accent2);margin-top:6px;">"Read my Notion Training Spec. What is my Week 1 focus and what open questions do I have?"</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px;">
+            <div style="padding:8px 10px;border-radius:6px;border:1px solid rgba(52,211,153,.2);background:rgba(52,211,153,.04);font-size:11px;line-height:1.5;">
+              <strong style="color:var(--green);font-size:10px;display:block;margin-bottom:2px;">GOOD — Context loaded</strong>
+              <span style="color:var(--muted);">Claude reads your Notion page and answers with your actual weekly focus and questions. MCP is working — Claude can access your Notion automatically.</span>
+            </div>
+            <div style="padding:8px 10px;border-radius:6px;border:1px solid rgba(248,113,113,.2);background:rgba(248,113,113,.04);font-size:11px;line-height:1.5;">
+              <strong style="color:var(--red);font-size:10px;display:block;margin-bottom:2px;">PROBLEM — MCP not connected</strong>
+              <span style="color:var(--muted);">Claude says it can't access Notion or gives a generic answer. Fix: check your MCP settings from Day 1 — the Notion integration may not be configured or authorized.</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:28px 1fr;gap:12px;padding:12px 16px;background:var(--surface);border:1px solid var(--border);border-radius:10px;align-items:start;">
+        <div style="width:28px;height:28px;border-radius:50%;background:rgba(52,211,153,.12);border:1px solid rgba(52,211,153,.3);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:var(--green);flex-shrink:0;">4</div>
+        <div>
+          <div style="font-size:13px;font-weight:600;margin-bottom:3px;">Both checks passed? You're ready to start.</div>
+          <div style="font-size:12px;color:var(--muted);line-height:1.6;">Scroll down to the Discovery Chain. That's your work for today.</div>
+        </div>
+      </div>
+
+    </div>
+
+    <div style="padding:12px 16px;background:rgba(251,191,36,.05);border:1px solid rgba(251,191,36,.2);border-radius:10px;margin-top:10px;">
+      <div style="font-size:12px;font-weight:700;color:var(--yellow);margin-bottom:6px;">Why did we just do that?</div>
+      <div style="font-size:12px;color:var(--muted);line-height:1.7;">
+        On Day 1 you learned about <strong style="color:var(--text);">C.R.A.F.T.</strong> — the 5 pieces of a good prompt: <strong style="color:var(--teal);">C</strong>ontext, <strong style="color:var(--teal);">R</strong>ole, <strong style="color:var(--teal);">A</strong>ction, <strong style="color:var(--teal);">F</strong>ormat, <strong style="color:var(--teal);">T</strong>one.<br><br>
+        What just happened:<br>
+        <span style="color:var(--text);">CLAUDE.md</span> = <strong style="color:var(--teal);">Role</strong> — auto-loaded when you open the folder. Claude knows who you are.<br>
+        <span style="color:var(--text);">Notion Training Spec</span> = <strong style="color:var(--teal);">Context</strong> — auto-loaded via MCP. Claude knows your current situation.<br><br>
+        That means for every prompt you write today, <strong style="color:var(--text);">you only need to write 3 things: the Action (what to do), the Format (how to structure the answer), and the Tone (level of detail)</strong>. The Role and Context are already there — working silently in the background.<br><br>
+        <span style="color:var(--dim);">This is why Day 1 setup matters. Every day from now on starts faster because your agent already knows you.</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- DISCOVERY CHAIN -->
+  <div class="section-block" id="chain">
+    <div class="sec-label">Discovery Chain — 7 questions, in order</div>
+
+    <div style="padding:14px 16px;background:var(--surface);border:1px solid var(--border);border-radius:10px;margin-bottom:14px;">
+      <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:8px;">How this works</div>
+      <div style="font-size:12px;color:var(--muted);line-height:1.8;">
+        Below are 7 questions. Each one has a <strong style="color:var(--accent2);">purple prompt</strong> — that's the exact text you copy and paste into your Claude session.<br>
+        <strong style="color:var(--text);">The workflow for each question:</strong>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:4px;margin-top:10px;">
+        <div style="display:flex;gap:10px;align-items:center;font-size:12px;"><span style="color:var(--accent);font-weight:700;width:20px;text-align:right;">1.</span><span style="color:var(--muted);">Read the question (white text) — this is what you're trying to understand</span></div>
+        <div style="display:flex;gap:10px;align-items:center;font-size:12px;"><span style="color:var(--accent);font-weight:700;width:20px;text-align:right;">2.</span><span style="color:var(--muted);">Copy the <strong style="color:var(--accent2);">purple prompt</strong> below it</span></div>
+        <div style="display:flex;gap:10px;align-items:center;font-size:12px;"><span style="color:var(--accent);font-weight:700;width:20px;text-align:right;">3.</span><span style="color:var(--muted);">Paste it into your Claude Code session and press Enter</span></div>
+        <div style="display:flex;gap:10px;align-items:center;font-size:12px;"><span style="color:var(--accent);font-weight:700;width:20px;text-align:right;">4.</span><span style="color:var(--muted);"><strong style="color:var(--text);">Read Claude's full response</strong> — don't skim. This is where you learn.</span></div>
+        <div style="display:flex;gap:10px;align-items:center;font-size:12px;"><span style="color:var(--accent);font-weight:700;width:20px;text-align:right;">5.</span><span style="color:var(--muted);">If something is unclear, ask Claude a follow-up — that's a normal conversation</span></div>
+        <div style="display:flex;gap:10px;align-items:center;font-size:12px;"><span style="color:var(--accent);font-weight:700;width:20px;text-align:right;">6.</span><span style="color:var(--muted);">Click the question card to mark it done, then move to the next one</span></div>
+      </div>
+      <div style="margin-top:10px;padding:8px 12px;border-radius:6px;border:1px solid rgba(251,146,60,.2);background:rgba(251,146,60,.04);font-size:11px;color:var(--muted);line-height:1.6;">
+        <strong style="color:var(--orange);">Important:</strong> The questions build on each other — Q3 only makes sense after you understand Q2. Don't skip ahead. <strong style="color:var(--text);">Q7 directly generates your artifact file</strong> — save that output into <code style="font-size:10px;color:var(--accent2);">memory/software-architecture.md</code>.
+      </div>
+    </div>
+
+    <div class="chain">
+
+      <div class="chain-item" onclick="toggleChain(this,0)">
+        <div class="chain-num">1</div>
+        <div class="chain-body">
+          <div class="chain-q">You receive a URL returning 500 errors in production. You have no idea what the app does. What is the first thing you ask — and what tools trace the failing request from browser to database?</div>
+          <div class="chain-prompt">Context: I'm a DevOps engineer on-call. A URL is returning 500 errors. I have no prior knowledge of this app. Walk me through the exact diagnostic steps — what questions I ask the dev team and what CLI tools I run — to trace this request from browser to database.</div>
+        </div>
+      </div>
+
+      <div class="chain-item" onclick="toggleChain(this,1)">
+        <div class="chain-num">2</div>
+        <div class="chain-body">
+          <div class="chain-q">The app has a frontend, a backend API (Node.js), and a database. What does a single "add to cart" action actually do — how many network calls, what data moves, and what could fail at each step?</div>
+          <div class="chain-prompt">Trace a single "add to cart" HTTP request through this stack: browser → Node.js API → database. Show me every network call, every piece of data that moves, and the specific failure mode at each step. Format as a numbered sequence.</div>
+        </div>
+      </div>
+
+      <div class="chain-item" onclick="toggleChain(this,2)">
+        <div class="chain-num">3</div>
+        <div class="chain-body">
+          <div class="chain-q">The backend now calls three separate services (inventory, pricing, payment) before responding. What failure modes exist that didn't exist in the monolith — and what happens to the cart if the pricing service is slow?</div>
+          <div class="chain-prompt">I've split a monolith into three microservices: inventory-service, pricing-service, payment-service. Each is a separate deployment. Compare the failure modes of this architecture versus the monolith. Be specific: what happens to the cart request if pricing-service responds in 8 seconds instead of 200ms?</div>
+          <div class="chain-hint">Key concept you're discovering: blast radius, cascading failure, timeout propagation</div>
+        </div>
+      </div>
+
+      <div class="chain-item" onclick="toggleChain(this,3)">
+        <div class="chain-num">4</div>
+        <div class="chain-body">
+          <div class="chain-q">The team uses a message queue between the order service and the fulfillment service. Why not a direct API call? What breaks under load if they had used one?</div>
+          <div class="chain-prompt">Explain why an e-commerce system uses a message queue (like SQS or RabbitMQ) between order-service and fulfillment-service instead of a direct HTTP call. Show me concretely what breaks under 1000 orders/minute if they had used a direct call — and how the queue solves each problem.</div>
+          <div class="chain-hint">Key concept: decoupling, backpressure, at-least-once delivery</div>
+        </div>
+      </div>
+
+      <div class="chain-item" onclick="toggleChain(this,4)">
+        <div class="chain-num">5</div>
+        <div class="chain-body">
+          <div class="chain-q">Redis sits between the API and the database. Every cache miss hits the database. The database is at 95% CPU. How do you decide: scale the database or fix the cache?</div>
+          <div class="chain-prompt">The database is at 95% CPU. Redis is in front of it. I need to decide: scale the database (vertical or horizontal) or fix the cache (TTL, eviction policy, cache warming). What are the three diagnostic questions I answer first — and what does each answer tell me about which action to take?</div>
+          <div class="chain-hint">Key concept: caching strategy, cache invalidation, the trade-off between cost and correctness</div>
+        </div>
+      </div>
+
+      <div class="chain-item" onclick="toggleChain(this,5)">
+        <div class="chain-num">6</div>
+        <div class="chain-body">
+          <div class="chain-q">The team wants to add a new microservice. They ask you to set up CI/CD for it. Compared to the monolith pipeline you already have — what new concerns appear?</div>
+          <div class="chain-prompt">I already have a CI/CD pipeline for a monolith. Now I need to add a pipeline for a new microservice that's part of a distributed system. List the specific new concerns that didn't exist for the monolith: deployment order, service discovery, distributed tracing, and independent rollback. One paragraph each.</div>
+        </div>
+      </div>
+
+      <div class="chain-item" onclick="toggleChain(this,6)">
+        <div class="chain-num">7</div>
+        <div class="chain-body">
+          <div class="chain-q">You sit down to write your memory file. What are the five architectural patterns a DevOps engineer must recognize on sight — and what does each imply about the operations work required?</div>
+          <div class="chain-prompt">I'm writing memory/software-architecture.md for my DevOps agent. List the five application architecture patterns I must recognize instantly (monolith, microservices, event-driven, serverless, and one more of your choice). For each: one sentence description + exactly what operations work it implies — pipeline complexity, scaling model, observability requirements, and rollback strategy.</div>
+          <div class="chain-hint">This prompt builds your artifact directly — save the output into your memory file.</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- FLOW CHART -->
+  <div class="section-block" id="flow-chart">
+    <div class="sec-label">How the questions build — concept ladder</div>
+    <div style="display:grid;grid-template-columns:1fr 180px;gap:20px;align-items:start;">
+
+      <div style="display:flex;flex-direction:column;gap:0;">
+
+        <div style="display:grid;grid-template-columns:36px 1fr 180px;gap:0;align-items:stretch;">
+          <div style="display:flex;flex-direction:column;align-items:center;"><div style="width:36px;height:36px;border-radius:50%;background:rgba(96,165,250,.15);border:2px solid var(--blue);color:var(--blue);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;">1</div><div style="width:2px;flex:1;min-height:12px;background:var(--border);"></div></div>
+          <div style="margin:0 14px 10px;padding:12px 14px;border-radius:10px;border:1px solid var(--border);background:var(--surface);"><div style="font-size:12px;font-weight:700;margin-bottom:3px;">500 error — trace from browser to DB</div><div style="font-size:11px;color:var(--muted);">On-call scenario. No prior knowledge. Diagnostic instinct.</div><span style="display:inline-block;margin-top:6px;font-size:10px;font-weight:700;padding:2px 7px;border-radius:4px;background:rgba(96,165,250,.08);color:var(--blue);border:1px solid rgba(96,165,250,.2);">HTTP lifecycle · diagnostic</span></div>
+          <div style="margin-bottom:10px;padding:10px 12px;border-radius:8px;border:1px dashed var(--border);font-size:11px;color:var(--muted);align-self:center;"><strong style="display:block;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--dim);margin-bottom:3px;">Establishes</strong>A request has a path. Every hop can fail.</div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:36px 1fr 180px;gap:0;align-items:stretch;">
+          <div style="display:flex;flex-direction:column;align-items:center;"><div style="width:36px;height:36px;border-radius:50%;background:rgba(96,165,250,.15);border:2px solid var(--blue);color:var(--blue);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;">2</div><div style="width:2px;flex:1;min-height:12px;background:var(--border);"></div></div>
+          <div style="margin:0 14px 10px;padding:12px 14px;border-radius:10px;border:1px solid var(--border);background:var(--surface);"><div style="font-size:12px;font-weight:700;margin-bottom:3px;">"Add to cart" — trace the monolith</div><div style="font-size:11px;color:var(--muted);">Frontend → API → DB. Every call, every failure mode.</div><span style="display:inline-block;margin-top:6px;font-size:10px;font-weight:700;padding:2px 7px;border-radius:4px;background:rgba(96,165,250,.08);color:var(--blue);border:1px solid rgba(96,165,250,.2);">Monolith · request/response</span></div>
+          <div style="margin-bottom:10px;padding:10px 12px;border-radius:8px;border:1px dashed var(--border);font-size:11px;color:var(--muted);align-self:center;"><strong style="display:block;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--dim);margin-bottom:3px;">Establishes</strong>One deployment unit. Failure is contained.</div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:36px 1fr 180px;gap:0;align-items:stretch;">
+          <div style="display:flex;flex-direction:column;align-items:center;"><div style="width:36px;height:36px;border-radius:50%;background:rgba(251,191,36,.15);border:2px solid var(--yellow);color:var(--yellow);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;">3</div><div style="width:2px;flex:1;min-height:12px;background:var(--border);"></div></div>
+          <div style="margin:0 14px 10px;padding:12px 14px;border-radius:10px;border:1px solid var(--border);background:var(--surface);"><div style="font-size:12px;font-weight:700;margin-bottom:3px;">Split into 3 services — what breaks?</div><div style="font-size:11px;color:var(--muted);">New failure modes. What happens when pricing is slow?</div><span style="display:inline-block;margin-top:6px;font-size:10px;font-weight:700;padding:2px 7px;border-radius:4px;background:rgba(251,191,36,.08);color:var(--yellow);border:1px solid rgba(251,191,36,.2);">Microservices · blast radius</span></div>
+          <div style="margin-bottom:10px;padding:10px 12px;border-radius:8px;border:1px dashed var(--border);font-size:11px;color:var(--muted);align-self:center;"><strong style="display:block;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--dim);margin-bottom:3px;">The shift</strong>More deployments = more failure points.</div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:36px 1fr 180px;gap:0;align-items:stretch;">
+          <div style="display:flex;flex-direction:column;align-items:center;"><div style="width:36px;height:36px;border-radius:50%;background:rgba(251,191,36,.15);border:2px solid var(--yellow);color:var(--yellow);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;">4</div><div style="width:2px;flex:1;min-height:12px;background:var(--border);"></div></div>
+          <div style="margin:0 14px 10px;padding:12px 14px;border-radius:10px;border:1px solid var(--border);background:var(--surface);"><div style="font-size:12px;font-weight:700;margin-bottom:3px;">Queue between order and fulfillment</div><div style="font-size:11px;color:var(--muted);">Why not a direct call? What breaks at 1000 orders/min?</div><span style="display:inline-block;margin-top:6px;font-size:10px;font-weight:700;padding:2px 7px;border-radius:4px;background:rgba(251,191,36,.08);color:var(--yellow);border:1px solid rgba(251,191,36,.2);">Queues · decoupling · backpressure</span></div>
+          <div style="margin-bottom:10px;padding:10px 12px;border-radius:8px;border:1px dashed var(--border);font-size:11px;color:var(--muted);align-self:center;"><strong style="display:block;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--dim);margin-bottom:3px;">Establishes</strong>Not every integration should be synchronous.</div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:36px 1fr 180px;gap:0;align-items:stretch;">
+          <div style="display:flex;flex-direction:column;align-items:center;"><div style="width:36px;height:36px;border-radius:50%;background:rgba(74,222,128,.15);border:2px solid var(--green);color:var(--green);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;">5</div><div style="width:2px;flex:1;min-height:12px;background:var(--border);"></div></div>
+          <div style="margin:0 14px 10px;padding:12px 14px;border-radius:10px;border:1px solid var(--border);background:var(--surface);"><div style="font-size:12px;font-weight:700;margin-bottom:3px;">DB at 95% CPU — scale or fix cache?</div><div style="font-size:11px;color:var(--muted);">Three diagnostic questions before any action.</div><span style="display:inline-block;margin-top:6px;font-size:10px;font-weight:700;padding:2px 7px;border-radius:4px;background:rgba(74,222,128,.08);color:var(--green);border:1px solid rgba(74,222,128,.2);">Caching · cost vs correctness</span></div>
+          <div style="margin-bottom:10px;padding:10px 12px;border-radius:8px;border:1px dashed var(--border);font-size:11px;color:var(--muted);align-self:center;"><strong style="display:block;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--dim);margin-bottom:3px;">Establishes</strong>Diagnosis before action. Scaling costs money.</div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:36px 1fr 180px;gap:0;align-items:stretch;">
+          <div style="display:flex;flex-direction:column;align-items:center;"><div style="width:36px;height:36px;border-radius:50%;background:rgba(167,139,250,.15);border:2px solid var(--purple);color:var(--purple);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;">6</div><div style="width:2px;flex:1;min-height:12px;background:var(--border);"></div></div>
+          <div style="margin:0 14px 10px;padding:12px 14px;border-radius:10px;border:1px solid var(--border);background:var(--surface);"><div style="font-size:12px;font-weight:700;margin-bottom:3px;">New microservice — set up CI/CD</div><div style="font-size:11px;color:var(--muted);">Deployment order · discovery · tracing · rollback.</div><span style="display:inline-block;margin-top:6px;font-size:10px;font-weight:700;padding:2px 7px;border-radius:4px;background:rgba(167,139,250,.08);color:var(--purple);border:1px solid rgba(167,139,250,.2);">CI/CD complexity · distributed ops</span></div>
+          <div style="margin-bottom:10px;padding:10px 12px;border-radius:8px;border:1px dashed var(--border);font-size:11px;color:var(--muted);align-self:center;"><strong style="display:block;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--dim);margin-bottom:3px;">Closes loop</strong>Architecture determines how hard your DevOps job is.</div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:36px 1fr 180px;gap:0;align-items:stretch;">
+          <div style="display:flex;flex-direction:column;align-items:center;"><div style="width:36px;height:36px;border-radius:50%;background:rgba(251,146,60,.15);border:2px solid var(--orange);color:var(--orange);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;">7</div></div>
+          <div style="margin:0 14px 0;padding:12px 14px;border-radius:10px;border:1px solid rgba(251,146,60,.3);background:rgba(251,146,60,.04);"><div style="font-size:12px;font-weight:700;margin-bottom:3px;color:var(--orange);">Write the memory file</div><div style="font-size:11px;color:var(--muted);">5 patterns · ops implications per pattern · prompt builds the artifact directly.</div><span style="display:inline-block;margin-top:6px;font-size:10px;font-weight:700;padding:2px 7px;border-radius:4px;background:rgba(251,146,60,.1);color:var(--orange);border:1px solid rgba(251,146,60,.25);">→ memory/software-architecture.md</span></div>
+          <div style="padding:10px 12px;border-radius:8px;border:1px dashed rgba(251,146,60,.3);font-size:11px;color:var(--muted);align-self:center;"><strong style="display:block;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--orange);margin-bottom:3px;">Output</strong>Save the response directly into your file.</div>
+        </div>
+
+      </div>
+
+      <!-- RIGHT: concept ladder + time -->
+      <div style="position:sticky;top:70px;">
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px;margin-bottom:12px;">
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--dim);margin-bottom:12px;">Concept groups</div>
+          <div style="display:flex;flex-direction:column;gap:0;">
+            <div style="display:flex;gap:8px;align-items:center;padding:7px 0;border-bottom:1px solid var(--border);"><div style="width:8px;height:8px;border-radius:50%;background:var(--blue);flex-shrink:0;"></div><div style="font-size:11px;color:var(--muted);">Q1–2 · <strong style="color:var(--text);">Request anatomy</strong></div></div>
+            <div style="display:flex;gap:8px;align-items:center;padding:7px 0;border-bottom:1px solid var(--border);"><div style="width:8px;height:8px;border-radius:50%;background:var(--yellow);flex-shrink:0;"></div><div style="font-size:11px;color:var(--muted);">Q3–4 · <strong style="color:var(--text);">Distribution patterns</strong></div></div>
+            <div style="display:flex;gap:8px;align-items:center;padding:7px 0;border-bottom:1px solid var(--border);"><div style="width:8px;height:8px;border-radius:50%;background:var(--green);flex-shrink:0;"></div><div style="font-size:11px;color:var(--muted);">Q5 · <strong style="color:var(--text);">Data layer ops</strong></div></div>
+            <div style="display:flex;gap:8px;align-items:center;padding:7px 0;border-bottom:1px solid var(--border);"><div style="width:8px;height:8px;border-radius:50%;background:var(--purple);flex-shrink:0;"></div><div style="font-size:11px;color:var(--muted);">Q6 · <strong style="color:var(--text);">CI/CD consequence</strong></div></div>
+            <div style="display:flex;gap:8px;align-items:center;padding:7px 0;"><div style="width:8px;height:8px;border-radius:50%;background:var(--orange);flex-shrink:0;"></div><div style="font-size:11px;color:var(--muted);">Q7 · <strong style="color:var(--text);">Write artifact</strong></div></div>
+          </div>
+        </div>
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px;">
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--dim);margin-bottom:10px;">Est. time</div>
+          <div style="font-size:11px;color:var(--muted);line-height:2.1;">Q1–2 &nbsp;~30 min<br>Q3–4 &nbsp;~40 min<br>Q5–6 &nbsp;~30 min<br>Q7 + file &nbsp;~40 min<br>Daily log &nbsp;~15 min</div>
+          <div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border);font-size:11px;color:var(--dim);">Total ~2.5 hrs</div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ARTIFACT SECTIONS BREAKDOWN -->
+    <div style="margin-top:24px;">
+      <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--dim);margin-bottom:12px;">What goes into the artifact — 5 required sections</div>
+      <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:10px;">
+        <div style="background:var(--surface);border:1px solid var(--border);border-top:3px solid var(--blue);border-radius:10px;padding:12px;">
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--muted);margin-bottom:5px;">Section 1</div>
+          <div style="font-size:12px;font-weight:700;margin-bottom:5px;">HTTP Anatomy</div>
+          <div style="font-size:11px;color:var(--muted);line-height:1.5;">Methods · status codes · headers · JSON body. A traced example, not definitions.</div>
+        </div>
+        <div style="background:var(--surface);border:1px solid var(--border);border-top:3px solid var(--yellow);border-radius:10px;padding:12px;">
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--muted);margin-bottom:5px;">Section 2</div>
+          <div style="font-size:12px;font-weight:700;margin-bottom:5px;">Monolith vs Microservice</div>
+          <div style="font-size:11px;color:var(--muted);line-height:1.5;">Comparison table: blast radius · scaling · CI/CD · observability. DevOps angle.</div>
+        </div>
+        <div style="background:var(--surface);border:1px solid var(--border);border-top:3px solid var(--green);border-radius:10px;padding:12px;">
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--muted);margin-bottom:5px;">Section 3</div>
+          <div style="font-size:12px;font-weight:700;margin-bottom:5px;">Message Queues</div>
+          <div style="font-size:11px;color:var(--muted);line-height:1.5;">What · when · why over direct API. Tools: SQS, RabbitMQ, Kafka.</div>
+        </div>
+        <div style="background:var(--surface);border:1px solid var(--border);border-top:3px solid var(--purple);border-radius:10px;padding:12px;">
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--muted);margin-bottom:5px;">Section 4</div>
+          <div style="font-size:12px;font-weight:700;margin-bottom:5px;">Caching</div>
+          <div style="font-size:11px;color:var(--muted);line-height:1.5;">Where it sits · cache invalidation in one sentence · TTL vs eviction.</div>
+        </div>
+        <div style="background:var(--surface);border:1px solid var(--border);border-top:3px solid var(--orange);border-radius:10px;padding:12px;">
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--muted);margin-bottom:5px;">Section 5</div>
+          <div style="font-size:12px;font-weight:700;margin-bottom:5px;">DevOps Implications</div>
+          <div style="font-size:11px;color:var(--muted);line-height:1.5;">One paragraph: architecture type → operations complexity. What your agent reads first.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ARTIFACT -->
+  <div class="section-block" id="artifact">
+    <div class="sec-label">Required artifact — must exist before end-of-day commit</div>
+    <div class="artifact-card">
+      <div class="artifact-head">
+        <div class="artifact-title">Software Architecture Memory File</div>
+        <div class="artifact-file">memory/software-architecture.md</div>
+      </div>
+      <div class="artifact-body">
+        <div style="font-size:11px;color:var(--muted);margin-bottom:12px;line-height:1.6;">Your agent reads this file at the start of every future session where architecture context matters. Write it to be consumed by Claude, not by you. Structured sections, not notes.</div>
+
+        <div class="artifact-row"><div class="ar-dot"></div><div class="ar-text"><strong>HTTP request/response anatomy</strong> — real examples: methods, status codes, headers, JSON body. Not definitions — a traced example.</div></div>
+        <div class="artifact-row"><div class="ar-dot"></div><div class="ar-text"><strong>Monolith vs microservice comparison table</strong> — deployment unit, failure blast radius, scaling model, CI/CD complexity, observability requirements. DevOps angle, not developer angle.</div></div>
+        <div class="artifact-row"><div class="ar-dot"></div><div class="ar-text"><strong>Message queue section</strong> — what it is, when a queue beats a direct API call, at least two tool examples (SQS, RabbitMQ, Kafka).</div></div>
+        <div class="artifact-row"><div class="ar-dot"></div><div class="ar-text"><strong>Caching section</strong> — what it is, where it sits in the stack, the cache invalidation problem in one sentence.</div></div>
+        <div class="artifact-row"><div class="ar-dot"></div><div class="ar-text"><strong>DevOps implication summary</strong> — one paragraph connecting architecture type to operations complexity. This is what your agent reads before any architecture discussion.</div></div>
+
+        <div class="artifact-fail">
+          <strong>Weak artifact signals:</strong> generic definitions with no DevOps angle · no failure modes or operational consequences · monolith vs microservice described in developer terms only · looks like a glossary, not a memory file
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- DONE CRITERIA -->
+  <div class="section-block" id="done">
+    <div class="sec-label">Before you send your end-of-day report — check these</div>
+    <div class="criteria">
+      <div class="crit" onclick="toggleCrit(this)">
+        <div class="crit-box"><span class="crit-check">✓</span></div>
+        <div class="crit-text">I worked through all 7 discovery questions with my agent — not read, not skimmed. I ran each prompt and read the full response.</div>
+      </div>
+      <div class="crit" onclick="toggleCrit(this)">
+        <div class="crit-box"><span class="crit-check">✓</span></div>
+        <div class="crit-text"><code style="font-size:11px;color:var(--accent2);">memory/software-architecture.md</code> exists in my repo with all 5 required sections filled.</div>
+      </div>
+      <div class="crit" onclick="toggleCrit(this)">
+        <div class="crit-box"><span class="crit-check">✓</span></div>
+        <div class="crit-text">I can explain the difference between a monolith and a microservice from an <em>operations</em> perspective — not just a development perspective.</div>
+      </div>
+      <div class="crit" onclick="toggleCrit(this)">
+        <div class="crit-box"><span class="crit-check">✓</span></div>
+        <div class="crit-text">I can describe one scenario where a message queue is better than a direct API call and why.</div>
+      </div>
+      <div class="crit" onclick="toggleCrit(this)">
+        <div class="crit-box"><span class="crit-check">✓</span></div>
+        <div class="crit-text">Daily log filled — Tomorrow's Context Block is 3 specific sentences, not "I learned software architecture today."</div>
+      </div>
+      <div class="crit" onclick="toggleCrit(this)">
+        <div class="crit-box"><span class="crit-check">✓</span></div>
+        <div class="crit-text">Git commit pushed: <code style="font-size:11px;color:var(--accent2);">Day 02 — memory: software-architecture.md</code></div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /main -->
+
+<!-- SIDEBAR -->
+<div class="sidebar">
+
+  <div class="widget">
+    <div class="widget-title">Progress</div>
+    <div class="progress-count" id="prog-count">0 / 7</div>
+    <div class="progress-wrap">
+      <div class="progress-bar"><div class="progress-fill" id="prog-fill" style="width:0%"></div></div>
+      <div class="progress-label" id="prog-label">Discovery chain</div>
+    </div>
+  </div>
+
+  <div class="widget">
+    <div class="widget-title">Today's Artifact</div>
+    <div class="artifact-status">
+      <div class="as-row"><div class="as-dot" id="dot-mem"></div><div class="as-name">memory/software-architecture.md</div></div>
+    </div>
+  </div>
+
+  <div class="widget">
+    <div class="widget-title">Connects To</div>
+    <div class="connects">
+      <div class="conn-row"><span class="conn-dir">← Day 1</span><span class="conn-val">How We Work — agent + daily loop</span></div>
+      <div class="conn-row"><span class="conn-dir">→ Day 3</span><span class="conn-val">Git + Networking Basics</span></div>
+      <div class="conn-row"><span class="conn-dir">→ Week 7</span><span class="conn-val">Architecture shapes your observability stack</span></div>
+      <div class="conn-row"><span class="conn-dir">→ Day 36</span><span class="conn-val">Capstone architecture decision</span></div>
+    </div>
+  </div>
+
+  <div class="report-box">
+    <div class="report-title">End-of-day report</div>
+    <div class="report-step"><span class="report-step-num">1.</span> Fill daily log + context block</div>
+    <div class="report-step"><span class="report-step-num">2.</span> git commit + push</div>
+    <div class="report-step"><span class="report-step-num">3.</span> Copy <code style="font-size:10px;color:var(--accent);">daily-report-template.md</code> → fill → paste to trainer chat</div>
+  </div>
+
+</div><!-- /sidebar -->
+</div><!-- /layout -->
+
+<script>
+const done = new Array(7).fill(false);
+
+function toggleChain(el, idx) {
+  done[idx] = !done[idx];
+  el.classList.toggle('done', done[idx]);
+  const n = done.filter(Boolean).length;
+  document.getElementById('prog-count').textContent = n + ' / 7';
+  document.getElementById('prog-fill').style.width = (n/7*100) + '%';
+  document.getElementById('prog-label').textContent = n === 7 ? 'All complete — write your artifact' : 'Discovery chain';
+  if (n >= 5) document.getElementById('dot-mem').classList.add('done');
+}
+
+function toggleCrit(el) {
+  el.classList.toggle('done');
+}
+</script>
+</body>
+</html>
