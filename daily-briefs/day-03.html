@@ -1,0 +1,549 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Day 3 — Git + Networking Basics · ProOps2026</title>
+<style>
+:root {
+  --bg:#0b0d14; --surface:#13161f; --surface2:#1c2030; --border:#252a3a;
+  --accent:#6c8ef7; --accent2:#a78bfa;
+  --green:#34d399; --yellow:#fbbf24; --orange:#fb923c;
+  --red:#f87171; --teal:#22d3ee; --blue:#60a5fa;
+  --text:#e8edf5; --muted:#7c87a0; --dim:#3a4258;
+}
+* { box-sizing:border-box; margin:0; padding:0; }
+body { background:var(--bg); color:var(--text); font-family:'Segoe UI',system-ui,sans-serif; font-size:15px; line-height:1.6; }
+
+nav { background:var(--surface);border-bottom:1px solid var(--border);padding:0 32px;height:50px;display:flex;align-items:center;gap:6px;position:sticky;top:0;z-index:200; }
+nav .brand { font-weight:800;font-size:14px;color:var(--accent);margin-right:12px; }
+nav a { color:var(--muted);text-decoration:none;font-size:12px;font-weight:600;padding:5px 12px;border-radius:6px;transition:all .15s;white-space:nowrap; }
+nav a:hover { color:var(--text);background:var(--surface2); }
+nav .spacer { flex:1; }
+nav .badge { background:rgba(251,146,60,.12);border:1px solid rgba(251,146,60,.25);color:var(--orange);font-size:11px;font-weight:700;padding:3px 12px;border-radius:20px; }
+
+.layout { display:grid;grid-template-columns:1fr 260px;gap:32px;max-width:1100px;margin:0 auto;padding:40px 32px; }
+.main { min-width:0; }
+.sidebar { position:sticky;top:70px;height:fit-content;display:flex;flex-direction:column;gap:14px; }
+
+.day-header { margin-bottom:32px; }
+.day-meta { display:flex;align-items:center;gap:10px;margin-bottom:12px; }
+.day-pill { font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;padding:3px 12px;border-radius:20px;background:rgba(108,142,247,.12);border:1px solid rgba(108,142,247,.25);color:var(--accent); }
+.day-tag { font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;padding:3px 12px;border-radius:20px;background:rgba(251,146,60,.08);border:1px solid rgba(251,146,60,.2);color:var(--orange); }
+.day-title { font-size:26px;font-weight:800;letter-spacing:-.3px;margin-bottom:8px; }
+.day-question { font-size:15px;color:var(--teal);font-style:italic;border-left:3px solid var(--teal);padding-left:14px;margin-bottom:16px;line-height:1.6; }
+.day-why { font-size:13px;color:var(--muted);line-height:1.7;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:14px 16px; }
+.day-why strong { color:var(--text); }
+
+.section-block { margin-bottom:32px; }
+.sec-label { font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:var(--dim);margin-bottom:14px;display:flex;align-items:center;gap:10px; }
+.sec-label::after { content:'';flex:1;height:1px;background:var(--border); }
+
+.chain { display:flex;flex-direction:column;gap:10px; }
+.chain-item { display:grid;grid-template-columns:32px 1fr;gap:14px;padding:14px 16px;background:var(--surface);border:1px solid var(--border);border-radius:10px;cursor:pointer;transition:border-color .15s; }
+.chain-item:hover { border-color:rgba(108,142,247,.4); }
+.chain-item.done { border-color:rgba(52,211,153,.3);background:rgba(52,211,153,.03); }
+.chain-num { width:32px;height:32px;border-radius:50%;background:var(--surface2);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;color:var(--muted);flex-shrink:0;transition:all .15s; }
+.chain-item.done .chain-num { background:rgba(52,211,153,.15);border-color:rgba(52,211,153,.4);color:var(--green); }
+.chain-q { font-size:13px;font-weight:600;margin-bottom:6px;line-height:1.5; }
+.chain-item.done .chain-q { color:var(--muted);text-decoration:line-through;text-decoration-color:var(--dim); }
+.chain-prompt { font-size:11px;font-family:'Cascadia Code','Fira Code',monospace;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:8px 12px;color:var(--accent2);line-height:1.6;margin-top:8px; }
+.chain-hint { font-size:11px;color:var(--dim);margin-top:6px;line-height:1.5; }
+
+.artifact-card { background:var(--surface);border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:14px; }
+.artifact-head { padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px; }
+.artifact-title { font-size:13px;font-weight:700;flex:1; }
+.artifact-file { font-family:'Cascadia Code','Fira Code',monospace;font-size:11px;color:var(--green);background:rgba(52,211,153,.08);border:1px solid rgba(52,211,153,.2);padding:2px 10px;border-radius:5px; }
+.artifact-body { padding:16px 18px; }
+.artifact-row { display:flex;gap:10px;margin-bottom:8px;font-size:12px;align-items:flex-start; }
+.artifact-row:last-child { margin-bottom:0; }
+.ar-dot { width:5px;height:5px;border-radius:50%;background:var(--accent);flex-shrink:0;margin-top:6px; }
+.ar-text { color:var(--muted);line-height:1.5; }
+.ar-text strong { color:var(--text); }
+.artifact-fail { margin-top:14px;padding:10px 14px;background:rgba(248,113,113,.06);border:1px solid rgba(248,113,113,.2);border-radius:7px;font-size:11px;color:var(--muted);line-height:1.6; }
+.artifact-fail strong { color:var(--red); }
+
+.criteria { display:flex;flex-direction:column;gap:8px; }
+.crit { display:flex;gap:10px;align-items:flex-start;padding:10px 14px;background:var(--surface);border:1px solid var(--border);border-radius:8px;font-size:12px;cursor:pointer;transition:border-color .15s; }
+.crit:hover { border-color:rgba(52,211,153,.3); }
+.crit.done { border-color:rgba(52,211,153,.35);background:rgba(52,211,153,.03); }
+.crit-box { width:16px;height:16px;border-radius:4px;border:1.5px solid var(--border);flex-shrink:0;margin-top:1px;display:flex;align-items:center;justify-content:center;transition:all .15s; }
+.crit.done .crit-box { background:var(--green);border-color:var(--green); }
+.crit-check { color:#0b0d14;font-size:10px;font-weight:900;display:none; }
+.crit.done .crit-check { display:block; }
+.crit-text { color:var(--muted);line-height:1.5; }
+.crit.done .crit-text { color:var(--dim); }
+
+.widget { background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px; }
+.widget-title { font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--dim);margin-bottom:12px; }
+.progress-bar { height:5px;background:var(--surface2);border-radius:10px;overflow:hidden;margin-bottom:6px; }
+.progress-fill { height:100%;background:linear-gradient(90deg,var(--accent),var(--teal));border-radius:10px;transition:width .3s; }
+.progress-label { font-size:11px;color:var(--muted); }
+.progress-count { font-size:22px;font-weight:800;color:var(--text);margin-bottom:2px; }
+
+.as-row { display:flex;align-items:center;gap:8px;font-size:11px;margin-bottom:4px; }
+.as-dot { width:7px;height:7px;border-radius:50%;background:var(--dim);flex-shrink:0; }
+.as-dot.done { background:var(--green); }
+.as-name { color:var(--muted);flex:1; }
+
+.connects { display:flex;flex-direction:column;gap:6px; }
+.conn-row { font-size:11px;color:var(--muted);display:flex;gap:8px;align-items:flex-start; }
+.conn-dir { color:var(--dim);flex-shrink:0;width:48px; }
+.conn-val { color:var(--muted); }
+
+.report-box { background:rgba(108,142,247,.06);border:1px solid rgba(108,142,247,.2);border-radius:10px;padding:14px 16px; }
+.report-title { font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--accent);margin-bottom:8px; }
+.report-step { font-size:11px;color:var(--muted);margin-bottom:6px;display:flex;gap:8px; }
+.report-step-num { color:var(--accent);font-weight:700;flex-shrink:0; }
+
+.track-divider { display:flex;align-items:center;gap:12px;margin:6px 0;padding:10px 16px;border-radius:8px;background:rgba(34,211,238,.04);border:1px dashed rgba(34,211,238,.2); }
+.track-divider .icon { font-size:14px;color:var(--teal); }
+.track-divider .text { font-size:11px;color:var(--teal);font-weight:600;line-height:1.5; }
+</style>
+</head>
+<body>
+
+<nav>
+  <span class="brand">ProOps2026</span>
+  <a href="#start">Start</a>
+  <a href="#chain">Discovery</a>
+  <a href="#flow-chart">How it builds</a>
+  <a href="#artifacts">Artifacts</a>
+  <a href="#done">Done?</a>
+  <div class="spacer"></div>
+  <span class="badge">Day 3 · Hands-on</span>
+</nav>
+
+<div class="layout">
+<div class="main">
+
+  <!-- HEADER -->
+  <div class="day-header">
+    <div class="day-meta">
+      <span class="day-pill">Week 1 · Day 3</span>
+      <span class="day-tag">Hands-on</span>
+    </div>
+    <div class="day-title">Git Basics + Networking Basics</div>
+    <div class="day-question">
+      How does code move from a developer's laptop to a server — and what does the network infrastructure look like that carries that traffic?
+    </div>
+    <div class="day-why">
+      <strong>Git</strong> is the source of truth for every artifact a DevOps engineer manages — not just application code, but Dockerfiles, Kubernetes manifests, Terraform configs, and CI/CD pipeline definitions. <strong>Networking</strong> is the substrate everything runs on: a deployment that "works on my machine" fails in production almost always because of a network or DNS issue. You cannot debug a broken pipeline or a failed deployment without understanding both.
+    </div>
+  </div>
+
+  <!-- START SESSION -->
+  <div class="section-block" id="start">
+    <div class="sec-label">Before you start — set up your session</div>
+
+    <div style="padding:12px 16px;background:rgba(108,142,247,.06);border:1px solid rgba(108,142,247,.2);border-radius:10px;margin-bottom:14px;font-size:12px;color:var(--muted);line-height:1.7;">
+      <strong style="color:var(--accent);">Same setup as Day 2 — this is now your daily routine:</strong><br>
+      Open Claude Code in your <code style="font-size:11px;color:var(--accent2);">proops2026/</code> folder. Claude reads your CLAUDE.md (Role) automatically. If you need to verify, ask: <em>"What is my background?"</em> — Claude should answer with your specifics.
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:4px;">
+
+      <div style="display:grid;grid-template-columns:28px 1fr;gap:12px;padding:12px 16px;background:var(--surface);border:1px solid var(--border);border-radius:10px;align-items:start;">
+        <div style="width:28px;height:28px;border-radius:50%;background:rgba(52,211,153,.12);border:1px solid rgba(52,211,153,.3);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:var(--green);flex-shrink:0;">1</div>
+        <div>
+          <div style="font-size:13px;font-weight:600;margin-bottom:3px;">Open Claude Code in <code style="font-size:11px;color:var(--accent2);">proops2026/</code></div>
+          <div style="font-size:12px;color:var(--muted);line-height:1.6;">Your CLAUDE.md auto-loads as your Role. Your Notion Training Spec auto-loads as your Context via MCP.</div>
+        </div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:28px 1fr;gap:12px;padding:12px 16px;background:var(--surface);border:1px solid var(--border);border-radius:10px;align-items:start;">
+        <div style="width:28px;height:28px;border-radius:50%;background:rgba(52,211,153,.12);border:1px solid rgba(52,211,153,.3);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:var(--green);flex-shrink:0;">2</div>
+        <div>
+          <div style="font-size:13px;font-weight:600;margin-bottom:3px;">Today is hands-on — you'll run real commands</div>
+          <div style="font-size:12px;color:var(--muted);line-height:1.6;">Unlike Day 2 (theory), today's discovery chain will have Claude show you actual <code style="font-size:11px;color:var(--accent2);">git</code> commands and networking tools (<code style="font-size:11px;color:var(--accent2);">curl</code>, <code style="font-size:11px;color:var(--accent2);">dig</code>, <code style="font-size:11px;color:var(--accent2);">openssl</code>). <strong style="color:var(--text);">When Claude shows you a command — run it.</strong> Don't just read it. Type it in your terminal, see the output, then continue.</div>
+        </div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:28px 1fr;gap:12px;padding:12px 16px;background:var(--surface);border:1px solid var(--border);border-radius:10px;align-items:start;">
+        <div style="width:28px;height:28px;border-radius:50%;background:rgba(52,211,153,.12);border:1px solid rgba(52,211,153,.3);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:var(--green);flex-shrink:0;">3</div>
+        <div>
+          <div style="font-size:13px;font-weight:600;margin-bottom:3px;">Work through the discovery chain below</div>
+          <div style="font-size:12px;color:var(--muted);line-height:1.6;">Copy each purple prompt, paste into Claude, read the response, <strong style="color:var(--text);">run the commands it gives you</strong>. Q1–Q4 = Git. Q5–Q7 = Networking. Q8 = write your two artifact files.</div>
+        </div>
+      </div>
+
+    </div>
+
+    <div style="padding:10px 14px;background:rgba(251,146,60,.05);border:1px solid rgba(251,146,60,.2);border-radius:8px;font-size:12px;color:var(--muted);margin-top:8px;line-height:1.6;">
+      <strong style="color:var(--orange);">Day 3 = two topics, two artifacts.</strong> The discovery chain is longer than Day 2 (8 questions instead of 7). Budget your time: ~1 hr for Git, ~1 hr for Networking, ~45 min to write both files.
+    </div>
+  </div>
+
+  <!-- DISCOVERY CHAIN -->
+  <div class="section-block" id="chain">
+    <div class="sec-label">Discovery Chain — 8 questions, in order</div>
+
+    <div style="padding:14px 16px;background:var(--surface);border:1px solid var(--border);border-radius:10px;margin-bottom:14px;">
+      <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:8px;">How this works</div>
+      <div style="font-size:12px;color:var(--muted);line-height:1.8;">
+        Each question has a <strong style="color:var(--accent2);">purple prompt</strong> — copy and paste it into your Claude session.<br>
+        <strong style="color:var(--text);">The workflow:</strong> read the question → copy the prompt → paste into Claude → <strong style="color:var(--text);">run any commands Claude gives you</strong> → read the explanation → ask follow-ups if unclear → click the card to mark done → next question.
+      </div>
+      <div style="margin-top:10px;padding:8px 12px;border-radius:6px;border:1px solid rgba(96,165,250,.2);background:rgba(96,165,250,.04);font-size:11px;color:var(--muted);line-height:1.6;">
+        <strong style="color:var(--blue);">Q1–Q4 = Git</strong> — you're debugging a broken pipeline by learning git commands in context.
+      </div>
+      <div style="margin-top:6px;padding:8px 12px;border-radius:6px;border:1px solid rgba(34,211,238,.2);background:rgba(34,211,238,.04);font-size:11px;color:var(--muted);line-height:1.6;">
+        <strong style="color:var(--teal);">Q5–Q7 = Networking</strong> — the code is fixed, but users still can't reach the app. Now you trace the network path.
+      </div>
+      <div style="margin-top:6px;padding:8px 12px;border-radius:6px;border:1px solid rgba(251,146,60,.2);background:rgba(251,146,60,.04);font-size:11px;color:var(--muted);line-height:1.6;">
+        <strong style="color:var(--orange);">Q8 = Write artifacts</strong> — this prompt generates both memory files. Save the output.
+      </div>
+    </div>
+
+    <div class="chain">
+
+      <!-- GIT TRACK -->
+      <div class="chain-item" onclick="toggleChain(this,0)">
+        <div class="chain-num">1</div>
+        <div class="chain-body">
+          <div class="chain-q">A developer says "I pushed but the pipeline didn't trigger." What git commands tell you the current branch state, recent commits, and whether the push actually reached the remote?</div>
+          <div class="chain-prompt">I'm a DevOps engineer. A developer says they pushed code but the CI/CD pipeline didn't trigger. Walk me through the exact git commands I'd run to check: which branch they're on, the last 5 commits, whether the push reached the remote, and the current state of the working tree. Show me the commands AND explain what each output tells me.</div>
+          <div class="chain-hint">Key concept: git status, git log, git remote — reading the state of a repo</div>
+        </div>
+      </div>
+
+      <div class="chain-item" onclick="toggleChain(this,1)">
+        <div class="chain-num">2</div>
+        <div class="chain-body">
+          <div class="chain-q">The push was to <code style="font-size:11px;color:var(--accent2);">feature/login</code> but the pipeline triggers on <code style="font-size:11px;color:var(--accent2);">main</code>. What is the git concept behind branches, and how do you merge feature→main without losing history?</div>
+          <div class="chain-prompt">The developer pushed to feature/login but the pipeline only triggers on main. Explain: (1) why branches exist in git and what they actually are under the hood, (2) the exact commands to merge feature/login into main — both merge and rebase approaches, (3) when to use merge vs rebase and why rebase rewrites history. Show me the commands I'd actually type.</div>
+          <div class="chain-hint">Key concept: branches as pointers, merge vs rebase, fast-forward</div>
+        </div>
+      </div>
+
+      <div class="chain-item" onclick="toggleChain(this,2)">
+        <div class="chain-num">3</div>
+        <div class="chain-body">
+          <div class="chain-q">The merge worked, but the new version is broken in production. You need to roll back. What are the two strategies (revert vs reset), and which one is safe on a shared branch?</div>
+          <div class="chain-prompt">I merged a feature branch into main and it broke production. I need to roll back. Explain the two strategies — git revert and git reset — with the exact commands for each. Show me what each one does to the git history (draw an ASCII diagram). Then tell me the safety rule: which is safe on a shared branch like main, and why the other one is dangerous when other people have already pulled.</div>
+          <div class="chain-hint">Key concept: revert = new commit that undoes. reset = rewrite history. Shared branch = revert only.</div>
+        </div>
+      </div>
+
+      <div class="chain-item" onclick="toggleChain(this,3)">
+        <div class="chain-num">4</div>
+        <div class="chain-body">
+          <div class="chain-q">After rolling back, you need to find what line of code caused the regression. How do you use git diff and git log to pinpoint the breaking commit?</div>
+          <div class="chain-prompt">The production rollback worked. Now I need to find the exact commit that introduced the bug. Show me: (1) git log with useful flags to narrow down the suspect commits, (2) git diff to compare two commits and see exactly what changed, (3) git bisect — what it is and when it's worth using over manual log reading. Give me the actual commands with realistic examples.</div>
+          <div class="chain-hint">Key concept: git as a debugging tool — log, diff, bisect, blame</div>
+        </div>
+      </div>
+
+      <!-- TRANSITION -->
+      <div class="track-divider">
+        <div class="icon">↓</div>
+        <div class="text">The code is fixed and deployed. But users still can't reach the app. The problem is now the network — not the code.</div>
+      </div>
+
+      <!-- NETWORKING TRACK -->
+      <div class="chain-item" onclick="toggleChain(this,4)">
+        <div class="chain-num">5</div>
+        <div class="chain-body">
+          <div class="chain-q">What is the complete sequence — DNS, TCP, TLS, HTTP — that must succeed for a browser to reach the app? Where do most outages live in that chain?</div>
+          <div class="chain-prompt">Walk me through the complete sequence when a browser requests https://app.example.com — from DNS resolution to the final HTTP response. Show every layer: (1) DNS resolution chain (browser cache → resolver → authoritative), (2) TCP 3-way handshake, (3) TLS handshake and what it establishes, (4) HTTP request/response. For each layer, tell me the most common failure mode that causes outages in production.</div>
+          <div class="chain-hint">Key concept: each layer can fail independently — you diagnose from the bottom up</div>
+        </div>
+      </div>
+
+      <div class="chain-item" onclick="toggleChain(this,5)">
+        <div class="chain-num">6</div>
+        <div class="chain-body">
+          <div class="chain-q">You can ping the server IP but <code style="font-size:11px;color:var(--accent2);">curl https://app.example.com</code> times out on port 443. What does this tell you, and what three CLI tools do you run next?</div>
+          <div class="chain-prompt">I can ping the server IP successfully, but curl https://app.example.com hangs and times out on port 443. Diagnose this: (1) what does "ping works but curl doesn't" tell me about which network layer the problem is at, (2) show me the 3 CLI tools I run next to narrow it down — dig (DNS), nc or telnet (port connectivity), traceroute (path). Give me the exact commands with example output and how to read each result. Also show me the 10 port numbers every DevOps engineer must know.</div>
+          <div class="chain-hint">Key concept: layer-by-layer diagnosis — ping = ICMP, curl = TCP+TLS+HTTP, each tests different things</div>
+        </div>
+      </div>
+
+      <div class="chain-item" onclick="toggleChain(this,6)">
+        <div class="chain-num">7</div>
+        <div class="chain-body">
+          <div class="chain-q">You opened port 443 in the security group, but HTTPS fails with a certificate error. What is a TLS certificate, what does this error mean, and how do you inspect the cert?</div>
+          <div class="chain-prompt">I opened port 443 and the TCP connection succeeds, but the browser shows a certificate error. Explain: (1) what a TLS certificate is and why HTTPS needs one, (2) the 3 most common certificate errors and what each means (expired, wrong hostname, self-signed), (3) the exact openssl command to inspect the certificate the server is presenting — show me the command and how to read the important fields in the output. Also explain what "stateful" means for firewall/security group rules — inbound vs outbound.</div>
+          <div class="chain-hint">Key concept: TLS is the last gate before HTTP works. openssl s_client is your debugging tool.</div>
+        </div>
+      </div>
+
+      <!-- OUTPUT -->
+      <div class="chain-item" onclick="toggleChain(this,7)" style="border-color:rgba(251,146,60,.3);">
+        <div class="chain-num" style="background:rgba(251,146,60,.12);border-color:rgba(251,146,60,.3);color:var(--orange);">8</div>
+        <div class="chain-body">
+          <div class="chain-q" style="color:var(--orange);">Write your two memory files. What are the five git commands a DevOps engineer runs every day, and what are the five networking concepts that explain 90% of connectivity failures?</div>
+          <div class="chain-prompt">I'm writing two memory files for my DevOps agent. Generate both in a single response.
+
+FILE 1: memory/git.md
+Include: (1) the six core commands (clone, add, commit, push, pull, branch) with real flag examples, (2) branch operations — create, switch, merge, plus when rebase vs merge, (3) conflict resolution step-by-step with conflict marker examples, (4) revert vs reset with the shared branch safety rule, (5) a "daily DevOps git workflow" section — how git applies to Dockerfiles and Terraform, not just app code.
+
+FILE 2: memory/networking-basics.md
+Include: (1) DNS resolution chain, (2) port table — at least 10 ports with numbers, (3) firewall/security group rules — inbound vs outbound, stateful explained, (4) TLS handshake + how to debug with openssl, (5) connectivity debug checklist — the 4 commands to run in order when a service is unreachable.</div>
+          <div class="chain-hint">This prompt generates both artifact files. Save each output into the correct path in your repo.</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- FLOW CHART -->
+  <div class="section-block" id="flow-chart">
+    <div class="sec-label">How the questions build — concept ladder</div>
+    <div style="display:grid;grid-template-columns:1fr 180px;gap:20px;align-items:start;">
+
+      <div style="display:flex;flex-direction:column;gap:0;">
+
+        <!-- Q1 -->
+        <div style="display:grid;grid-template-columns:36px 1fr 180px;gap:0;align-items:stretch;">
+          <div style="display:flex;flex-direction:column;align-items:center;"><div style="width:36px;height:36px;border-radius:50%;background:rgba(96,165,250,.15);border:2px solid var(--blue);color:var(--blue);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;">1</div><div style="width:2px;flex:1;min-height:12px;background:var(--border);"></div></div>
+          <div style="margin:0 14px 10px;padding:12px 14px;border-radius:10px;border:1px solid var(--border);background:var(--surface);"><div style="font-size:12px;font-weight:700;margin-bottom:3px;">Pipeline didn't trigger — read repo state</div><div style="font-size:11px;color:var(--muted);">git status, git log, git remote. What does the repo tell you?</div><span style="display:inline-block;margin-top:6px;font-size:10px;font-weight:700;padding:2px 7px;border-radius:4px;background:rgba(96,165,250,.08);color:var(--blue);border:1px solid rgba(96,165,250,.2);">Git · reading state</span></div>
+          <div style="margin-bottom:10px;padding:10px 12px;border-radius:8px;border:1px dashed var(--border);font-size:11px;color:var(--muted);align-self:center;"><strong style="display:block;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--dim);margin-bottom:3px;">Establishes</strong>Git is your source of truth — learn to read it.</div>
+        </div>
+
+        <!-- Q2 -->
+        <div style="display:grid;grid-template-columns:36px 1fr 180px;gap:0;align-items:stretch;">
+          <div style="display:flex;flex-direction:column;align-items:center;"><div style="width:36px;height:36px;border-radius:50%;background:rgba(96,165,250,.15);border:2px solid var(--blue);color:var(--blue);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;">2</div><div style="width:2px;flex:1;min-height:12px;background:var(--border);"></div></div>
+          <div style="margin:0 14px 10px;padding:12px 14px;border-radius:10px;border:1px solid var(--border);background:var(--surface);"><div style="font-size:12px;font-weight:700;margin-bottom:3px;">Branches and merging feature→main</div><div style="font-size:11px;color:var(--muted);">Why branches exist. Merge vs rebase. Fast-forward.</div><span style="display:inline-block;margin-top:6px;font-size:10px;font-weight:700;padding:2px 7px;border-radius:4px;background:rgba(96,165,250,.08);color:var(--blue);border:1px solid rgba(96,165,250,.2);">Git · branching</span></div>
+          <div style="margin-bottom:10px;padding:10px 12px;border-radius:8px;border:1px dashed var(--border);font-size:11px;color:var(--muted);align-self:center;"><strong style="display:block;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--dim);margin-bottom:3px;">Establishes</strong>Branches isolate work. Merge integrates it.</div>
+        </div>
+
+        <!-- Q3 -->
+        <div style="display:grid;grid-template-columns:36px 1fr 180px;gap:0;align-items:stretch;">
+          <div style="display:flex;flex-direction:column;align-items:center;"><div style="width:36px;height:36px;border-radius:50%;background:rgba(96,165,250,.15);border:2px solid var(--blue);color:var(--blue);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;">3</div><div style="width:2px;flex:1;min-height:12px;background:var(--border);"></div></div>
+          <div style="margin:0 14px 10px;padding:12px 14px;border-radius:10px;border:1px solid var(--border);background:var(--surface);"><div style="font-size:12px;font-weight:700;margin-bottom:3px;">Revert vs reset — rollback safely</div><div style="font-size:11px;color:var(--muted);">Production is broken. Which rollback is safe on shared branch?</div><span style="display:inline-block;margin-top:6px;font-size:10px;font-weight:700;padding:2px 7px;border-radius:4px;background:rgba(96,165,250,.08);color:var(--blue);border:1px solid rgba(96,165,250,.2);">Git · safety</span></div>
+          <div style="margin-bottom:10px;padding:10px 12px;border-radius:8px;border:1px dashed var(--border);font-size:11px;color:var(--muted);align-self:center;"><strong style="display:block;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--dim);margin-bottom:3px;">Establishes</strong>Revert for shared. Reset for local. Always.</div>
+        </div>
+
+        <!-- Q4 -->
+        <div style="display:grid;grid-template-columns:36px 1fr 180px;gap:0;align-items:stretch;">
+          <div style="display:flex;flex-direction:column;align-items:center;"><div style="width:36px;height:36px;border-radius:50%;background:rgba(96,165,250,.15);border:2px solid var(--blue);color:var(--blue);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;">4</div><div style="width:2px;flex:1;min-height:12px;background:var(--border);"></div></div>
+          <div style="margin:0 14px 10px;padding:12px 14px;border-radius:10px;border:1px solid var(--border);background:var(--surface);"><div style="font-size:12px;font-weight:700;margin-bottom:3px;">Find the breaking commit — git as a debugging tool</div><div style="font-size:11px;color:var(--muted);">git diff, git log, git bisect. Trace the regression.</div><span style="display:inline-block;margin-top:6px;font-size:10px;font-weight:700;padding:2px 7px;border-radius:4px;background:rgba(96,165,250,.08);color:var(--blue);border:1px solid rgba(96,165,250,.2);">Git · debugging</span></div>
+          <div style="margin-bottom:10px;padding:10px 12px;border-radius:8px;border:1px dashed var(--border);font-size:11px;color:var(--muted);align-self:center;"><strong style="display:block;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--dim);margin-bottom:3px;">Establishes</strong>Git is a debugging tool, not just version control.</div>
+        </div>
+
+        <!-- TRANSITION -->
+        <div style="display:grid;grid-template-columns:36px 1fr 180px;gap:0;align-items:stretch;">
+          <div style="display:flex;flex-direction:column;align-items:center;"><div style="width:2px;flex:1;background:linear-gradient(var(--blue),var(--teal));"></div></div>
+          <div style="margin:4px 14px 10px;padding:10px 14px;border-radius:8px;border:1px dashed rgba(34,211,238,.25);background:rgba(34,211,238,.03);font-size:11px;color:var(--teal);font-weight:600;line-height:1.5;grid-column:2 / 4;">Code is fixed. Users still can't reach the app. → The problem is the network.</div>
+        </div>
+
+        <!-- Q5 -->
+        <div style="display:grid;grid-template-columns:36px 1fr 180px;gap:0;align-items:stretch;">
+          <div style="display:flex;flex-direction:column;align-items:center;"><div style="width:36px;height:36px;border-radius:50%;background:rgba(34,211,238,.15);border:2px solid var(--teal);color:var(--teal);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;">5</div><div style="width:2px;flex:1;min-height:12px;background:var(--border);"></div></div>
+          <div style="margin:0 14px 10px;padding:12px 14px;border-radius:10px;border:1px solid var(--border);background:var(--surface);"><div style="font-size:12px;font-weight:700;margin-bottom:3px;">DNS → TCP → TLS → HTTP — the full chain</div><div style="font-size:11px;color:var(--muted);">What must succeed for a browser to reach the app?</div><span style="display:inline-block;margin-top:6px;font-size:10px;font-weight:700;padding:2px 7px;border-radius:4px;background:rgba(34,211,238,.08);color:var(--teal);border:1px solid rgba(34,211,238,.2);">Network · request lifecycle</span></div>
+          <div style="margin-bottom:10px;padding:10px 12px;border-radius:8px;border:1px dashed var(--border);font-size:11px;color:var(--muted);align-self:center;"><strong style="display:block;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--dim);margin-bottom:3px;">The shift</strong>Every layer can fail independently.</div>
+        </div>
+
+        <!-- Q6 -->
+        <div style="display:grid;grid-template-columns:36px 1fr 180px;gap:0;align-items:stretch;">
+          <div style="display:flex;flex-direction:column;align-items:center;"><div style="width:36px;height:36px;border-radius:50%;background:rgba(34,211,238,.15);border:2px solid var(--teal);color:var(--teal);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;">6</div><div style="width:2px;flex:1;min-height:12px;background:var(--border);"></div></div>
+          <div style="margin:0 14px 10px;padding:12px 14px;border-radius:10px;border:1px solid var(--border);background:var(--surface);"><div style="font-size:12px;font-weight:700;margin-bottom:3px;">Ping works, curl fails — port 443 blocked</div><div style="font-size:11px;color:var(--muted);">dig, nc, traceroute. Layer-by-layer diagnosis.</div><span style="display:inline-block;margin-top:6px;font-size:10px;font-weight:700;padding:2px 7px;border-radius:4px;background:rgba(34,211,238,.08);color:var(--teal);border:1px solid rgba(34,211,238,.2);">Network · diagnosis tools</span></div>
+          <div style="margin-bottom:10px;padding:10px 12px;border-radius:8px;border:1px dashed var(--border);font-size:11px;color:var(--muted);align-self:center;"><strong style="display:block;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--dim);margin-bottom:3px;">Establishes</strong>Different tools test different layers.</div>
+        </div>
+
+        <!-- Q7 -->
+        <div style="display:grid;grid-template-columns:36px 1fr 180px;gap:0;align-items:stretch;">
+          <div style="display:flex;flex-direction:column;align-items:center;"><div style="width:36px;height:36px;border-radius:50%;background:rgba(34,211,238,.15);border:2px solid var(--teal);color:var(--teal);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;">7</div><div style="width:2px;flex:1;min-height:12px;background:var(--border);"></div></div>
+          <div style="margin:0 14px 10px;padding:12px 14px;border-radius:10px;border:1px solid var(--border);background:var(--surface);"><div style="font-size:12px;font-weight:700;margin-bottom:3px;">TLS cert error — the last gate</div><div style="font-size:11px;color:var(--muted);">What certs are, common errors, openssl s_client.</div><span style="display:inline-block;margin-top:6px;font-size:10px;font-weight:700;padding:2px 7px;border-radius:4px;background:rgba(34,211,238,.08);color:var(--teal);border:1px solid rgba(34,211,238,.2);">Network · TLS · firewalls</span></div>
+          <div style="margin-bottom:10px;padding:10px 12px;border-radius:8px;border:1px dashed var(--border);font-size:11px;color:var(--muted);align-self:center;"><strong style="display:block;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--dim);margin-bottom:3px;">Closes loop</strong>Every network layer debugged. App is reachable.</div>
+        </div>
+
+        <!-- Q8 -->
+        <div style="display:grid;grid-template-columns:36px 1fr 180px;gap:0;align-items:stretch;">
+          <div style="display:flex;flex-direction:column;align-items:center;"><div style="width:36px;height:36px;border-radius:50%;background:rgba(251,146,60,.15);border:2px solid var(--orange);color:var(--orange);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;">8</div></div>
+          <div style="margin:0 14px 0;padding:12px 14px;border-radius:10px;border:1px solid rgba(251,146,60,.3);background:rgba(251,146,60,.04);"><div style="font-size:12px;font-weight:700;margin-bottom:3px;color:var(--orange);">Write both memory files</div><div style="font-size:11px;color:var(--muted);">5 sections each. One prompt generates both artifacts.</div><span style="display:inline-block;margin-top:6px;font-size:10px;font-weight:700;padding:2px 7px;border-radius:4px;background:rgba(251,146,60,.1);color:var(--orange);border:1px solid rgba(251,146,60,.25);">→ memory/git.md + memory/networking-basics.md</span></div>
+          <div style="padding:10px 12px;border-radius:8px;border:1px dashed rgba(251,146,60,.3);font-size:11px;color:var(--muted);align-self:center;"><strong style="display:block;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--orange);margin-bottom:3px;">Output</strong>Save each section into the correct file path.</div>
+        </div>
+
+      </div>
+
+      <!-- RIGHT COLUMN -->
+      <div style="position:sticky;top:70px;">
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px;margin-bottom:12px;">
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--dim);margin-bottom:12px;">Concept groups</div>
+          <div style="display:flex;flex-direction:column;gap:0;">
+            <div style="display:flex;gap:8px;align-items:center;padding:7px 0;border-bottom:1px solid var(--border);"><div style="width:8px;height:8px;border-radius:50%;background:var(--blue);flex-shrink:0;"></div><div style="font-size:11px;color:var(--muted);">Q1–4 · <strong style="color:var(--text);">Git fundamentals</strong></div></div>
+            <div style="display:flex;gap:8px;align-items:center;padding:7px 0;border-bottom:1px solid var(--border);"><div style="width:8px;height:8px;border-radius:50%;background:var(--teal);flex-shrink:0;"></div><div style="font-size:11px;color:var(--muted);">Q5–7 · <strong style="color:var(--text);">Networking fundamentals</strong></div></div>
+            <div style="display:flex;gap:8px;align-items:center;padding:7px 0;"><div style="width:8px;height:8px;border-radius:50%;background:var(--orange);flex-shrink:0;"></div><div style="font-size:11px;color:var(--muted);">Q8 · <strong style="color:var(--text);">Write both artifacts</strong></div></div>
+          </div>
+        </div>
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px;">
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--dim);margin-bottom:10px;">Est. time</div>
+          <div style="font-size:11px;color:var(--muted);line-height:2.1;">Q1–4 &nbsp;~1 hr<br>Q5–7 &nbsp;~1 hr<br>Q8 + files &nbsp;~45 min<br>Daily log &nbsp;~15 min</div>
+          <div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border);font-size:11px;color:var(--dim);">Total ~3 hrs</div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ARTIFACT SECTIONS BREAKDOWN -->
+    <div style="margin-top:24px;">
+      <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--dim);margin-bottom:12px;">What goes into the artifacts — required sections</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+
+        <!-- GIT ARTIFACT -->
+        <div style="background:var(--surface);border:1px solid var(--border);border-top:3px solid var(--blue);border-radius:10px;padding:16px;">
+          <div style="font-size:11px;font-weight:700;color:var(--blue);margin-bottom:2px;">memory/git.md</div>
+          <div style="font-size:13px;font-weight:700;margin-bottom:10px;">Git Fundamentals</div>
+          <div style="display:flex;flex-direction:column;gap:6px;">
+            <div style="font-size:11px;color:var(--muted);display:flex;gap:8px;"><span style="color:var(--blue);font-weight:700;">1.</span>6 core commands with real flags, not just syntax</div>
+            <div style="font-size:11px;color:var(--muted);display:flex;gap:8px;"><span style="color:var(--blue);font-weight:700;">2.</span>Branch ops: create, switch, merge + rebase vs merge</div>
+            <div style="font-size:11px;color:var(--muted);display:flex;gap:8px;"><span style="color:var(--blue);font-weight:700;">3.</span>Conflict resolution step-by-step with markers</div>
+            <div style="font-size:11px;color:var(--muted);display:flex;gap:8px;"><span style="color:var(--blue);font-weight:700;">4.</span>Revert vs reset + shared branch safety rule</div>
+            <div style="font-size:11px;color:var(--muted);display:flex;gap:8px;"><span style="color:var(--blue);font-weight:700;">5.</span>Daily DevOps git workflow (Dockerfiles, Terraform)</div>
+          </div>
+        </div>
+
+        <!-- NETWORKING ARTIFACT -->
+        <div style="background:var(--surface);border:1px solid var(--border);border-top:3px solid var(--teal);border-radius:10px;padding:16px;">
+          <div style="font-size:11px;font-weight:700;color:var(--teal);margin-bottom:2px;">memory/networking-basics.md</div>
+          <div style="font-size:13px;font-weight:700;margin-bottom:10px;">Networking Fundamentals</div>
+          <div style="display:flex;flex-direction:column;gap:6px;">
+            <div style="font-size:11px;color:var(--muted);display:flex;gap:8px;"><span style="color:var(--teal);font-weight:700;">1.</span>DNS resolution chain (browser → resolver → authoritative)</div>
+            <div style="font-size:11px;color:var(--muted);display:flex;gap:8px;"><span style="color:var(--teal);font-weight:700;">2.</span>Port table: 10+ ports every DevOps engineer knows</div>
+            <div style="font-size:11px;color:var(--muted);display:flex;gap:8px;"><span style="color:var(--teal);font-weight:700;">3.</span>Firewall / security group rules (stateful explained)</div>
+            <div style="font-size:11px;color:var(--muted);display:flex;gap:8px;"><span style="color:var(--teal);font-weight:700;">4.</span>TLS handshake + openssl s_client debugging</div>
+            <div style="font-size:11px;color:var(--muted);display:flex;gap:8px;"><span style="color:var(--teal);font-weight:700;">5.</span>Connectivity debug checklist (4 commands in order)</div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- ARTIFACTS -->
+  <div class="section-block" id="artifacts">
+    <div class="sec-label">Required artifacts — must exist before end-of-day commit</div>
+
+    <div class="artifact-card">
+      <div class="artifact-head">
+        <div class="artifact-title">Git Memory File</div>
+        <div class="artifact-file">memory/git.md</div>
+      </div>
+      <div class="artifact-body">
+        <div style="font-size:11px;color:var(--muted);margin-bottom:12px;line-height:1.6;">Your agent reads this when it needs git context — rollback decisions, branching strategy, merge vs rebase. Write it for Claude, not for yourself.</div>
+        <div class="artifact-row"><div class="ar-dot" style="background:var(--blue);"></div><div class="ar-text"><strong>Six core commands</strong> — clone, add, commit, push, pull, branch. With real flag examples, not just syntax.</div></div>
+        <div class="artifact-row"><div class="ar-dot" style="background:var(--blue);"></div><div class="ar-text"><strong>Branch operations</strong> — create, switch, merge. One-line: when rebase vs merge is appropriate.</div></div>
+        <div class="artifact-row"><div class="ar-dot" style="background:var(--blue);"></div><div class="ar-text"><strong>Conflict resolution</strong> — what conflict markers look like, step-by-step resolution process.</div></div>
+        <div class="artifact-row"><div class="ar-dot" style="background:var(--blue);"></div><div class="ar-text"><strong>Revert vs reset</strong> — what each does to history, and the safety rule for shared branches.</div></div>
+        <div class="artifact-row"><div class="ar-dot" style="background:var(--blue);"></div><div class="ar-text"><strong>Daily DevOps git workflow</strong> — how git applies to Dockerfiles, Terraform configs, and CI/CD definitions. Not just app code.</div></div>
+      </div>
+    </div>
+
+    <div class="artifact-card">
+      <div class="artifact-head">
+        <div class="artifact-title">Networking Memory File</div>
+        <div class="artifact-file">memory/networking-basics.md</div>
+      </div>
+      <div class="artifact-body">
+        <div style="font-size:11px;color:var(--muted);margin-bottom:12px;line-height:1.6;">Your agent reads this when debugging connectivity failures — DNS issues, blocked ports, cert errors. The debug checklist is the most-referenced section.</div>
+        <div class="artifact-row"><div class="ar-dot" style="background:var(--teal);"></div><div class="ar-text"><strong>DNS resolution chain</strong> — browser → resolver → authoritative nameserver → IP address.</div></div>
+        <div class="artifact-row"><div class="ar-dot" style="background:var(--teal);"></div><div class="ar-text"><strong>Port table</strong> — at least 10 ports by number (22, 80, 443, 3306, 5432, 6379, 8080, 9090, 9093, 27017).</div></div>
+        <div class="artifact-row"><div class="ar-dot" style="background:var(--teal);"></div><div class="ar-text"><strong>Firewall / security group rules</strong> — inbound vs outbound, what "stateful" means in practice.</div></div>
+        <div class="artifact-row"><div class="ar-dot" style="background:var(--teal);"></div><div class="ar-text"><strong>TLS</strong> — what the handshake does, what cert errors mean, <code style="font-size:10px;color:var(--accent2);">openssl s_client -connect host:443</code>.</div></div>
+        <div class="artifact-row"><div class="ar-dot" style="background:var(--teal);"></div><div class="ar-text"><strong>Connectivity debug checklist</strong> — the 4 commands to run in order when a service is unreachable.</div></div>
+        <div class="artifact-fail">
+          <strong>Weak artifact signals:</strong> git cheatsheet with syntax only, no DevOps workflow context · networking definitions without CLI commands · no mention of how git history debugs production incidents · looks like a glossary, not a memory file
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- DONE CRITERIA -->
+  <div class="section-block" id="done">
+    <div class="sec-label">Before you send your end-of-day report — check these</div>
+    <div class="criteria">
+      <div class="crit" onclick="toggleCrit(this)">
+        <div class="crit-box"><span class="crit-check">&#10003;</span></div>
+        <div class="crit-text">I worked through all 8 discovery questions — not read, <strong>ran the commands</strong> Claude gave me and saw the output.</div>
+      </div>
+      <div class="crit" onclick="toggleCrit(this)">
+        <div class="crit-box"><span class="crit-check">&#10003;</span></div>
+        <div class="crit-text"><code style="font-size:11px;color:var(--accent2);">memory/git.md</code> exists in my repo with all 5 required sections filled.</div>
+      </div>
+      <div class="crit" onclick="toggleCrit(this)">
+        <div class="crit-box"><span class="crit-check">&#10003;</span></div>
+        <div class="crit-text"><code style="font-size:11px;color:var(--accent2);">memory/networking-basics.md</code> exists in my repo with all 5 required sections filled.</div>
+      </div>
+      <div class="crit" onclick="toggleCrit(this)">
+        <div class="crit-box"><span class="crit-check">&#10003;</span></div>
+        <div class="crit-text">I can explain when to use <code style="font-size:11px;color:var(--accent2);">git revert</code> vs <code style="font-size:11px;color:var(--accent2);">git reset</code> and why one is dangerous on a shared branch.</div>
+      </div>
+      <div class="crit" onclick="toggleCrit(this)">
+        <div class="crit-box"><span class="crit-check">&#10003;</span></div>
+        <div class="crit-text">I can describe the 4-step debug checklist when a service is unreachable (DNS → port → path → TLS).</div>
+      </div>
+      <div class="crit" onclick="toggleCrit(this)">
+        <div class="crit-box"><span class="crit-check">&#10003;</span></div>
+        <div class="crit-text">Daily log filled — Tomorrow's Context Block is 3 specific sentences about what I learned and what's next.</div>
+      </div>
+      <div class="crit" onclick="toggleCrit(this)">
+        <div class="crit-box"><span class="crit-check">&#10003;</span></div>
+        <div class="crit-text">Git commit pushed: <code style="font-size:11px;color:var(--accent2);">Day 03 — memory: git.md + networking-basics.md</code></div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /main -->
+
+<!-- SIDEBAR -->
+<div class="sidebar">
+
+  <div class="widget">
+    <div class="widget-title">Progress</div>
+    <div class="progress-count" id="prog-count">0 / 8</div>
+    <div class="progress-wrap" style="margin-bottom:8px;">
+      <div class="progress-bar"><div class="progress-fill" id="prog-fill" style="width:0%"></div></div>
+      <div class="progress-label" id="prog-label">Discovery chain</div>
+    </div>
+  </div>
+
+  <div class="widget">
+    <div class="widget-title">Today's Artifacts</div>
+    <div class="artifact-status">
+      <div class="as-row"><div class="as-dot" id="dot-git"></div><div class="as-name">memory/git.md</div></div>
+      <div class="as-row"><div class="as-dot" id="dot-net"></div><div class="as-name">memory/networking-basics.md</div></div>
+    </div>
+  </div>
+
+  <div class="widget">
+    <div class="widget-title">Connects To</div>
+    <div class="connects">
+      <div class="conn-row"><span class="conn-dir">&larr; Day 2</span><span class="conn-val">Software App Fundamentals</span></div>
+      <div class="conn-row"><span class="conn-dir">&rarr; Day 4</span><span class="conn-val">Linux Basics</span></div>
+      <div class="conn-row"><span class="conn-dir">&rarr; Week 5</span><span class="conn-val">Git workflow feeds CI/CD pipeline</span></div>
+      <div class="conn-row"><span class="conn-dir">&rarr; Day 24</span><span class="conn-val">GitOps deployment pattern</span></div>
+    </div>
+  </div>
+
+  <div class="report-box">
+    <div class="report-title">End-of-day report</div>
+    <div class="report-step"><span class="report-step-num">1.</span> Fill daily log + context block</div>
+    <div class="report-step"><span class="report-step-num">2.</span> git commit + push</div>
+    <div class="report-step"><span class="report-step-num">3.</span> Copy <code style="font-size:10px;color:var(--accent);">templates/daily-report-template.md</code> &rarr; fill &rarr; paste to trainer chat</div>
+  </div>
+
+</div><!-- /sidebar -->
+</div><!-- /layout -->
+
+<script>
+const done = new Array(8).fill(false);
+
+function toggleChain(el, idx) {
+  done[idx] = !done[idx];
+  el.classList.toggle('done', done[idx]);
+  const n = done.filter(Boolean).length;
+  document.getElementById('prog-count').textContent = n + ' / 8';
+  document.getElementById('prog-fill').style.width = (n/8*100) + '%';
+  document.getElementById('prog-label').textContent = n === 8 ? 'All complete — write your artifacts' : 'Discovery chain';
+  if (n >= 4) document.getElementById('dot-git').classList.add('done');
+  if (n >= 7) document.getElementById('dot-net').classList.add('done');
+}
+
+function toggleCrit(el) {
+  el.classList.toggle('done');
+}
+</script>
+</body>
+</html>

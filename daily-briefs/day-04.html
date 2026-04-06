@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Day 4 — Linux Basics · ProOps2026</title>
+<style>
+:root {
+  --bg:#0b0d14; --surface:#13161f; --surface2:#1c2030; --border:#252a3a;
+  --accent:#6c8ef7; --accent2:#a78bfa;
+  --green:#34d399; --yellow:#fbbf24; --orange:#fb923c;
+  --red:#f87171; --teal:#22d3ee; --blue:#60a5fa;
+  --text:#e8edf5; --muted:#7c87a0; --dim:#3a4258;
+}
+* { box-sizing:border-box; margin:0; padding:0; }
+body { background:var(--bg); color:var(--text); font-family:'Segoe UI',system-ui,sans-serif; font-size:15px; line-height:1.6; }
+
+nav { background:var(--surface);border-bottom:1px solid var(--border);padding:0 32px;height:50px;display:flex;align-items:center;gap:6px;position:sticky;top:0;z-index:200; }
+nav .brand { font-weight:800;font-size:14px;color:var(--accent);margin-right:12px; }
+nav a { color:var(--muted);text-decoration:none;font-size:12px;font-weight:600;padding:5px 12px;border-radius:6px;transition:all .15s;white-space:nowrap; }
+nav a:hover { color:var(--text);background:var(--surface2); }
+nav .spacer { flex:1; }
+nav .badge { background:rgba(251,146,60,.12);border:1px solid rgba(251,146,60,.25);color:var(--orange);font-size:11px;font-weight:700;padding:3px 12px;border-radius:20px; }
+
+.layout { display:grid;grid-template-columns:1fr 260px;gap:32px;max-width:1100px;margin:0 auto;padding:40px 32px; }
+.main { min-width:0; }
+.sidebar { position:sticky;top:70px;height:fit-content;display:flex;flex-direction:column;gap:14px; }
+
+.day-header { margin-bottom:32px; }
+.day-meta { display:flex;align-items:center;gap:10px;margin-bottom:12px; }
+.day-pill { font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;padding:3px 12px;border-radius:20px;background:rgba(108,142,247,.12);border:1px solid rgba(108,142,247,.25);color:var(--accent); }
+.day-tag { font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;padding:3px 12px;border-radius:20px;background:rgba(251,146,60,.08);border:1px solid rgba(251,146,60,.2);color:var(--orange); }
+.day-title { font-size:26px;font-weight:800;letter-spacing:-.3px;margin-bottom:8px; }
+.day-question { font-size:15px;color:var(--teal);font-style:italic;border-left:3px solid var(--teal);padding-left:14px;margin-bottom:16px;line-height:1.6; }
+.day-why { font-size:13px;color:var(--muted);line-height:1.7;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:14px 16px; }
+.day-why strong { color:var(--text); }
+
+.section-block { margin-bottom:32px; }
+.sec-label { font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:var(--dim);margin-bottom:14px;display:flex;align-items:center;gap:10px; }
+.sec-label::after { content:'';flex:1;height:1px;background:var(--border); }
+
+.chain { display:flex;flex-direction:column;gap:10px; }
+.chain-item { display:grid;grid-template-columns:32px 1fr;gap:14px;padding:14px 16px;background:var(--surface);border:1px solid var(--border);border-radius:10px;cursor:pointer;transition:border-color .15s; }
+.chain-item:hover { border-color:rgba(108,142,247,.4); }
+.chain-item.done { border-color:rgba(52,211,153,.3);background:rgba(52,211,153,.03); }
+.chain-num { width:32px;height:32px;border-radius:50%;background:var(--surface2);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;color:var(--muted);flex-shrink:0;transition:all .15s; }
+.chain-item.done .chain-num { background:rgba(52,211,153,.15);border-color:rgba(52,211,153,.4);color:var(--green); }
+.chain-q { font-size:13px;font-weight:600;margin-bottom:6px;line-height:1.5; }
+.chain-item.done .chain-q { color:var(--muted);text-decoration:line-through;text-decoration-color:var(--dim); }
+.chain-prompt { font-size:11px;font-family:'Cascadia Code','Fira Code',monospace;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:8px 12px;color:var(--accent2);line-height:1.6;margin-top:8px; }
+.chain-hint { font-size:11px;color:var(--dim);margin-top:6px;line-height:1.5; }
+
+.artifact-card { background:var(--surface);border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:14px; }
+.artifact-head { padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px; }
+.artifact-title { font-size:13px;font-weight:700;flex:1; }
+.artifact-file { font-family:'Cascadia Code','Fira Code',monospace;font-size:11px;color:var(--green);background:rgba(52,211,153,.08);border:1px solid rgba(52,211,153,.2);padding:2px 10px;border-radius:5px; }
+.artifact-body { padding:16px 18px; }
+.artifact-row { display:flex;gap:10px;margin-bottom:8px;font-size:12px;align-items:flex-start; }
+.artifact-row:last-child { margin-bottom:0; }
+.ar-dot { width:5px;height:5px;border-radius:50%;background:var(--green);flex-shrink:0;margin-top:6px; }
+.ar-text { color:var(--muted);line-height:1.5; }
+.ar-text strong { color:var(--text); }
+.artifact-fail { margin-top:14px;padding:10px 14px;background:rgba(248,113,113,.06);border:1px solid rgba(248,113,113,.2);border-radius:7px;font-size:11px;color:var(--muted);line-height:1.6; }
+.artifact-fail strong { color:var(--red); }
+
+.criteria { display:flex;flex-direction:column;gap:8px; }
+.crit { display:flex;gap:10px;align-items:flex-start;padding:10px 14px;background:var(--surface);border:1px solid var(--border);border-radius:8px;font-size:12px;cursor:pointer;transition:border-color .15s; }
+.crit:hover { border-color:rgba(52,211,153,.3); }
+.crit.done { border-color:rgba(52,211,153,.35);background:rgba(52,211,153,.03); }
+.crit-box { width:16px;height:16px;border-radius:4px;border:1.5px solid var(--border);flex-shrink:0;margin-top:1px;display:flex;align-items:center;justify-content:center;transition:all .15s; }
+.crit.done .crit-box { background:var(--green);border-color:var(--green); }
+.crit-check { color:#0b0d14;font-size:10px;font-weight:900;display:none; }
+.crit.done .crit-check { display:block; }
+.crit-text { color:var(--muted);line-height:1.5; }
+.crit.done .crit-text { color:var(--dim); }
+
+.widget { background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px; }
+.widget-title { font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--dim);margin-bottom:12px; }
+.progress-bar { height:5px;background:var(--surface2);border-radius:10px;overflow:hidden;margin-bottom:6px; }
+.progress-fill { height:100%;background:linear-gradient(90deg,var(--accent),var(--green));border-radius:10px;transition:width .3s; }
+.progress-label { font-size:11px;color:var(--muted); }
+.progress-count { font-size:22px;font-weight:800;color:var(--text);margin-bottom:2px; }
+.as-row { display:flex;align-items:center;gap:8px;font-size:11px;margin-bottom:4px; }
+.as-dot { width:7px;height:7px;border-radius:50%;background:var(--dim);flex-shrink:0; }
+.as-dot.done { background:var(--green); }
+.as-name { color:var(--muted);flex:1; }
+.conn-row { font-size:11px;color:var(--muted);display:flex;gap:8px;align-items:flex-start; }
+.conn-dir { color:var(--dim);flex-shrink:0;width:48px; }
+.report-box { background:rgba(108,142,247,.06);border:1px solid rgba(108,142,247,.2);border-radius:10px;padding:14px 16px; }
+.report-title { font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--accent);margin-bottom:8px; }
+.report-step { font-size:11px;color:var(--muted);margin-bottom:6px;display:flex;gap:8px; }
+.report-step-num { color:var(--accent);font-weight:700;flex-shrink:0; }
+
+.explore-section { margin-bottom:32px; }
+.explore-header { display:flex;align-items:center;gap:12px;padding:12px 16px;background:rgba(251,191,36,.04);border:1px solid rgba(251,191,36,.2);border-radius:10px 10px 0 0;border-bottom:none; }
+.explore-header .icon { font-size:14px;color:var(--yellow); }
+.explore-header .label { font-size:12px;font-weight:700;color:var(--yellow); }
+.explore-header .sublabel { font-size:11px;color:var(--muted);margin-left:auto; }
+.explore-body { padding:14px 16px;background:rgba(251,191,36,.02);border:1px solid rgba(251,191,36,.2);border-radius:0 0 10px 10px;display:flex;flex-direction:column;gap:10px; }
+.explore-item { font-size:12px;color:var(--muted);line-height:1.6;padding-left:14px;position:relative; }
+.explore-item::before { content:'';position:absolute;left:0;top:7px;width:5px;height:5px;border-radius:50%;background:var(--yellow); }
+.explore-item strong { color:var(--text); }
+.explore-item code { font-size:10px;color:var(--accent2);background:var(--surface2);padding:1px 5px;border-radius:3px; }
+</style>
+</head>
+<body>
+
+<nav>
+  <span class="brand">ProOps2026</span>
+  <a href="#start">Start</a>
+  <a href="#chain">Discovery</a>
+  <a href="#artifact">Artifact</a>
+  <a href="#done">Done?</a>
+  <div class="spacer"></div>
+  <span class="badge">Day 4 · Hands-on</span>
+</nav>
+
+<div class="layout">
+<div class="main">
+
+  <!-- HEADER -->
+  <div class="day-header">
+    <div class="day-meta">
+      <span class="day-pill">Week 1 · Day 4</span>
+      <span class="day-tag">Hands-on</span>
+    </div>
+    <div class="day-title">Linux Basics</div>
+    <div class="day-question">
+      When a production server goes down at 2am and you SSH in to a blank terminal — what do you actually do?
+    </div>
+    <div class="day-why">
+      Linux is the operating system running almost every server, container, and cloud VM. When something breaks in production, you are staring at a bash prompt with no GUI and no installer wizard. <strong>Everything a DevOps engineer does — deploying containers, managing services, reading logs, fixing permissions — happens at the Linux command line.</strong> A DevOps engineer who is not fluent in the Linux CLI is blocked at every step of every real incident.
+    </div>
+  </div>
+
+  <!-- REQUIRED CALLOUT -->
+  <div style="padding:14px 18px;background:rgba(52,211,153,.04);border:1px solid rgba(52,211,153,.25);border-radius:10px;margin-bottom:28px;">
+    <div style="font-size:12px;font-weight:700;color:var(--green);margin-bottom:6px;">What you must complete today</div>
+    <div style="font-size:12px;color:var(--muted);line-height:1.7;">
+      1. Work through all 8 discovery questions — <strong style="color:var(--text);">run every command Claude gives you in your terminal</strong>, don't just read them<br>
+      2. Create <code style="font-size:11px;color:var(--accent2);">memory/linux-basics.md</code> with all 5 required sections<br>
+      3. Push commit and send daily report
+    </div>
+    <div style="margin-top:10px;padding:8px 12px;border-radius:6px;background:rgba(251,191,36,.06);border:1px solid rgba(251,191,36,.2);font-size:11px;color:var(--yellow);">
+      After those 3 are done, there is an optional "Explore further" section at the bottom of this page. Only go there once the required work is complete and pushed.
+    </div>
+  </div>
+
+  <!-- LINUX ENV SETUP -->
+  <div class="section-block" id="start">
+    <div class="sec-label">Before you start — set up your Linux terminal</div>
+    <div style="padding:16px 18px;background:rgba(248,113,113,.04);border:1px solid rgba(248,113,113,.25);border-radius:10px;margin-bottom:14px;">
+      <div style="font-size:12px;font-weight:700;color:var(--red);margin-bottom:10px;">&#9888; This is a hands-on day. You need a real Linux terminal — not a browser simulator.</div>
+      <div style="font-size:12px;color:var(--muted);line-height:1.8;">
+        Commands like <code style="font-size:11px;color:var(--accent2);">systemctl</code>, <code style="font-size:11px;color:var(--accent2);">chown</code>, and <code style="font-size:11px;color:var(--accent2);">find</code> must actually run and return real output. Reading Claude's answers without running the commands does not count as completing this day.
+      </div>
+
+      <!-- Option 1: WSL2 -->
+      <div style="margin-top:14px;padding:12px 14px;background:rgba(52,211,153,.04);border:1px solid rgba(52,211,153,.2);border-radius:8px;">
+        <div style="font-size:11px;font-weight:700;color:var(--green);margin-bottom:6px;">Option 1 — WSL2 (recommended for Windows)</div>
+        <div style="font-size:11px;color:var(--muted);line-height:1.8;">
+          WSL2 gives you a real Ubuntu terminal inside Windows. Run once in PowerShell (as Administrator):<br>
+          <code style="display:block;margin:6px 0;padding:6px 10px;background:var(--surface2);border-radius:5px;color:var(--accent2);">wsl --install</code>
+          Restart your computer. Open "Ubuntu" from the Start menu. Done — you have a real Linux shell.<br>
+          <span style="color:var(--dim);">If WSL is already installed: just open the Ubuntu app or type <code style="font-size:10px;color:var(--accent2);">wsl</code> in any terminal.</span>
+        </div>
+      </div>
+
+      <!-- Option 2: Killercoda -->
+      <div style="margin-top:10px;padding:12px 14px;background:rgba(108,142,247,.04);border:1px solid rgba(108,142,247,.2);border-radius:8px;">
+        <div style="font-size:11px;font-weight:700;color:var(--accent);margin-bottom:6px;">Option 2 — Killercoda (zero setup, browser-based)</div>
+        <div style="font-size:11px;color:var(--muted);line-height:1.8;">
+          Go to <strong style="color:var(--text);">killercoda.com</strong> → search "Ubuntu Playground" → launch. You get a full Ubuntu VM in your browser — <code style="font-size:10px;color:var(--accent2);">systemctl</code> works, <code style="font-size:10px;color:var(--accent2);">apt</code> works, everything works.<br>
+          <span style="color:var(--dim);">Use this if you can't install WSL2 or are on a managed laptop.</span>
+        </div>
+      </div>
+
+      <!-- Option 3: Already have Linux -->
+      <div style="margin-top:10px;padding:10px 14px;background:var(--surface);border:1px solid var(--border);border-radius:8px;font-size:11px;color:var(--dim);">
+        Already on Mac or Linux? You're ready — just open Terminal. On Mac, note that <code style="font-size:10px;color:var(--accent2);">brew</code> replaces <code style="font-size:10px;color:var(--accent2);">apt</code> and systemd is not available — use the Killercoda playground for the systemd questions.
+      </div>
+    </div>
+
+    <!-- Start session -->
+    <div style="padding:12px 16px;background:var(--surface);border:1px solid var(--border);border-radius:10px;font-size:12px;color:var(--muted);line-height:1.7;">
+      Once your Linux terminal is open: launch Claude Code in your <code style="font-size:11px;color:var(--accent2);">proops2026/</code> folder as usual. CLAUDE.md + Notion MCP load automatically. Keep <strong style="color:var(--text);">both windows side by side</strong> — Claude on one side, your Linux terminal on the other. Copy each prompt into Claude, run the commands it gives you, then move to the next question.
+    </div>
+  </div>
+
+  <!-- DISCOVERY CHAIN -->
+  <div class="section-block" id="chain">
+    <div class="sec-label">Discovery Chain — 8 questions, one incident scenario</div>
+
+    <div style="padding:12px 16px;background:var(--surface);border:1px solid var(--border);border-radius:10px;margin-bottom:14px;font-size:12px;color:var(--muted);line-height:1.7;">
+      Today's 8 questions follow a single production incident from start to finish. Q1 is you SSHing in. Q8 is you writing the memory file after everything is resolved. <strong style="color:var(--text);">Copy each purple prompt, paste into Claude, run the commands it gives you, understand the output — then move to the next question.</strong>
+    </div>
+
+    <div class="chain">
+
+      <div class="chain-item" onclick="toggleChain(this,0)">
+        <div class="chain-num">1</div>
+        <div class="chain-body">
+          <div class="chain-q">You SSH into a production server that's behaving strangely. What commands tell you where you are — hostname, OS version, current user, and how long the system has been running?</div>
+          <div class="chain-prompt">I just SSH'd into a production server that's behaving strangely. Before I do anything else, I need to understand where I am. Give me the exact commands to check: (1) the hostname, (2) the OS version and kernel, (3) which user I'm running as and whether I have sudo, (4) how long the system has been up and the current load. Show me the commands and explain what each line of output means.</div>
+          <div class="chain-hint">Run these commands for real in your terminal — see your own output</div>
+        </div>
+      </div>
+
+      <div class="chain-item" onclick="toggleChain(this,1)">
+        <div class="chain-num">2</div>
+        <div class="chain-body">
+          <div class="chain-q">You need to find the application's log file — you know it's somewhere under <code style="font-size:11px;color:var(--accent2);">/var</code> but not the exact path. How do you find it, and how do you search it for a specific error string?</div>
+          <div class="chain-prompt">I need to find an application log file somewhere under /var but I don't know the exact path. Show me: (1) the command to find files by name pattern across a directory tree (e.g., find any file named "app.log" or "*.log" under /var), (2) how to search inside a log file for lines containing a specific error string without opening the whole file, (3) how to show the last 50 lines of a log file and watch it in real time as new lines appear. Give me the exact commands with real examples.</div>
+          <div class="chain-hint">Key commands: find, grep, tail -f — you will use these every on-call shift</div>
+        </div>
+      </div>
+
+      <div class="chain-item" onclick="toggleChain(this,2)">
+        <div class="chain-num">3</div>
+        <div class="chain-body">
+          <div class="chain-q">The log shows a permission error — the app can't write to <code style="font-size:11px;color:var(--accent2);">/var/app/data</code>. You run <code style="font-size:11px;color:var(--accent2);">ls -la</code>. How do you read the permission string, and what is the minimum fix without making the directory world-writable?</div>
+          <div class="chain-prompt">The application log shows: "permission denied: cannot write to /var/app/data". I run ls -la on that directory and see: drwxr-xr-x 2 root root 4096 Apr 5 09:00 data. Explain to me: (1) how to read that permission string character by character — what each position means, (2) who can currently read, write, and execute on this directory, (3) the exact chmod command to give the app write access with the minimum permission change — and why making it 777 is wrong. Show me the numeric and symbolic chmod syntax.</div>
+          <div class="chain-hint">Understand this: 755, 644, 700 — what each means and when to use it</div>
+        </div>
+      </div>
+
+      <div class="chain-item" onclick="toggleChain(this,3)">
+        <div class="chain-num">4</div>
+        <div class="chain-body">
+          <div class="chain-q">The app runs as user <code style="font-size:11px;color:var(--accent2);">appuser</code> but the directory is owned by <code style="font-size:11px;color:var(--accent2);">root</code>. How do you change ownership — and why is running applications as root a hard no?</div>
+          <div class="chain-prompt">The application runs as "appuser" but /var/app/data is owned by root, which is why it can't write there. Show me: (1) the exact chown command to change the owner and group of that directory to appuser, (2) how to verify the change worked with ls -la, (3) a clear explanation of why running an application process as root is a security problem I should refuse — what specifically can go wrong if the app is compromised while running as root versus running as a limited user.</div>
+          <div class="chain-hint">Least privilege: the single most important Linux security concept for DevOps</div>
+        </div>
+      </div>
+
+      <div class="chain-item" onclick="toggleChain(this,4)">
+        <div class="chain-num">5</div>
+        <div class="chain-body">
+          <div class="chain-q">The application is a systemd service and it crashed. What commands show you the status, restart it, check its logs, and make sure it auto-restarts if it crashes again?</div>
+          <div class="chain-prompt">The application is managed by systemd as a service called "myapp". It crashed and is not running. Show me the exact commands to: (1) check the current service status and see the last error, (2) restart the service, (3) view the last 100 lines of the service's logs using journalctl, (4) configure the service to automatically restart if it crashes — show me where in the systemd unit file this is set and what the Restart= options mean. Also explain the systemd service lifecycle: what happens from "systemctl start" to the process actually running.</div>
+          <div class="chain-hint">systemd is how almost every production process runs — learn this cold</div>
+        </div>
+      </div>
+
+      <div class="chain-item" onclick="toggleChain(this,5)">
+        <div class="chain-num">6</div>
+        <div class="chain-body">
+          <div class="chain-q">The server is slow. You suspect high CPU or memory. What three commands give you a live view of what's happening — and how do you kill the process consuming 100% CPU?</div>
+          <div class="chain-prompt">The server feels slow after I restarted the service. I need to diagnose it. Show me: (1) the three commands to get a live view of running processes, CPU usage, and memory usage — explain the key columns in each output and what numbers should concern me, (2) how to identify the process consuming the most CPU from that output, (3) the exact command to kill that process — explain the difference between kill (SIGTERM) and kill -9 (SIGKILL) and when to use each. Also show me how to find which process is listening on a specific port (e.g., port 8080).</div>
+          <div class="chain-hint">ps, top, ss — diagnostic before action, always</div>
+        </div>
+      </div>
+
+      <div class="chain-item" onclick="toggleChain(this,6)">
+        <div class="chain-num">7</div>
+        <div class="chain-body">
+          <div class="chain-q">You need to install a monitoring tool the server doesn't have. What is the two-command sequence — and why must the update command run first?</div>
+          <div class="chain-prompt">I need to install "htop" on this server for better process monitoring. Show me: (1) the two-command sequence to install a package on a Debian/Ubuntu server — and explain exactly why running the update command first is required, what breaks if you skip it, (2) the equivalent commands on a RHEL/CentOS/Amazon Linux server, (3) how to verify the package was installed successfully, (4) how to list all installed packages and search for a specific one. Keep it practical — what I'd actually run during an incident.</div>
+          <div class="chain-hint">apt and yum/dnf — servers will be one or the other, know both</div>
+        </div>
+      </div>
+
+      <div class="chain-item" onclick="toggleChain(this,7)" style="border-color:rgba(52,211,153,.3);">
+        <div class="chain-num" style="background:rgba(52,211,153,.12);border-color:rgba(52,211,153,.3);color:var(--green);">8</div>
+        <div class="chain-body">
+          <div class="chain-q" style="color:var(--green);">All issues are resolved. Write <code style="font-size:11px;color:var(--accent2);">memory/linux-basics.md</code> — the 5 command categories a DevOps engineer must own.</div>
+          <div class="chain-prompt">I'm writing memory/linux-basics.md for my DevOps agent. Generate the full file with these 5 sections:
+
+1. Filesystem hierarchy — the purpose of /etc, /var, /tmp, /proc, /home, /usr/bin with a concrete DevOps example for each (what you look for in that directory during an incident)
+2. Permission model — how to read rwxr-xr-x, numeric notation 755/644/600/700, when to use each, and why 777 is a red flag with a real security example
+3. User and group management — the commands to create, modify, list, and delete users; what /etc/passwd and /etc/shadow contain and why they're split
+4. Process and service management — ps flags, top key columns, kill vs kill -9, systemctl status/start/stop/restart/enable — with the systemd service lifecycle explained
+5. Package management — apt and yum/dnf patterns side by side with the commands I'd run during an incident
+
+Write it for my agent to consume, not as notes for me. Structured sections, real command examples.</div>
+          <div class="chain-hint">Save the full output into memory/linux-basics.md in your repo</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ARTIFACT -->
+  <div class="section-block" id="artifact">
+    <div class="sec-label">Required artifact — must be pushed before end-of-day commit</div>
+    <div class="artifact-card">
+      <div class="artifact-head">
+        <div class="artifact-title">Linux Basics Memory File</div>
+        <div class="artifact-file">memory/linux-basics.md</div>
+      </div>
+      <div class="artifact-body">
+        <div style="font-size:11px;color:var(--muted);margin-bottom:12px;line-height:1.6;">Your agent reads this file every time a task involves a Linux server — incident response, service management, permission issues. Write it for Claude to consume, not as personal notes.</div>
+        <div class="artifact-row"><div class="ar-dot"></div><div class="ar-text"><strong>Filesystem hierarchy</strong> — /etc, /var, /tmp, /proc, /home, /usr/bin with a concrete DevOps example for each directory.</div></div>
+        <div class="artifact-row"><div class="ar-dot"></div><div class="ar-text"><strong>Permission model</strong> — reading rwxr-xr-x, numeric notation (755, 644, 600), when to use each, why 777 is a red flag.</div></div>
+        <div class="artifact-row"><div class="ar-dot"></div><div class="ar-text"><strong>User and group management</strong> — 4 commands (create, modify, list, delete), what /etc/passwd and /etc/shadow contain.</div></div>
+        <div class="artifact-row"><div class="ar-dot"></div><div class="ar-text"><strong>Process and service management</strong> — ps, top, kill, systemctl lifecycle. The systemd service states explained.</div></div>
+        <div class="artifact-row"><div class="ar-dot"></div><div class="ar-text"><strong>Package management</strong> — apt and yum/dnf patterns side by side with commands you'd run during an incident.</div></div>
+        <div class="artifact-fail">
+          <strong>Weak artifact signals:</strong> command list with no context for when or why · no systemd section · permissions explained as syntax only with no security reasoning · looks like a cheatsheet, not a memory file your agent can act on
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- DONE CRITERIA -->
+  <div class="section-block" id="done">
+    <div class="sec-label">Before you send your end-of-day report — check these</div>
+    <div class="criteria">
+      <div class="crit" onclick="toggleCrit(this)">
+        <div class="crit-box"><span class="crit-check">&#10003;</span></div>
+        <div class="crit-text">I have a working Linux terminal: <strong>WSL2 / Killercoda / Mac Terminal / SSH</strong> — and I will note which one in my daily report under <code style="font-size:11px;color:var(--accent2);">LINUX ENV</code>.</div>
+      </div>
+      <div class="crit" onclick="toggleCrit(this)">
+        <div class="crit-box"><span class="crit-check">&#10003;</span></div>
+        <div class="crit-text">I worked through all 8 discovery questions — and <strong>ran the commands in a real terminal</strong>, not just read them.</div>
+      </div>
+      <div class="crit" onclick="toggleCrit(this)">
+        <div class="crit-box"><span class="crit-check">&#10003;</span></div>
+        <div class="crit-text"><code style="font-size:11px;color:var(--accent2);">memory/linux-basics.md</code> exists in my repo with all 5 required sections.</div>
+      </div>
+      <div class="crit" onclick="toggleCrit(this)">
+        <div class="crit-box"><span class="crit-check">&#10003;</span></div>
+        <div class="crit-text">I can explain the difference between <code style="font-size:11px;color:var(--accent2);">chmod</code> and <code style="font-size:11px;color:var(--accent2);">chown</code> without looking at my notes — and can give a real example of when each is needed.</div>
+      </div>
+      <div class="crit" onclick="toggleCrit(this)">
+        <div class="crit-box"><span class="crit-check">&#10003;</span></div>
+        <div class="crit-text">I can name the 4 systemctl commands used in an incident and explain what systemd auto-restart does.</div>
+      </div>
+      <div class="crit" onclick="toggleCrit(this)">
+        <div class="crit-box"><span class="crit-check">&#10003;</span></div>
+        <div class="crit-text">Daily log filled — Tomorrow's Context Block is 3 specific sentences written by me, not by Claude.</div>
+      </div>
+      <div class="crit" onclick="toggleCrit(this)">
+        <div class="crit-box"><span class="crit-check">&#10003;</span></div>
+        <div class="crit-text">Git commit pushed: <code style="font-size:11px;color:var(--accent2);">Day 04 — memory: linux-basics.md</code></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- EXPLORE FURTHER — clearly separated, optional -->
+  <div class="explore-section">
+    <div class="explore-header">
+      <span class="icon">&#9654;</span>
+      <span class="label">Explore further</span>
+      <span class="sublabel">Only after required work is pushed &#10003;</span>
+    </div>
+    <div class="explore-body">
+      <div style="font-size:11px;color:var(--dim);margin-bottom:4px;">These are optional. They go deeper than today's required content. Only work on these if your artifact is committed, your report is ready to send, and you have time left.</div>
+
+      <div class="explore-item">
+        <strong>The /proc filesystem as a live diagnostic tool.</strong> Ask Claude: <code>"Show me how to read CPU info, memory stats, and open file descriptors for a running process directly from /proc/[pid] — what specific files do I read and what does each contain?"</code> This is how senior engineers diagnose issues without installing any extra tools.
+      </div>
+
+      <div class="explore-item">
+        <strong>journalctl filtering — beyond basic logs.</strong> Ask Claude: <code>"Show me how to use journalctl to filter logs by time range, by specific service, and to follow only ERROR-level entries in real time. Give me the exact flags."</code> Useful when you need to narrow 10,000 log lines to the 5 that matter.
+      </div>
+
+      <div class="explore-item">
+        <strong>Connect today to containers.</strong> Ask Claude: <code>"Linux containers (Docker) use two Linux kernel features — namespaces and cgroups. Explain what each one does in one paragraph, and how they connect to the process management and permissions I learned today."</code> Day 7 is Docker — this preview will make it land faster.
+      </div>
+    </div>
+  </div>
+
+</div><!-- /main -->
+
+<!-- SIDEBAR -->
+<div class="sidebar">
+
+  <div class="widget">
+    <div class="widget-title">Progress</div>
+    <div class="progress-count" id="prog-count">0 / 8</div>
+    <div style="margin-bottom:8px;">
+      <div class="progress-bar"><div class="progress-fill" id="prog-fill" style="width:0%"></div></div>
+      <div class="progress-label" id="prog-label">Discovery chain</div>
+    </div>
+  </div>
+
+  <div class="widget">
+    <div class="widget-title">Today's Artifact</div>
+    <div class="as-row"><div class="as-dot" id="dot-linux"></div><div class="as-name">memory/linux-basics.md</div></div>
+  </div>
+
+  <div class="widget">
+    <div class="widget-title">Connects To</div>
+    <div style="display:flex;flex-direction:column;gap:6px;">
+      <div class="conn-row"><span class="conn-dir">&larr; Day 3</span><span style="font-size:11px;color:var(--muted);">Git + Networking</span></div>
+      <div class="conn-row"><span class="conn-dir">&rarr; Day 5</span><span style="font-size:11px;color:var(--muted);">Virtualization + Cloud</span></div>
+      <div class="conn-row"><span class="conn-dir">&rarr; Day 7</span><span style="font-size:11px;color:var(--muted);">Docker (namespaces + cgroups)</span></div>
+      <div class="conn-row"><span class="conn-dir">&rarr; Day 16</span><span style="font-size:11px;color:var(--muted);">Advanced Linux</span></div>
+    </div>
+  </div>
+
+  <div class="widget" style="background:rgba(251,191,36,.04);border-color:rgba(251,191,36,.2);">
+    <div class="widget-title" style="color:var(--yellow);">Required vs Explore</div>
+    <div style="font-size:11px;color:var(--muted);line-height:1.6;">
+      <strong style="color:var(--green);">Required:</strong> Q1–Q8 + artifact + commit + report<br><br>
+      <strong style="color:var(--yellow);">Explore after:</strong> /proc, journalctl, containers preview<br><br>
+      <span style="color:var(--dim);">Explore only after required is pushed.</span>
+    </div>
+  </div>
+
+  <div class="report-box">
+    <div class="report-title">End-of-day report</div>
+    <div class="report-step"><span class="report-step-num">1.</span> Fill daily log + context block</div>
+    <div class="report-step"><span class="report-step-num">2.</span> git commit + push</div>
+    <div class="report-step"><span class="report-step-num">3.</span> Fill <code style="font-size:10px;color:var(--accent);">templates/daily-report-template.md</code> &rarr; paste to trainer chat</div>
+  </div>
+
+</div><!-- /sidebar -->
+</div><!-- /layout -->
+
+<script>
+const done = new Array(8).fill(false);
+function toggleChain(el, idx) {
+  done[idx] = !done[idx];
+  el.classList.toggle('done', done[idx]);
+  const n = done.filter(Boolean).length;
+  document.getElementById('prog-count').textContent = n + ' / 8';
+  document.getElementById('prog-fill').style.width = (n/8*100) + '%';
+  document.getElementById('prog-label').textContent = n === 8 ? 'All complete — write your artifact' : 'Discovery chain';
+  if (n >= 7) document.getElementById('dot-linux').classList.add('done');
+}
+function toggleCrit(el) { el.classList.toggle('done'); }
+</script>
+</body>
+</html>
