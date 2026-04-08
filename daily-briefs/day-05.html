@@ -1,0 +1,541 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Day 5 — Virtualization + Cloud Concepts · ProOps2026</title>
+<style>
+:root {
+  --bg:#0b0d14; --surface:#13161f; --surface2:#1c2030; --border:#252a3a;
+  --accent:#6c8ef7; --accent2:#a78bfa;
+  --green:#34d399; --yellow:#fbbf24; --orange:#fb923c;
+  --red:#f87171; --teal:#22d3ee; --blue:#60a5fa;
+  --text:#e8edf5; --muted:#7c87a0; --dim:#3a4258;
+}
+* { box-sizing:border-box; margin:0; padding:0; }
+body { background:var(--bg); color:var(--text); font-family:'Segoe UI',system-ui,sans-serif; font-size:15px; line-height:1.6; }
+
+nav { background:var(--surface);border-bottom:1px solid var(--border);padding:0 32px;height:50px;display:flex;align-items:center;gap:6px;position:sticky;top:0;z-index:200; }
+nav .brand { font-weight:800;font-size:14px;color:var(--accent);margin-right:12px; }
+nav a { color:var(--muted);text-decoration:none;font-size:12px;font-weight:600;padding:5px 12px;border-radius:6px;transition:all .15s;white-space:nowrap; }
+nav a:hover { color:var(--text);background:var(--surface2); }
+nav .spacer { flex:1; }
+nav .badge { background:rgba(167,139,250,.12);border:1px solid rgba(167,139,250,.25);color:var(--accent2);font-size:11px;font-weight:700;padding:3px 12px;border-radius:20px; }
+
+.layout { display:grid;grid-template-columns:1fr 260px;gap:32px;max-width:1100px;margin:0 auto;padding:40px 32px; }
+.main { min-width:0; }
+.sidebar { position:sticky;top:70px;height:fit-content;display:flex;flex-direction:column;gap:14px; }
+
+.day-header { margin-bottom:32px; }
+.day-meta { display:flex;align-items:center;gap:10px;margin-bottom:12px; }
+.day-pill { font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;padding:3px 12px;border-radius:20px;background:rgba(108,142,247,.12);border:1px solid rgba(108,142,247,.25);color:var(--accent); }
+.day-tag { font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;padding:3px 12px;border-radius:20px;background:rgba(167,139,250,.08);border:1px solid rgba(167,139,250,.2);color:var(--accent2); }
+.day-title { font-size:26px;font-weight:800;letter-spacing:-.3px;margin-bottom:8px; }
+.day-question { font-size:15px;color:var(--accent2);font-style:italic;border-left:3px solid var(--accent2);padding-left:14px;margin-bottom:16px;line-height:1.6; }
+.day-why { font-size:13px;color:var(--muted);line-height:1.7;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:14px 16px; }
+.day-why strong { color:var(--text); }
+
+.section-block { margin-bottom:32px; }
+.sec-label { font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:var(--dim);margin-bottom:14px;display:flex;align-items:center;gap:10px; }
+.sec-label::after { content:'';flex:1;height:1px;background:var(--border); }
+
+.chain { display:flex;flex-direction:column;gap:10px; }
+.chain-item { display:grid;grid-template-columns:32px 1fr;gap:14px;padding:14px 16px;background:var(--surface);border:1px solid var(--border);border-radius:10px;cursor:pointer;transition:border-color .15s; }
+.chain-item:hover { border-color:rgba(167,139,250,.4); }
+.chain-item.done { border-color:rgba(52,211,153,.3);background:rgba(52,211,153,.03); }
+.chain-num { width:32px;height:32px;border-radius:50%;background:var(--surface2);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;color:var(--muted);flex-shrink:0;transition:all .15s; }
+.chain-item.done .chain-num { background:rgba(52,211,153,.15);border-color:rgba(52,211,153,.4);color:var(--green); }
+.chain-q { font-size:13px;font-weight:600;margin-bottom:6px;line-height:1.5; }
+.chain-item.done .chain-q { color:var(--muted);text-decoration:line-through;text-decoration-color:var(--dim); }
+.chain-prompt { font-size:11px;font-family:'Cascadia Code','Fira Code',monospace;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:8px 12px;color:var(--accent2);line-height:1.6;margin-top:8px; }
+.chain-hint { font-size:11px;color:var(--dim);margin-top:6px;line-height:1.5; }
+
+.artifact-card { background:var(--surface);border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:14px; }
+.artifact-head { padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px; }
+.artifact-title { font-size:13px;font-weight:700;flex:1; }
+.artifact-file { font-family:'Cascadia Code','Fira Code',monospace;font-size:11px;color:var(--green);background:rgba(52,211,153,.08);border:1px solid rgba(52,211,153,.2);padding:2px 10px;border-radius:5px; }
+.artifact-body { padding:16px 18px; }
+.artifact-row { display:flex;gap:10px;margin-bottom:8px;font-size:12px;align-items:flex-start; }
+.artifact-row:last-child { margin-bottom:0; }
+.ar-dot { width:5px;height:5px;border-radius:50%;background:var(--green);flex-shrink:0;margin-top:6px; }
+.ar-text { color:var(--muted);line-height:1.5; }
+.ar-text strong { color:var(--text); }
+.artifact-fail { margin-top:14px;padding:10px 14px;background:rgba(248,113,113,.06);border:1px solid rgba(248,113,113,.2);border-radius:7px;font-size:11px;color:var(--muted);line-height:1.6; }
+.artifact-fail strong { color:var(--red); }
+
+/* INTERVIEW QUESTIONS */
+.iq-section { margin-bottom:32px; }
+.iq-header { padding:14px 18px;background:rgba(167,139,250,.06);border:1px solid rgba(167,139,250,.25);border-radius:10px 10px 0 0;border-bottom:none; }
+.iq-title { font-size:12px;font-weight:700;color:var(--accent2);margin-bottom:4px; }
+.iq-subtitle { font-size:11px;color:var(--muted);line-height:1.6; }
+.iq-body { padding:14px 18px;background:rgba(167,139,250,.02);border:1px solid rgba(167,139,250,.25);border-radius:0 0 10px 10px;display:flex;flex-direction:column;gap:8px; }
+.iq-item { background:var(--surface);border:1px solid var(--border);border-radius:8px;overflow:hidden;cursor:pointer;transition:border-color .15s; }
+.iq-item:hover { border-color:rgba(167,139,250,.35); }
+.iq-item.answered { border-color:rgba(52,211,153,.3); }
+.iq-q { display:flex;align-items:flex-start;gap:12px;padding:10px 14px; }
+.iq-num { font-size:10px;font-weight:800;color:var(--accent2);background:rgba(167,139,250,.1);border:1px solid rgba(167,139,250,.2);padding:2px 7px;border-radius:4px;flex-shrink:0;margin-top:2px; }
+.iq-item.answered .iq-num { background:rgba(52,211,153,.12);border-color:rgba(52,211,153,.3);color:var(--green); }
+.iq-text { font-size:12px;color:var(--text);line-height:1.6;flex:1; }
+.iq-item.answered .iq-text { color:var(--muted); }
+.iq-check { font-size:11px;color:var(--dim);flex-shrink:0;margin-top:3px; }
+.iq-item.answered .iq-check { color:var(--green); }
+
+.criteria { display:flex;flex-direction:column;gap:8px; }
+.crit { display:flex;gap:10px;align-items:flex-start;padding:10px 14px;background:var(--surface);border:1px solid var(--border);border-radius:8px;font-size:12px;cursor:pointer;transition:border-color .15s; }
+.crit:hover { border-color:rgba(52,211,153,.3); }
+.crit.done { border-color:rgba(52,211,153,.35);background:rgba(52,211,153,.03); }
+.crit-box { width:16px;height:16px;border-radius:4px;border:1.5px solid var(--border);flex-shrink:0;margin-top:1px;display:flex;align-items:center;justify-content:center;transition:all .15s; }
+.crit.done .crit-box { background:var(--green);border-color:var(--green); }
+.crit-check { color:#0b0d14;font-size:10px;font-weight:900;display:none; }
+.crit.done .crit-check { display:block; }
+.crit-text { color:var(--muted);line-height:1.5; }
+.crit.done .crit-text { color:var(--dim); }
+
+.widget { background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px; }
+.widget-title { font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--dim);margin-bottom:12px; }
+.progress-bar { height:5px;background:var(--surface2);border-radius:10px;overflow:hidden;margin-bottom:6px; }
+.progress-fill { height:100%;background:linear-gradient(90deg,var(--accent),var(--green));border-radius:10px;transition:width .3s; }
+.progress-label { font-size:11px;color:var(--muted); }
+.progress-count { font-size:22px;font-weight:800;color:var(--text);margin-bottom:2px; }
+.as-row { display:flex;align-items:center;gap:8px;font-size:11px;margin-bottom:4px; }
+.as-dot { width:7px;height:7px;border-radius:50%;background:var(--dim);flex-shrink:0; }
+.as-dot.done { background:var(--green); }
+.as-name { color:var(--muted);flex:1; }
+.conn-row { font-size:11px;color:var(--muted);display:flex;gap:8px;align-items:flex-start; }
+.conn-dir { color:var(--dim);flex-shrink:0;width:48px; }
+.report-box { background:rgba(108,142,247,.06);border:1px solid rgba(108,142,247,.2);border-radius:10px;padding:14px 16px; }
+.report-title { font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--accent);margin-bottom:8px; }
+.report-step { font-size:11px;color:var(--muted);margin-bottom:6px;display:flex;gap:8px; }
+.report-step-num { color:var(--accent);font-weight:700;flex-shrink:0; }
+
+.explore-section { margin-bottom:32px; }
+.explore-header { display:flex;align-items:center;gap:12px;padding:12px 16px;background:rgba(251,191,36,.04);border:1px solid rgba(251,191,36,.2);border-radius:10px 10px 0 0;border-bottom:none; }
+.explore-header .icon { font-size:14px;color:var(--yellow); }
+.explore-header .label { font-size:12px;font-weight:700;color:var(--yellow); }
+.explore-header .sublabel { font-size:11px;color:var(--muted);margin-left:auto; }
+.explore-body { padding:14px 16px;background:rgba(251,191,36,.02);border:1px solid rgba(251,191,36,.2);border-radius:0 0 10px 10px;display:flex;flex-direction:column;gap:10px; }
+.explore-item { font-size:12px;color:var(--muted);line-height:1.6;padding-left:14px;position:relative; }
+.explore-item::before { content:'';position:absolute;left:0;top:7px;width:5px;height:5px;border-radius:50%;background:var(--yellow); }
+.explore-item strong { color:var(--text); }
+.explore-item code { font-size:10px;color:var(--accent2);background:var(--surface2);padding:1px 5px;border-radius:3px; }
+</style>
+</head>
+<body>
+
+<nav>
+  <span class="brand">ProOps2026</span>
+  <a href="#start">Start</a>
+  <a href="#chain">Discovery</a>
+  <a href="#artifact">Artifact</a>
+  <a href="#interview">Interview Qs</a>
+  <a href="#done">Done?</a>
+  <div class="spacer"></div>
+  <span class="badge">Day 5 · Theory</span>
+</nav>
+
+<div class="layout">
+<div class="main">
+
+  <!-- HEADER -->
+  <div class="day-header">
+    <div class="day-meta">
+      <span class="day-pill">Week 1 · Day 5</span>
+      <span class="day-tag">Theory</span>
+    </div>
+    <div class="day-title">Virtualization + Cloud Concepts</div>
+    <div class="day-question">
+      What are the layers of abstraction between your application and physical hardware — and why do those layers exist in the first place?
+    </div>
+    <div class="day-why">
+      Every cloud resource you will ever provision is a virtualization product. Understanding the stack — physical server → hypervisor → VM → container runtime → container — explains why things behave the way they do: <strong>why containers start in milliseconds while VMs take minutes, why a VM crash doesn't affect its neighbors, why "the cloud" still has capacity limits.</strong> Without this model, every cloud architecture decision is guesswork. With it, you can reason about cost, performance, isolation, and failure from first principles.
+    </div>
+  </div>
+
+  <!-- REQUIRED CALLOUT -->
+  <div style="padding:14px 18px;background:rgba(52,211,153,.04);border:1px solid rgba(52,211,153,.25);border-radius:10px;margin-bottom:28px;">
+    <div style="font-size:12px;font-weight:700;color:var(--green);margin-bottom:6px;">What you must complete today</div>
+    <div style="font-size:12px;color:var(--muted);line-height:1.7;">
+      1. Watch the training session recording first (from 1:02:00, ~90 min)<br>
+      2. Work through all 8 discovery questions with Claude<br>
+      3. Create <code style="font-size:11px;color:var(--accent2);">memory/cloud-concepts.md</code> with all 5 required sections<br>
+      4. Try to answer the interview questions at the bottom of this page from your own understanding<br>
+      5. Push commit and send daily report
+    </div>
+    <div style="margin-top:10px;padding:8px 12px;border-radius:6px;background:rgba(251,191,36,.06);border:1px solid rgba(251,191,36,.2);font-size:11px;color:var(--yellow);">
+      After those are done, there is an optional Explore further section at the bottom. Only go there once the artifact is committed and pushed.
+    </div>
+  </div>
+
+  <!-- WATCH FIRST -->
+  <div class="section-block" id="start">
+    <div class="sec-label">Before you start — watch the training session</div>
+    <div style="padding:16px 18px;background:rgba(108,142,247,.04);border:1px solid rgba(108,142,247,.25);border-radius:10px;margin-bottom:14px;">
+      <div style="font-size:12px;font-weight:700;color:var(--accent);margin-bottom:8px;">Training session recording — start here</div>
+      <div style="font-size:12px;color:var(--muted);line-height:1.8;">
+        The trainer recorded a session that walks through today's concepts. Watch it before starting the discovery chain — <strong style="color:var(--text);">from 1:02:00 to the end</strong> (~90 minutes).<br><br>
+        The discovery chain covers the same topics. If you watch the video first, you will be applying what you already understand instead of learning everything from scratch with Claude. Most trainees find this cuts their total time significantly.
+      </div>
+      <div style="margin-top:10px;">
+        <a href="https://drive.google.com/file/d/1RWnO5ukoggtmTFE-XJt7zzhlMtXsnrdZ/view?usp=sharing" target="_blank" style="display:inline-block;padding:8px 16px;border-radius:6px;background:rgba(108,142,247,.1);border:1px solid rgba(108,142,247,.3);font-size:12px;font-weight:600;color:var(--accent);text-decoration:none;transition:all .15s;">Watch recording on Google Drive</a>
+        <span style="font-size:11px;color:var(--dim);margin-left:8px;">Start from 1:02:00</span>
+      </div>
+    </div>
+
+    <!-- Start session -->
+    <div style="padding:12px 16px;background:var(--surface);border:1px solid var(--border);border-radius:10px;font-size:12px;color:var(--muted);line-height:1.7;">
+      After watching the video: open Claude Code in your <code style="font-size:11px;color:var(--accent2);">proops2026/</code> folder. CLAUDE.md and Notion Training Spec load automatically. This is a theory day — no terminal required. Work through each question with Claude, understand the model, then write the artifact in your own words.
+    </div>
+  </div>
+
+  <!-- DISCOVERY CHAIN -->
+  <div class="section-block" id="chain">
+    <div class="sec-label">Discovery Chain — 8 questions, one abstraction stack</div>
+
+    <div style="padding:12px 16px;background:var(--surface);border:1px solid var(--border);border-radius:10px;margin-bottom:14px;font-size:12px;color:var(--muted);line-height:1.7;">
+      Today's 8 questions build the mental model from the ground up — starting with why virtualization exists, through VMs and containers, up to cloud architecture decisions and cost. <strong style="color:var(--text);">Copy each purple prompt, paste into Claude, read the answer carefully, then rephrase the key idea in your own words before moving on.</strong>
+    </div>
+
+    <div class="chain">
+
+      <div class="chain-item" onclick="toggleChain(this,0)">
+        <div class="chain-num">1</div>
+        <div class="chain-body">
+          <div class="chain-q">Your company runs an app on one physical server. It sits at 10% CPU most of the day but spikes to 90% at peak hours. What does virtualization solve that buying a bigger server does not?</div>
+          <div class="chain-prompt">I'm running an application on a single physical server. It uses 10% CPU most of the day but spikes to 90% during business hours. My manager says "just buy a bigger server." Explain to me: (1) why that doesn't actually solve the core problem, (2) what virtualization solves instead — specifically, what a hypervisor does and what resource isolation means, (3) why running multiple VMs on one physical host is economically and operationally better than one app per server. Use concrete numbers in the explanation.</div>
+          <div class="chain-hint">The core insight: physical resources are fixed, but virtual allocation is flexible</div>
+        </div>
+      </div>
+
+      <div class="chain-item" onclick="toggleChain(this,1)">
+        <div class="chain-num">2</div>
+        <div class="chain-body">
+          <div class="chain-q">You provision a VM on AWS — 4 vCPUs, 16GB RAM. The physical host has 32 cores and 256GB RAM with 12 VMs. What is the hypervisor actually doing, and what happens when all 12 VMs spike at once?</div>
+          <div class="chain-prompt">I just provisioned an EC2 instance with 4 vCPUs and 16GB RAM. Explain to me: (1) what the hypervisor is doing between my VM and the physical hardware — specifically the difference between Type 1 and Type 2 hypervisors and which type AWS uses, (2) what "CPU oversubscription" means — if the physical host has 32 cores and 12 VMs each claim 4 vCPUs, that's 48 vCPUs on 32 physical cores, how is that possible and what's the risk, (3) what AWS does at the infrastructure level to prevent one noisy neighbor from degrading other VMs on the same host.</div>
+          <div class="chain-hint">Oversubscription is why cloud is cheap — and why "burstable" instances exist</div>
+        </div>
+      </div>
+
+      <div class="chain-item" onclick="toggleChain(this,2)">
+        <div class="chain-num">3</div>
+        <div class="chain-body">
+          <div class="chain-q">You package your app as a Docker container (200MB) instead of a VM image (10GB). What is the technical difference in how they achieve isolation — and why is the container 50x smaller?</div>
+          <div class="chain-prompt">I need to deploy the same application as either a Docker container or a VM image. The container is 200MB. The VM image is 10GB. Explain: (1) technically how a VM achieves isolation (full OS kernel, virtual hardware) vs how a container achieves isolation (Linux namespaces and cgroups — explain what each of these does), (2) why the container is so much smaller — what is in the VM that is not in the container, (3) the startup time difference and why — what has to happen when a VM boots vs when a container starts. Give me the mental model, not just the facts.</div>
+          <div class="chain-hint">Containers share the host kernel — that's the source of both the speed advantage and the security trade-off</div>
+        </div>
+      </div>
+
+      <div class="chain-item" onclick="toggleChain(this,3)">
+        <div class="chain-num">4</div>
+        <div class="chain-body">
+          <div class="chain-q">A security auditor asks: "Is our container environment more or less isolated than our VM environment?" What is the honest answer?</div>
+          <div class="chain-prompt">A security auditor asks me whether our containerized application is more or less secure than a VM-based deployment. Give me: (1) the honest answer — with the specific technical reason why containers provide weaker isolation than VMs, (2) what "shared kernel" means as a security risk — what attack surface exists that a VM does not expose, (3) one real-world container escape vulnerability category that has been exploited in production (no need for details — just the class of attack), (4) what security controls mitigate container isolation weaknesses in production (seccomp, AppArmor, rootless containers, etc.) — one sentence each. I need to be able to answer this question in an interview and in a design review.</div>
+          <div class="chain-hint">Honest answer: less isolated. Understanding why is what makes you credible</div>
+        </div>
+      </div>
+
+      <div class="chain-item" onclick="toggleChain(this,4)">
+        <div class="chain-num">5</div>
+        <div class="chain-body">
+          <div class="chain-q">Your team is choosing between AWS EC2 (IaaS), Elastic Beanstalk (PaaS), and a SaaS product. What exactly changes about what you manage at each layer?</div>
+          <div class="chain-prompt">My team needs to choose between AWS EC2 (IaaS), AWS Elastic Beanstalk (PaaS), and a third-party SaaS tool for a new service. Explain: (1) draw out the shared responsibility stack for each — at IaaS, PaaS, and SaaS, list exactly what the provider manages and what I manage (OS patching, runtime, middleware, application code, data, network config), (2) how this choice changes the size and skills required of my operations team, (3) a concrete example: if I choose EC2 vs Beanstalk for deploying a Node.js API, what work does Beanstalk do that I would have to do myself on EC2? Keep it practical — this is a decision I'll have to make and justify.</div>
+          <div class="chain-hint">More control = more responsibility. The right choice depends on your team's capacity</div>
+        </div>
+      </div>
+
+      <div class="chain-item" onclick="toggleChain(this,5)">
+        <div class="chain-num">6</div>
+        <div class="chain-body">
+          <div class="chain-q">The CTO asks you to design for high availability. You propose multi-AZ. What is an Availability Zone — and what failure does it protect against that a single-AZ deployment does not?</div>
+          <div class="chain-prompt">My CTO asked me to design for high availability on AWS and I proposed deploying across multiple Availability Zones. Explain to me: (1) what an Availability Zone physically is — what "physically separate data center" means in practice (separate power, cooling, networking), (2) what specific failure scenarios multi-AZ protects against versus a single-AZ deployment — give concrete examples (power outage, flood, hardware failure, network partition), (3) what multi-AZ does NOT protect against — what failure would take down all AZs in a region simultaneously, (4) what the trade-off is — what does multi-AZ cost you in terms of latency, data consistency, and operational complexity? I need to be able to defend this design decision.</div>
+          <div class="chain-hint">AZ = failure domain. Understand what it protects against AND what it doesn't</div>
+        </div>
+      </div>
+
+      <div class="chain-item" onclick="toggleChain(this,6)">
+        <div class="chain-num">7</div>
+        <div class="chain-body">
+          <div class="chain-q">Finance says the cloud bill doubled last month. Nobody changed the application. What are the three most likely causes — and what monitoring would have caught each one?</div>
+          <div class="chain-prompt">Our cloud bill doubled last month and nobody made any application changes. I need to investigate and explain it to finance. Walk me through: (1) the three most common causes of unexpected cloud cost increases when code hasn't changed (data transfer costs, over-provisioned instances left running, forgotten resources like old snapshots or load balancers, traffic spikes), (2) for each cause: what AWS Cost Explorer or CloudWatch metric would have shown the spike before the invoice arrived, (3) what a basic cloud cost hygiene checklist looks like — the 5 things a DevOps engineer should check weekly to prevent surprise bills. Give me enough to run a real cost investigation.</div>
+          <div class="chain-hint">Data egress is the most common invisible cost — know it before your first production deployment</div>
+        </div>
+      </div>
+
+      <div class="chain-item" onclick="toggleChain(this,7)" style="border-color:rgba(52,211,153,.3);">
+        <div class="chain-num" style="background:rgba(52,211,153,.12);border-color:rgba(52,211,153,.3);color:var(--green);">8</div>
+        <div class="chain-body">
+          <div class="chain-q" style="color:var(--green);">Write <code style="font-size:11px;color:var(--accent2);">memory/cloud-concepts.md</code> — the five foundational cloud concepts every DevOps engineer must own.</div>
+          <div class="chain-prompt">I'm writing memory/cloud-concepts.md for my DevOps agent. Generate the full file with these 5 sections:
+
+1. Virtualization stack — physical → hypervisor (Type 1 vs Type 2) → VM → container runtime → container. Include: what each layer does, startup time comparison, size comparison, when to use VM vs container
+2. VM vs container isolation — side-by-side comparison: isolation mechanism, startup time, image size, portability, security boundary, when each is the right choice
+3. IaaS / PaaS / SaaS — table of what you manage at each layer, one real AWS and one real Azure example for each, and the DevOps implication of each choice (team size, skill requirements, operational overhead)
+4. Availability Zones and high availability — what an AZ is, what multi-AZ protects against, what it does not protect against (region failure), trade-offs (latency, cost, complexity)
+5. Cloud cost mechanics — the three biggest sources of surprise bills (data transfer, over-provisioned instances, forgotten resources), one monitoring signal for each, and a weekly hygiene checklist
+
+Write it for my agent to consume, not as personal notes. My agent needs to be able to make architecture recommendations from this file.</div>
+          <div class="chain-hint">Save the full output into memory/cloud-concepts.md in your repo</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ARTIFACT -->
+  <div class="section-block" id="artifact">
+    <div class="sec-label">Required artifact — must be pushed before end-of-day commit</div>
+    <div class="artifact-card">
+      <div class="artifact-head">
+        <div class="artifact-title">Cloud Concepts Memory File</div>
+        <div class="artifact-file">memory/cloud-concepts.md</div>
+      </div>
+      <div class="artifact-body">
+        <div style="font-size:11px;color:var(--muted);margin-bottom:12px;line-height:1.6;">Your agent reads this file every time a task involves cloud architecture, infrastructure decisions, or cost questions. Write it for Claude to act on, not as a study guide for yourself.</div>
+        <div class="artifact-row"><div class="ar-dot"></div><div class="ar-text"><strong>Virtualization stack</strong> — physical → hypervisor → VM → container runtime → container, with startup time and size at each layer.</div></div>
+        <div class="artifact-row"><div class="ar-dot"></div><div class="ar-text"><strong>VM vs container comparison</strong> — isolation mechanism, startup time, image size, security boundary, when each is the right choice.</div></div>
+        <div class="artifact-row"><div class="ar-dot"></div><div class="ar-text"><strong>IaaS / PaaS / SaaS</strong> — what you manage at each layer, one real AWS and Azure product per layer, DevOps implication of each choice.</div></div>
+        <div class="artifact-row"><div class="ar-dot"></div><div class="ar-text"><strong>Availability Zones</strong> — what an AZ is, what multi-AZ protects against, what it does not protect against, cost and latency trade-offs.</div></div>
+        <div class="artifact-row"><div class="ar-dot"></div><div class="ar-text"><strong>Cloud cost mechanics</strong> — three biggest surprise bill sources, one monitoring signal each, weekly hygiene checklist.</div></div>
+        <div class="artifact-fail">
+          <strong>Weak artifact signals:</strong> generic Wikipedia-level definitions with no DevOps angle · no concrete AWS or Azure product examples · AZs explained without the failure scenario · cost section that lists prices but no monitoring or hygiene approach
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- INTERVIEW QUESTIONS -->
+  <div class="iq-section" id="interview">
+    <div class="iq-header">
+      <div class="iq-title">Interview Questions — verify your understanding</div>
+      <div class="iq-subtitle">These are real questions asked in DevOps interviews for this topic. Try to answer each one from memory before looking at your artifact. If you cannot answer a question confidently, your artifact for that section is not complete enough — go back and strengthen it before committing.</div>
+    </div>
+    <div class="iq-body">
+
+      <div class="iq-item" onclick="toggleIQ(this)">
+        <div class="iq-q">
+          <span class="iq-num">Q1</span>
+          <span class="iq-text">What problem does virtualization solve that simply buying a bigger server does not?</span>
+          <span class="iq-check">&#10003;</span>
+        </div>
+      </div>
+
+      <div class="iq-item" onclick="toggleIQ(this)">
+        <div class="iq-q">
+          <span class="iq-num">Q2</span>
+          <span class="iq-text">What is the difference between a Type 1 and Type 2 hypervisor? Which type does AWS EC2 use?</span>
+          <span class="iq-check">&#10003;</span>
+        </div>
+      </div>
+
+      <div class="iq-item" onclick="toggleIQ(this)">
+        <div class="iq-q">
+          <span class="iq-num">Q3</span>
+          <span class="iq-text">A Docker container for your app is 200MB. A VM image of the same app is 10GB. Explain the technical reason for that difference.</span>
+          <span class="iq-check">&#10003;</span>
+        </div>
+      </div>
+
+      <div class="iq-item" onclick="toggleIQ(this)">
+        <div class="iq-q">
+          <span class="iq-num">Q4</span>
+          <span class="iq-text">Is a container more or less isolated than a VM? Give the specific technical reason.</span>
+          <span class="iq-check">&#10003;</span>
+        </div>
+      </div>
+
+      <div class="iq-item" onclick="toggleIQ(this)">
+        <div class="iq-q">
+          <span class="iq-num">Q5</span>
+          <span class="iq-text">What are Linux namespaces and cgroups? How do they relate to container isolation?</span>
+          <span class="iq-check">&#10003;</span>
+        </div>
+      </div>
+
+      <div class="iq-item" onclick="toggleIQ(this)">
+        <div class="iq-q">
+          <span class="iq-num">Q6</span>
+          <span class="iq-text">Your team is deploying a Node.js API. List three things you would manage yourself on EC2 that AWS Elastic Beanstalk would handle for you.</span>
+          <span class="iq-check">&#10003;</span>
+        </div>
+      </div>
+
+      <div class="iq-item" onclick="toggleIQ(this)">
+        <div class="iq-q">
+          <span class="iq-num">Q7</span>
+          <span class="iq-text">What is an Availability Zone? Describe a specific failure scenario that multi-AZ protects against — and one scenario it does not protect against.</span>
+          <span class="iq-check">&#10003;</span>
+        </div>
+      </div>
+
+      <div class="iq-item" onclick="toggleIQ(this)">
+        <div class="iq-q">
+          <span class="iq-num">Q8</span>
+          <span class="iq-text">The cloud bill doubled with no code changes. Walk me through the three most likely causes and the AWS tool you would use to investigate each.</span>
+          <span class="iq-check">&#10003;</span>
+        </div>
+      </div>
+
+      <div class="iq-item" onclick="toggleIQ(this)">
+        <div class="iq-q">
+          <span class="iq-num">Q9</span>
+          <span class="iq-text">What is CPU oversubscription in a cloud environment? What is the risk, and how does AWS mitigate it?</span>
+          <span class="iq-check">&#10003;</span>
+        </div>
+      </div>
+
+      <div class="iq-item" onclick="toggleIQ(this)">
+        <div class="iq-q">
+          <span class="iq-num">Q10</span>
+          <span class="iq-text">Describe the shared responsibility model. Give one example of what the cloud provider is responsible for and one example of what you are responsible for — for each of IaaS, PaaS, and SaaS.</span>
+          <span class="iq-check">&#10003;</span>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- DONE CRITERIA -->
+  <div class="section-block" id="done">
+    <div class="sec-label">Before you send your end-of-day report — check these</div>
+    <div class="criteria">
+      <div class="crit" onclick="toggleCrit(this)">
+        <div class="crit-box"><span class="crit-check">&#10003;</span></div>
+        <div class="crit-text">I watched the training session recording (from 1:02:00) before starting the discovery chain.</div>
+      </div>
+      <div class="crit" onclick="toggleCrit(this)">
+        <div class="crit-box"><span class="crit-check">&#10003;</span></div>
+        <div class="crit-text">I worked through all 8 discovery questions and read Claude's answers carefully — not just skimmed them.</div>
+      </div>
+      <div class="crit" onclick="toggleCrit(this)">
+        <div class="crit-box"><span class="crit-check">&#10003;</span></div>
+        <div class="crit-text"><code style="font-size:11px;color:var(--accent2);">memory/cloud-concepts.md</code> exists in my repo with all 5 required sections.</div>
+      </div>
+      <div class="crit" onclick="toggleCrit(this)">
+        <div class="crit-box"><span class="crit-check">&#10003;</span></div>
+        <div class="crit-text">I tried to answer all 10 interview questions from memory. Any I could not answer — I went back and strengthened that section in my artifact.</div>
+      </div>
+      <div class="crit" onclick="toggleCrit(this)">
+        <div class="crit-box"><span class="crit-check">&#10003;</span></div>
+        <div class="crit-text">I can explain the difference between a VM and a container to someone without looking at my notes — including the security trade-off.</div>
+      </div>
+      <div class="crit" onclick="toggleCrit(this)">
+        <div class="crit-box"><span class="crit-check">&#10003;</span></div>
+        <div class="crit-text">I can describe what an Availability Zone is, what failure it protects against, and what it does not protect against.</div>
+      </div>
+      <div class="crit" onclick="toggleCrit(this)">
+        <div class="crit-box"><span class="crit-check">&#10003;</span></div>
+        <div class="crit-text">Daily log filled — Tomorrow's Context Block is 3 specific sentences written by me, not by Claude.</div>
+      </div>
+      <div class="crit" onclick="toggleCrit(this)">
+        <div class="crit-box"><span class="crit-check">&#10003;</span></div>
+        <div class="crit-text">Git commit pushed: <code style="font-size:11px;color:var(--accent2);">Day 05 — memory: cloud-concepts.md</code></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- EXPLORE FURTHER -->
+  <div class="explore-section">
+    <div class="explore-header">
+      <span class="icon">&#9654;</span>
+      <span class="label">Explore further</span>
+      <span class="sublabel">Only after required work is pushed &#10003;</span>
+    </div>
+    <div class="explore-body">
+      <div style="font-size:11px;color:var(--dim);margin-bottom:4px;">These are optional. Only work on these if your artifact is committed, your report is ready to send, and you have time left.</div>
+
+      <div class="explore-item">
+        <strong>Container runtime internals.</strong> Ask Claude: <code>"Walk me through exactly what happens at the Linux kernel level when I run 'docker run -it ubuntu bash' — which namespace types are created (pid, net, mnt, uts, ipc, user), what cgroup limits are set by default, and how do I inspect both from inside and outside the container?"</code> This is the depth that separates a DevOps engineer from a Docker user.
+      </div>
+
+      <div class="explore-item">
+        <strong>AWS shared responsibility deep dive.</strong> Ask Claude: <code>"Give me 5 real security incidents where the failure was on the customer side of the shared responsibility model — what was misconfigured, what was breached, and what the correct configuration would have been."</code> Understanding shared responsibility through failure cases is much faster than reading the documentation.
+      </div>
+
+      <div class="explore-item">
+        <strong>Cloud cost architecture.</strong> Ask Claude: <code>"Design a minimal AWS cost monitoring setup for a startup — what services, what alarms, what thresholds, what would it cost to run the monitoring itself? I want to catch a 2x bill increase before the invoice arrives."</code> Day 6 is AWS hands-on — this is the right mental model to have before you start provisioning.
+      </div>
+    </div>
+  </div>
+
+</div><!-- /main -->
+
+<!-- SIDEBAR -->
+<div class="sidebar">
+
+  <div class="widget">
+    <div class="widget-title">Progress</div>
+    <div class="progress-count" id="prog-count">0 / 8</div>
+    <div style="margin-bottom:8px;">
+      <div class="progress-bar"><div class="progress-fill" id="prog-fill" style="width:0%"></div></div>
+      <div class="progress-label" id="prog-label">Discovery chain</div>
+    </div>
+  </div>
+
+  <div class="widget">
+    <div class="widget-title">Interview Questions</div>
+    <div class="progress-count" id="iq-count">0 / 10</div>
+    <div style="margin-bottom:8px;">
+      <div class="progress-bar"><div class="progress-fill" id="iq-fill" style="width:0%;background:linear-gradient(90deg,var(--accent2),var(--accent))"></div></div>
+      <div class="progress-label" id="iq-label">Self-verify your understanding</div>
+    </div>
+  </div>
+
+  <div class="widget">
+    <div class="widget-title">Today's Artifact</div>
+    <div class="as-row"><div class="as-dot" id="dot-cloud"></div><div class="as-name">memory/cloud-concepts.md</div></div>
+  </div>
+
+  <div class="widget">
+    <div class="widget-title">Connects To</div>
+    <div style="display:flex;flex-direction:column;gap:6px;">
+      <div class="conn-row"><span class="conn-dir">&larr; Day 4</span><span style="font-size:11px;color:var(--muted);">Linux Basics</span></div>
+      <div class="conn-row"><span class="conn-dir">&rarr; Day 6</span><span style="font-size:11px;color:var(--muted);">AWS Hands-on (EC2, S3, VPC)</span></div>
+      <div class="conn-row"><span class="conn-dir">&rarr; Day 7</span><span style="font-size:11px;color:var(--muted);">Docker (containers from today)</span></div>
+      <div class="conn-row"><span class="conn-dir">&rarr; Day 36</span><span style="font-size:11px;color:var(--muted);">Capstone infrastructure design</span></div>
+    </div>
+  </div>
+
+  <div class="widget" style="background:rgba(251,191,36,.04);border-color:rgba(251,191,36,.2);">
+    <div class="widget-title" style="color:var(--yellow);">Required vs Explore</div>
+    <div style="font-size:11px;color:var(--muted);line-height:1.6;">
+      <strong style="color:var(--green);">Required:</strong> Q1–Q8 + artifact + interview Qs + commit + report<br><br>
+      <strong style="color:var(--yellow);">Explore after:</strong> container internals, shared responsibility cases, cost architecture<br><br>
+      <span style="color:var(--dim);">Explore only after required is pushed.</span>
+    </div>
+  </div>
+
+  <div class="report-box">
+    <div class="report-title">End-of-day report</div>
+    <div class="report-step"><span class="report-step-num">1.</span> Fill daily log + context block</div>
+    <div class="report-step"><span class="report-step-num">2.</span> git commit + push</div>
+    <div class="report-step"><span class="report-step-num">3.</span> Fill <code style="font-size:10px;color:var(--accent);">templates/daily-report-template.md</code> &rarr; paste to trainer chat</div>
+  </div>
+
+</div><!-- /sidebar -->
+</div><!-- /layout -->
+
+<script>
+const chainDone = new Array(8).fill(false);
+const iqDone = new Array(10).fill(false);
+
+function toggleChain(el, idx) {
+  chainDone[idx] = !chainDone[idx];
+  el.classList.toggle('done', chainDone[idx]);
+  const n = chainDone.filter(Boolean).length;
+  document.getElementById('prog-count').textContent = n + ' / 8';
+  document.getElementById('prog-fill').style.width = (n/8*100) + '%';
+  document.getElementById('prog-label').textContent = n === 8 ? 'All complete — write your artifact' : 'Discovery chain';
+  if (n >= 7) document.getElementById('dot-cloud').classList.add('done');
+}
+
+function toggleIQ(el) {
+  el.classList.toggle('answered');
+  const n = document.querySelectorAll('.iq-item.answered').length;
+  document.getElementById('iq-count').textContent = n + ' / 10';
+  document.getElementById('iq-fill').style.width = (n/10*100) + '%';
+  document.getElementById('iq-label').textContent = n === 10 ? 'All questions attempted' : 'Self-verify your understanding';
+}
+
+function toggleCrit(el) { el.classList.toggle('done'); }
+</script>
+</body>
+</html>
