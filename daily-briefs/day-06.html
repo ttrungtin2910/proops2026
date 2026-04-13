@@ -1,0 +1,575 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Day 6 — AWS Hands-on: EC2, S3, VPC, CLI · ProOps2026</title>
+<style>
+:root {
+  --bg:#0b0d14; --surface:#13161f; --surface2:#1c2030; --border:#252a3a;
+  --accent:#6c8ef7; --accent2:#a78bfa;
+  --green:#34d399; --yellow:#fbbf24; --orange:#fb923c;
+  --red:#f87171; --teal:#22d3ee; --blue:#60a5fa;
+  --text:#e8edf5; --muted:#7c87a0; --dim:#3a4258;
+}
+* { box-sizing:border-box; margin:0; padding:0; }
+body { background:var(--bg); color:var(--text); font-family:'Segoe UI',system-ui,sans-serif; font-size:15px; line-height:1.6; }
+
+nav { background:var(--surface);border-bottom:1px solid var(--border);padding:0 32px;height:50px;display:flex;align-items:center;gap:6px;position:sticky;top:0;z-index:200; }
+nav .brand { font-weight:800;font-size:14px;color:var(--accent);margin-right:12px; }
+nav a { color:var(--muted);text-decoration:none;font-size:12px;font-weight:600;padding:5px 12px;border-radius:6px;transition:all .15s;white-space:nowrap; }
+nav a:hover { color:var(--text);background:var(--surface2); }
+nav .spacer { flex:1; }
+nav .badge { background:rgba(251,191,36,.12);border:1px solid rgba(251,191,36,.25);color:var(--yellow);font-size:11px;font-weight:700;padding:3px 12px;border-radius:20px; }
+
+.layout { display:grid;grid-template-columns:1fr 260px;gap:32px;max-width:1100px;margin:0 auto;padding:40px 32px; }
+.main { min-width:0; }
+.sidebar { position:sticky;top:70px;height:fit-content;display:flex;flex-direction:column;gap:14px; }
+
+.day-header { margin-bottom:32px; }
+.day-meta { display:flex;align-items:center;gap:10px;margin-bottom:12px; }
+.day-pill { font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;padding:3px 12px;border-radius:20px;background:rgba(108,142,247,.12);border:1px solid rgba(108,142,247,.25);color:var(--accent); }
+.day-tag { font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;padding:3px 12px;border-radius:20px;background:rgba(251,191,36,.08);border:1px solid rgba(251,191,36,.2);color:var(--yellow); }
+.day-title { font-size:26px;font-weight:800;letter-spacing:-.3px;margin-bottom:8px; }
+.day-question { font-size:15px;color:var(--accent2);font-style:italic;border-left:3px solid var(--accent2);padding-left:14px;margin-bottom:16px;line-height:1.6; }
+.day-why { font-size:13px;color:var(--muted);line-height:1.7;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:14px 16px; }
+.day-why strong { color:var(--text); }
+
+.section-block { margin-bottom:32px; }
+.sec-label { font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:var(--dim);margin-bottom:14px;display:flex;align-items:center;gap:10px; }
+.sec-label::after { content:'';flex:1;height:1px;background:var(--border); }
+
+.chain { display:flex;flex-direction:column;gap:10px; }
+.chain-item { display:grid;grid-template-columns:32px 1fr;gap:14px;padding:14px 16px;background:var(--surface);border:1px solid var(--border);border-radius:10px;cursor:pointer;transition:border-color .15s; }
+.chain-item:hover { border-color:rgba(167,139,250,.4); }
+.chain-item.done { border-color:rgba(52,211,153,.3);background:rgba(52,211,153,.03); }
+.chain-num { width:32px;height:32px;border-radius:50%;background:var(--surface2);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;color:var(--muted);flex-shrink:0;transition:all .15s; }
+.chain-item.done .chain-num { background:rgba(52,211,153,.15);border-color:rgba(52,211,153,.4);color:var(--green); }
+.chain-q { font-size:13px;font-weight:600;margin-bottom:6px;line-height:1.5; }
+.chain-item.done .chain-q { color:var(--muted);text-decoration:line-through;text-decoration-color:var(--dim); }
+.chain-prompt { font-size:11px;font-family:'Cascadia Code','Fira Code',monospace;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:8px 12px;color:var(--accent2);line-height:1.6;margin-top:8px; }
+.chain-hint { font-size:11px;color:var(--dim);margin-top:6px;line-height:1.5; }
+
+.artifact-card { background:var(--surface);border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:14px; }
+.artifact-head { padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px; }
+.artifact-title { font-size:13px;font-weight:700;flex:1; }
+.artifact-file { font-family:'Cascadia Code','Fira Code',monospace;font-size:11px;color:var(--green);background:rgba(52,211,153,.08);border:1px solid rgba(52,211,153,.2);padding:2px 10px;border-radius:5px; }
+.artifact-body { padding:16px 18px; }
+.artifact-row { display:flex;gap:10px;margin-bottom:8px;font-size:12px;align-items:flex-start; }
+.artifact-row:last-child { margin-bottom:0; }
+.ar-dot { width:5px;height:5px;border-radius:50%;background:var(--green);flex-shrink:0;margin-top:6px; }
+.ar-text { color:var(--muted);line-height:1.5; }
+.ar-text strong { color:var(--text); }
+.artifact-fail { margin-top:14px;padding:10px 14px;background:rgba(248,113,113,.06);border:1px solid rgba(248,113,113,.2);border-radius:7px;font-size:11px;color:var(--muted);line-height:1.6; }
+.artifact-fail strong { color:var(--red); }
+
+.iq-section { margin-bottom:32px; }
+.iq-header { padding:14px 18px;background:rgba(167,139,250,.06);border:1px solid rgba(167,139,250,.25);border-radius:10px 10px 0 0;border-bottom:none; }
+.iq-title { font-size:12px;font-weight:700;color:var(--accent2);margin-bottom:4px; }
+.iq-subtitle { font-size:11px;color:var(--muted);line-height:1.6; }
+.iq-body { padding:14px 18px;background:rgba(167,139,250,.02);border:1px solid rgba(167,139,250,.25);border-radius:0 0 10px 10px;display:flex;flex-direction:column;gap:8px; }
+.iq-item { background:var(--surface);border:1px solid var(--border);border-radius:8px;overflow:hidden;cursor:pointer;transition:border-color .15s; }
+.iq-item:hover { border-color:rgba(167,139,250,.35); }
+.iq-item.answered { border-color:rgba(52,211,153,.3); }
+.iq-q { display:flex;align-items:flex-start;gap:12px;padding:10px 14px; }
+.iq-num { font-size:10px;font-weight:800;color:var(--accent2);background:rgba(167,139,250,.1);border:1px solid rgba(167,139,250,.2);padding:2px 7px;border-radius:4px;flex-shrink:0;margin-top:2px; }
+.iq-item.answered .iq-num { background:rgba(52,211,153,.12);border-color:rgba(52,211,153,.3);color:var(--green); }
+.iq-text { font-size:12px;color:var(--text);line-height:1.6;flex:1; }
+.iq-item.answered .iq-text { color:var(--muted); }
+.iq-check { font-size:11px;color:var(--dim);flex-shrink:0;margin-top:3px; }
+.iq-item.answered .iq-check { color:var(--green); }
+
+.criteria { display:flex;flex-direction:column;gap:8px; }
+.crit { display:flex;gap:10px;align-items:flex-start;padding:10px 14px;background:var(--surface);border:1px solid var(--border);border-radius:8px;font-size:12px;cursor:pointer;transition:border-color .15s; }
+.crit:hover { border-color:rgba(52,211,153,.3); }
+.crit.done { border-color:rgba(52,211,153,.35);background:rgba(52,211,153,.03); }
+.crit-box { width:16px;height:16px;border-radius:4px;border:1.5px solid var(--border);flex-shrink:0;margin-top:1px;display:flex;align-items:center;justify-content:center;transition:all .15s; }
+.crit.done .crit-box { background:var(--green);border-color:var(--green); }
+.crit-check { color:#0b0d14;font-size:10px;font-weight:900;display:none; }
+.crit.done .crit-check { display:block; }
+.crit-text { color:var(--muted);line-height:1.5; }
+.crit.done .crit-text { color:var(--dim); }
+
+.widget { background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px; }
+.widget-title { font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--dim);margin-bottom:12px; }
+.progress-bar { height:5px;background:var(--surface2);border-radius:10px;overflow:hidden;margin-bottom:6px; }
+.progress-fill { height:100%;background:linear-gradient(90deg,var(--accent),var(--green));border-radius:10px;transition:width .3s; }
+.progress-label { font-size:11px;color:var(--muted); }
+.progress-count { font-size:22px;font-weight:800;color:var(--text);margin-bottom:2px; }
+.as-row { display:flex;align-items:center;gap:8px;font-size:11px;margin-bottom:4px; }
+.as-dot { width:7px;height:7px;border-radius:50%;background:var(--dim);flex-shrink:0; }
+.as-dot.done { background:var(--green); }
+.as-name { color:var(--muted);flex:1; }
+.conn-row { font-size:11px;color:var(--muted);display:flex;gap:8px;align-items:flex-start; }
+.conn-dir { color:var(--dim);flex-shrink:0;width:48px; }
+.report-box { background:rgba(108,142,247,.06);border:1px solid rgba(108,142,247,.2);border-radius:10px;padding:14px 16px; }
+.report-title { font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--accent);margin-bottom:8px; }
+.report-step { font-size:11px;color:var(--muted);margin-bottom:6px;display:flex;gap:8px; }
+.report-step-num { color:var(--accent);font-weight:700;flex-shrink:0; }
+
+.explore-section { margin-bottom:32px; }
+.explore-header { display:flex;align-items:center;gap:12px;padding:12px 16px;background:rgba(251,191,36,.04);border:1px solid rgba(251,191,36,.2);border-radius:10px 10px 0 0;border-bottom:none; }
+.explore-header .icon { font-size:14px;color:var(--yellow); }
+.explore-header .label { font-size:12px;font-weight:700;color:var(--yellow); }
+.explore-header .sublabel { font-size:11px;color:var(--muted);margin-left:auto; }
+.explore-body { padding:14px 16px;background:rgba(251,191,36,.02);border:1px solid rgba(251,191,36,.2);border-radius:0 0 10px 10px;display:flex;flex-direction:column;gap:10px; }
+.explore-item { font-size:12px;color:var(--muted);line-height:1.6;padding-left:14px;position:relative; }
+.explore-item::before { content:'';position:absolute;left:0;top:7px;width:5px;height:5px;border-radius:50%;background:var(--yellow); }
+.explore-item strong { color:var(--text); }
+.explore-item code { font-size:10px;color:var(--accent2);background:var(--surface2);padding:1px 5px;border-radius:3px; }
+</style>
+</head>
+<body>
+
+<nav>
+  <span class="brand">ProOps2026</span>
+  <a href="#start">Start</a>
+  <a href="#chain">Discovery</a>
+  <a href="#artifact">Artifact</a>
+  <a href="#interview">Interview Qs</a>
+  <a href="#done">Done?</a>
+  <div class="spacer"></div>
+  <span class="badge">Day 6 · Hands-On</span>
+</nav>
+
+<div class="layout">
+<div class="main">
+
+  <!-- HEADER -->
+  <div class="day-header">
+    <div class="day-meta">
+      <span class="day-pill">Week 2 · Day 6</span>
+      <span class="day-tag">Hands-On</span>
+    </div>
+    <div class="day-title">AWS Hands-on: EC2, S3, VPC, CLI</div>
+    <div class="day-question">
+      How do you provision, connect to, and operate the core AWS building blocks (EC2, S3, VPC) that form the foundation of almost every cloud architecture?
+    </div>
+    <div class="day-why">
+      EC2, S3, and VPC are the three primitives everything else in AWS is built on. A DevOps engineer who cannot provision a server, configure its network, and connect to it from the CLI is blocked before they can deploy anything. <strong>The AWS CLI is equally critical — manual console clicks don't belong in automation pipelines, and every real DevOps workflow eventually scripts its cloud operations.</strong> Day 5 gave you the theory. Today you apply it.
+    </div>
+  </div>
+
+  <!-- REQUIRED CALLOUT -->
+  <div style="padding:14px 18px;background:rgba(52,211,153,.04);border:1px solid rgba(52,211,153,.25);border-radius:10px;margin-bottom:28px;">
+    <div style="font-size:12px;font-weight:700;color:var(--green);margin-bottom:6px;">What you must complete today</div>
+    <div style="font-size:12px;color:var(--muted);line-height:1.7;">
+      1. Watch the training video sections listed below<br>
+      2. Work through all 8 discovery questions with Claude<br>
+      3. Create <code style="font-size:11px;color:var(--accent2);">memory/aws.md</code> with all 5 required sections<br>
+      4. Try to answer the interview questions at the bottom of this page from your own understanding<br>
+      5. Push commit and send daily report
+    </div>
+    <div style="margin-top:10px;padding:8px 12px;border-radius:6px;background:rgba(251,191,36,.06);border:1px solid rgba(251,191,36,.2);font-size:11px;color:var(--yellow);">
+      After those are done, there is an optional Explore further section at the bottom. Only go there once the artifact is committed and pushed.
+    </div>
+  </div>
+
+  <!-- WATCH FIRST -->
+  <div class="section-block" id="start">
+    <div class="sec-label">Before you start — watch the training video</div>
+    <div style="padding:16px 18px;background:rgba(108,142,247,.04);border:1px solid rgba(108,142,247,.25);border-radius:10px;margin-bottom:14px;">
+      <div style="font-size:12px;font-weight:700;color:var(--accent);margin-bottom:8px;">Training video — watch these sections</div>
+      <div style="font-size:12px;color:var(--muted);line-height:1.8;">
+        The video covers three parts that map directly to today's work. Watch them before starting the discovery chain — <strong style="color:var(--text);">the discovery questions build on what the video demonstrates.</strong>
+      </div>
+      <div style="margin-top:12px;display:flex;flex-direction:column;gap:8px;">
+        <div style="padding:8px 14px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;font-size:12px;">
+          <strong style="color:var(--accent);">14:25 &ndash; 18:11</strong> <span style="color:var(--muted);">&mdash; Basic AWS architecture overview</span>
+        </div>
+        <div style="padding:8px 14px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;font-size:12px;">
+          <strong style="color:var(--accent);">1:03:00 &ndash; 1:11:00</strong> <span style="color:var(--muted);">&mdash; How to install and configure AWS CLI</span>
+        </div>
+        <div style="padding:8px 14px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;font-size:12px;">
+          <strong style="color:var(--accent);">1:15:00 &ndash; 2:20:00</strong> <span style="color:var(--muted);">&mdash; Practice: create a simple architecture step by step</span>
+        </div>
+      </div>
+      <div style="margin-top:12px;">
+        <a href="https://drive.google.com/file/d/1wt3gBzE18Kk6f8ciO-GJoLBwiGahUF18/view?usp=sharing" target="_blank" style="display:inline-block;padding:8px 16px;border-radius:6px;background:rgba(108,142,247,.1);border:1px solid rgba(108,142,247,.3);font-size:12px;font-weight:600;color:var(--accent);text-decoration:none;transition:all .15s;">Watch recording on Google Drive</a>
+      </div>
+      <div style="margin-top:8px;font-size:11px;color:var(--dim);line-height:1.6;">
+        Most trainees find that watching the video first cuts their total time significantly. The discovery chain covers the same topics in depth — if you watch first, you will be applying what you already understand.
+      </div>
+    </div>
+
+    <!-- TARGET ARCHITECTURE -->
+    <div style="padding:16px 18px;background:rgba(52,211,153,.04);border:1px solid rgba(52,211,153,.25);border-radius:10px;margin-bottom:14px;">
+      <div style="font-size:12px;font-weight:700;color:var(--green);margin-bottom:8px;">Target architecture — this is what you are building today</div>
+      <div style="font-size:12px;color:var(--muted);line-height:1.8;">
+        The diagram below shows the architecture demonstrated in the video practice session (1:15:00 – 2:20:00). Your goal is to understand each component and how they connect.
+      </div>
+      <div style="margin-top:12px;padding:12px 16px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;font-size:12px;line-height:1.8;">
+        <strong style="color:var(--text);">VPC</strong> <span style="color:var(--dim);">10.11.0.0/16</span> &mdash; Region: ap-southeast-1<br>
+        <span style="color:var(--green);">Public Subnet</span> <span style="color:var(--dim);">10.x.2.0/24 – 10.x.4.0/24</span> &rarr; EC2 Public (internet-facing)<br>
+        <span style="color:var(--blue);">Private Subnet</span> <span style="color:var(--dim);">10.x.11.0/24 – 10.x.13.0/24</span> &rarr; EC2 Private (app layer)<br>
+        <span style="color:var(--accent2);">Database Subnet</span> <span style="color:var(--dim);">10.x.20.0/24 – 10.x.21.0/24</span> &rarr; EC2 Database Private (PostgreSQL)
+      </div>
+      <div style="margin-top:10px;padding:10px 14px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;font-size:11px;color:var(--muted);line-height:1.8;">
+        <strong style="color:var(--text);">Define of Done for this architecture:</strong><br>
+        &bull; Internet can access EC2 Public<br>
+        &bull; EC2 Public can access EC2 Private and EC2 Database<br>
+        &bull; EC2 Private can access EC2 Database<br>
+        &bull; EC2 Private (database) can access the internet, but the internet cannot access it directly
+      </div>
+      <div style="margin-top:12px;">
+        <a href="DRAWIO_LINK_PLACEHOLDER" target="_blank" style="display:inline-block;padding:8px 16px;border-radius:6px;background:rgba(52,211,153,.1);border:1px solid rgba(52,211,153,.3);font-size:12px;font-weight:600;color:var(--green);text-decoration:none;transition:all .15s;">Open architecture diagram (draw.io)</a>
+      </div>
+    </div>
+
+    <!-- Start session -->
+    <div style="padding:12px 16px;background:var(--surface);border:1px solid var(--border);border-radius:10px;font-size:12px;color:var(--muted);line-height:1.7;">
+      After watching the video: open Claude Code in your <code style="font-size:11px;color:var(--accent2);">proops2026/</code> folder. CLAUDE.md and Notion Training Spec load automatically. This is a hands-on day — <strong style="color:var(--text);">you will be working with AWS CLI and the AWS console.</strong> If you do not have an AWS account, ask Claude to walk you through the scenarios conceptually and write the CLI commands you would run.
+    </div>
+  </div>
+
+  <!-- DISCOVERY CHAIN -->
+  <div class="section-block" id="chain">
+    <div class="sec-label">Discovery Chain — 8 questions, one AWS stack</div>
+
+    <div style="padding:12px 16px;background:var(--surface);border:1px solid var(--border);border-radius:10px;margin-bottom:14px;font-size:12px;color:var(--muted);line-height:1.7;">
+      Today's 8 questions follow a single scenario — provisioning a server, connecting to it, configuring storage, locking down the network, and scripting the whole thing with the CLI. <strong style="color:var(--text);">Copy each purple prompt, paste into Claude, read the answer carefully, then rephrase the key idea in your own words before moving on.</strong>
+    </div>
+
+    <div class="chain">
+
+      <div class="chain-item" onclick="toggleChain(this,0)">
+        <div class="chain-num">1</div>
+        <div class="chain-body">
+          <div class="chain-q">You are asked to provision a server in AWS for a new application. Before clicking anything, what questions must you answer first — region, instance type, OS, and network?</div>
+          <div class="chain-prompt">I'm a DevOps engineer and I need to provision an EC2 instance for a new application. Before I touch the console or CLI, walk me through: (1) the four decisions I must make first — region, instance type, AMI (OS), and VPC/subnet — and what factors drive each decision, (2) where in the AWS console I find each option and what the defaults are, (3) the AWS CLI equivalent: show me the exact `aws ec2 run-instances` command with all required parameters, explain each flag. I want to understand the decisions, not just click through a wizard.</div>
+          <div class="chain-hint">Region = latency + compliance. Instance type = workload profile. AMI = OS. VPC = network boundary.</div>
+        </div>
+      </div>
+
+      <div class="chain-item" onclick="toggleChain(this,1)">
+        <div class="chain-num">2</div>
+        <div class="chain-body">
+          <div class="chain-q">You launch the EC2 instance. It shows "running" but you cannot SSH into it. What are the four things that must be correctly configured for SSH to work?</div>
+          <div class="chain-prompt">I launched an EC2 instance and it shows "running" in the console, but I cannot SSH into it. Walk me through the four things that must all be correct for SSH to work: (1) key pair — how it's created, where the private key lives, what happens if you lose it, (2) security group — what inbound rule is needed for SSH, what port, what source CIDR, (3) public IP — when an instance gets one vs when it doesn't, what an Elastic IP is, (4) route to the internet — what the route table must contain, what an Internet Gateway does. For each one, show me the AWS CLI command to check the current state and the command to fix it. This is a real troubleshooting scenario I need to be able to resolve in 5 minutes.</div>
+          <div class="chain-hint">SSH troubleshooting is the most common Day 1 AWS problem. Master this flow.</div>
+        </div>
+      </div>
+
+      <div class="chain-item" onclick="toggleChain(this,2)">
+        <div class="chain-num">3</div>
+        <div class="chain-body">
+          <div class="chain-q">You SSH in successfully. The app needs to read a config file from S3. What IAM concept lets EC2 access S3 without hardcoding credentials — and why is hardcoding a critical mistake?</div>
+          <div class="chain-prompt">I'm SSHed into my EC2 instance and the application needs to read a configuration file from S3. Explain: (1) why I should NEVER put AWS access keys in the application code or environment variables on the instance — what specific security risk this creates, (2) what an IAM Role is and how an Instance Profile works — the mechanism by which EC2 gets temporary credentials automatically, (3) the exact steps to create an IAM role with S3 read access and attach it to a running EC2 instance — both via console and via CLI (`aws iam create-role`, `aws ec2 associate-iam-instance-profile`), (4) how the application on the instance uses these credentials — what the SDK does behind the scenes with the instance metadata service.</div>
+          <div class="chain-hint">IAM Roles + Instance Profiles = the correct way to give EC2 access to other AWS services</div>
+        </div>
+      </div>
+
+      <div class="chain-item" onclick="toggleChain(this,3)">
+        <div class="chain-num">4</div>
+        <div class="chain-body">
+          <div class="chain-q">You run <code>aws s3 ls</code> from EC2 and get "Access Denied." What does this tell you about the IAM role or policy, and what is the minimum permission needed?</div>
+          <div class="chain-prompt">I'm on my EC2 instance and I run `aws s3 ls` but I get "Access Denied." Walk me through: (1) what this error means — is it an authentication problem or an authorization problem, and how to tell the difference, (2) how to check what IAM role is attached to this instance (`curl http://169.254.169.254/latest/meta-data/iam/security-credentials/`), (3) how to read the IAM policy attached to the role and identify exactly what's missing, (4) what the minimum S3 permission looks like for listing a specific bucket and reading specific objects — write the exact JSON policy document, (5) why "s3:*" is wrong and what "principle of least privilege" means in one sentence. Show me the CLI commands for each diagnostic step.</div>
+          <div class="chain-hint">Least privilege: grant exactly what's needed, nothing more. Debug by reading the policy.</div>
+        </div>
+      </div>
+
+      <div class="chain-item" onclick="toggleChain(this,4)">
+        <div class="chain-num">5</div>
+        <div class="chain-body">
+          <div class="chain-q">You upload a config file to S3 with <code>aws s3 cp</code>. The upload succeeds but the app can't find the file. What are two possible explanations?</div>
+          <div class="chain-prompt">I ran `aws s3 cp config.json s3://mybucket/` and it succeeded. But my application says it can't find the file at that path. Explain: (1) two possible causes — wrong S3 key path vs wrong bucket, and how S3 "paths" actually work (S3 has no folders — it's flat key-value storage with prefix-based display), (2) how to verify the file is actually where the app expects it using `aws s3 ls s3://mybucket/ --recursive`, (3) the difference between `aws s3 cp` and `aws s3api put-object` — when you need the lower-level API, (4) how to download the file back to verify its contents: `aws s3 cp s3://mybucket/config.json -`. Show me the exact commands for each step.</div>
+          <div class="chain-hint">S3 has no folders — just keys. "directory/file.json" is a single key string, not a path.</div>
+        </div>
+      </div>
+
+      <div class="chain-item" onclick="toggleChain(this,5)">
+        <div class="chain-num">6</div>
+        <div class="chain-body">
+          <div class="chain-q">The app is working. Now lock down the network: port 443 from the internet, port 5432 to a database in the same VPC. What VPC components do you configure?</div>
+          <div class="chain-prompt">My application is running on EC2 and I need to lock down the network. Requirements: (1) accept traffic on port 443 (HTTPS) from the internet, (2) allow outbound to a PostgreSQL database on port 5432 in a private subnet in the same VPC. Explain: (1) what a security group is — stateful firewall, inbound vs outbound rules, how "stateful" means return traffic is automatic, (2) the difference between a public subnet and a private subnet — route table, Internet Gateway, NAT Gateway, (3) the exact security group rules I need — write the JSON or CLI commands for both the web server SG and the database SG, (4) why the database should be in a private subnet and what happens if it's accidentally in a public subnet. Give me the full VPC design with two subnets.</div>
+          <div class="chain-hint">Public subnet = route to Internet Gateway. Private subnet = route to NAT Gateway (or no internet at all).</div>
+        </div>
+      </div>
+
+      <div class="chain-item" onclick="toggleChain(this,6)">
+        <div class="chain-num">7</div>
+        <div class="chain-body">
+          <div class="chain-q">A teammate needs the same setup in a new environment. What AWS CLI commands reproduce the EC2 + S3 + security group setup — and why is this the first step toward infrastructure as code?</div>
+          <div class="chain-prompt">A teammate needs to replicate my setup (EC2 instance + S3 bucket + security group + IAM role) in a new AWS account. I don't want to walk them through the console. Write me: (1) the complete sequence of AWS CLI commands to reproduce the entire setup from scratch — VPC, subnet, internet gateway, route table, security group, key pair, EC2 instance, S3 bucket, IAM role, instance profile — in the correct order, (2) explain why the order matters (you can't launch EC2 before the VPC exists), (3) why this script is the first step toward infrastructure as code — and what Terraform and CloudFormation do that a bash script of CLI commands does not. Give me the real commands, not pseudocode.</div>
+          <div class="chain-hint">CLI scripts = reproducible but fragile. IaC tools add state tracking, dependency graphs, and drift detection.</div>
+        </div>
+      </div>
+
+      <div class="chain-item" onclick="toggleChain(this,7)" style="border-color:rgba(52,211,153,.3);">
+        <div class="chain-num" style="background:rgba(52,211,153,.12);border-color:rgba(52,211,153,.3);color:var(--green);">8</div>
+        <div class="chain-body">
+          <div class="chain-q" style="color:var(--green);">Write <code style="font-size:11px;color:var(--accent2);">memory/aws.md</code> — the five AWS concepts every DevOps engineer must know before they can do anything else in AWS.</div>
+          <div class="chain-prompt">I'm writing memory/aws.md for my DevOps agent. Generate the full file with these 5 sections:
+
+1. EC2 instance lifecycle — instance states (pending, running, stopping, stopped, terminated), how to launch/stop/terminate via CLI, what persists across a stop (EBS volume, Elastic IP) vs what's lost on termination, key pair management
+2. S3 operations — bucket creation, object upload/download/list via CLI, the difference between bucket policy and IAM policy for access control, how S3 keys work (no real folders), versioning in one sentence
+3. VPC networking — subnets (public vs private, how the route table differs), security groups (stateful, inbound/outbound rules), Internet Gateway, NAT Gateway, when to use each
+4. IAM fundamentals — the difference between a user, a role, and a policy; why EC2 instances should use roles not access keys; Instance Profiles; the principle of least privilege as a one-sentence rule
+5. AWS CLI pattern — command structure (`aws &lt;service&gt; &lt;action&gt; --&lt;option&gt;`), how to configure a profile, how to use `--query` and `--output` to filter results, the 10 most common commands a DevOps engineer runs daily
+
+Write it for my agent to consume. My agent needs to be able to provision infrastructure and debug access issues from this file.</div>
+          <div class="chain-hint">Save the full output into memory/aws.md in your repo</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ARTIFACT -->
+  <div class="section-block" id="artifact">
+    <div class="sec-label">Required artifact — must be pushed with your commit</div>
+    <div class="artifact-card">
+      <div class="artifact-head">
+        <div class="artifact-title">AWS Fundamentals Memory File</div>
+        <div class="artifact-file">memory/aws.md</div>
+      </div>
+      <div class="artifact-body">
+        <div style="font-size:11px;color:var(--muted);margin-bottom:12px;line-height:1.6;">Your agent reads this file every time a task involves AWS infrastructure, access control, or CLI scripting. Write it for Claude to act on, not as a study guide.</div>
+        <div class="artifact-row"><div class="ar-dot"></div><div class="ar-text"><strong>EC2 lifecycle</strong> — instance states, launch/stop/terminate via CLI, what persists across a stop vs what's lost on termination.</div></div>
+        <div class="artifact-row"><div class="ar-dot"></div><div class="ar-text"><strong>S3 operations</strong> — bucket creation, object upload/download/list via CLI, bucket policy vs IAM policy for access control.</div></div>
+        <div class="artifact-row"><div class="ar-dot"></div><div class="ar-text"><strong>VPC networking</strong> — subnets (public vs private), security groups (stateful), Internet Gateway, NAT Gateway, route tables.</div></div>
+        <div class="artifact-row"><div class="ar-dot"></div><div class="ar-text"><strong>IAM fundamentals</strong> — user vs role vs policy, Instance Profiles, why roles not access keys, least privilege in one sentence.</div></div>
+        <div class="artifact-row"><div class="ar-dot"></div><div class="ar-text"><strong>AWS CLI pattern</strong> — command structure, profile config, --query and --output, 10 most common daily commands.</div></div>
+        <div class="artifact-fail">
+          <strong>Weak artifact signals:</strong> screenshots of the console with no CLI equivalents · IAM section that says "IAM controls access" without explaining roles vs users vs policies · VPC section with no mention of subnet routing or public vs private distinction · no actual CLI commands
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- INTERVIEW QUESTIONS -->
+  <div class="iq-section" id="interview">
+    <div class="iq-header">
+      <div class="iq-title">Interview Questions — verify your understanding</div>
+      <div class="iq-subtitle">These are real questions asked in DevOps interviews about AWS fundamentals. Try to answer each one from memory before looking at your artifact. If you cannot answer confidently, go back and strengthen that section.</div>
+    </div>
+    <div class="iq-body">
+
+      <div class="iq-item" onclick="toggleIQ(this)">
+        <div class="iq-q">
+          <span class="iq-num">Q1</span>
+          <span class="iq-text">What happens to an EC2 instance's data when you stop it vs when you terminate it? What persists and what is lost?</span>
+          <span class="iq-check">&#10003;</span>
+        </div>
+      </div>
+
+      <div class="iq-item" onclick="toggleIQ(this)">
+        <div class="iq-q">
+          <span class="iq-num">Q2</span>
+          <span class="iq-text">You can't SSH into a running EC2 instance. Walk me through the four things you check — in order.</span>
+          <span class="iq-check">&#10003;</span>
+        </div>
+      </div>
+
+      <div class="iq-item" onclick="toggleIQ(this)">
+        <div class="iq-q">
+          <span class="iq-num">Q3</span>
+          <span class="iq-text">What is the difference between an IAM user and an IAM role? When would you use each?</span>
+          <span class="iq-check">&#10003;</span>
+        </div>
+      </div>
+
+      <div class="iq-item" onclick="toggleIQ(this)">
+        <div class="iq-q">
+          <span class="iq-num">Q4</span>
+          <span class="iq-text">Why should EC2 instances use IAM roles instead of access keys? What specific risk do hardcoded credentials create?</span>
+          <span class="iq-check">&#10003;</span>
+        </div>
+      </div>
+
+      <div class="iq-item" onclick="toggleIQ(this)">
+        <div class="iq-q">
+          <span class="iq-num">Q5</span>
+          <span class="iq-text">What is the difference between a public subnet and a private subnet? What makes a subnet "public"?</span>
+          <span class="iq-check">&#10003;</span>
+        </div>
+      </div>
+
+      <div class="iq-item" onclick="toggleIQ(this)">
+        <div class="iq-q">
+          <span class="iq-num">Q6</span>
+          <span class="iq-text">Security groups are "stateful." What does that mean — and how does it affect your inbound/outbound rules?</span>
+          <span class="iq-check">&#10003;</span>
+        </div>
+      </div>
+
+      <div class="iq-item" onclick="toggleIQ(this)">
+        <div class="iq-q">
+          <span class="iq-num">Q7</span>
+          <span class="iq-text">You get "Access Denied" when running <code>aws s3 ls</code> from an EC2 instance. How do you diagnose whether it's an authentication or authorization problem?</span>
+          <span class="iq-check">&#10003;</span>
+        </div>
+      </div>
+
+      <div class="iq-item" onclick="toggleIQ(this)">
+        <div class="iq-q">
+          <span class="iq-num">Q8</span>
+          <span class="iq-text">Explain the AWS CLI command structure. Give an example of a command to list all running EC2 instances with a specific tag.</span>
+          <span class="iq-check">&#10003;</span>
+        </div>
+      </div>
+
+      <div class="iq-item" onclick="toggleIQ(this)">
+        <div class="iq-q">
+          <span class="iq-num">Q9</span>
+          <span class="iq-text">What is the principle of least privilege? Give a concrete example of an S3 bucket policy that follows it vs one that violates it.</span>
+          <span class="iq-check">&#10003;</span>
+        </div>
+      </div>
+
+      <div class="iq-item" onclick="toggleIQ(this)">
+        <div class="iq-q">
+          <span class="iq-num">Q10</span>
+          <span class="iq-text">Why is a bash script of AWS CLI commands considered "the first step toward infrastructure as code" but not actual IaC? What does Terraform add?</span>
+          <span class="iq-check">&#10003;</span>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- DONE CRITERIA -->
+  <div class="section-block" id="done">
+    <div class="sec-label">Before you send your end-of-day report — check these</div>
+    <div class="criteria">
+      <div class="crit" onclick="toggleCrit(this)">
+        <div class="crit-box"><span class="crit-check">&#10003;</span></div>
+        <div class="crit-text">I watched the training video sections (basic architecture, AWS CLI install, practice architecture).</div>
+      </div>
+      <div class="crit" onclick="toggleCrit(this)">
+        <div class="crit-box"><span class="crit-check">&#10003;</span></div>
+        <div class="crit-text">I worked through all 8 discovery questions and read Claude's answers carefully — not just skimmed them.</div>
+      </div>
+      <div class="crit" onclick="toggleCrit(this)">
+        <div class="crit-box"><span class="crit-check">&#10003;</span></div>
+        <div class="crit-text"><code style="font-size:11px;color:var(--accent2);">memory/aws.md</code> exists in my repo with all 5 required sections.</div>
+      </div>
+      <div class="crit" onclick="toggleCrit(this)">
+        <div class="crit-box"><span class="crit-check">&#10003;</span></div>
+        <div class="crit-text">I tried to answer all 10 interview questions from memory. Any I could not answer — I went back and strengthened that section.</div>
+      </div>
+      <div class="crit" onclick="toggleCrit(this)">
+        <div class="crit-box"><span class="crit-check">&#10003;</span></div>
+        <div class="crit-text">I can explain the SSH troubleshooting flow (key pair, security group, public IP, route table) without looking at my notes.</div>
+      </div>
+      <div class="crit" onclick="toggleCrit(this)">
+        <div class="crit-box"><span class="crit-check">&#10003;</span></div>
+        <div class="crit-text">I can explain why EC2 instances should use IAM roles, not access keys — and what an Instance Profile is.</div>
+      </div>
+      <div class="crit" onclick="toggleCrit(this)">
+        <div class="crit-box"><span class="crit-check">&#10003;</span></div>
+        <div class="crit-text">Daily log filled — Tomorrow's Context Block is 3 specific sentences written by me, not by Claude.</div>
+      </div>
+      <div class="crit" onclick="toggleCrit(this)">
+        <div class="crit-box"><span class="crit-check">&#10003;</span></div>
+        <div class="crit-text">Git commit pushed: <code style="font-size:11px;color:var(--accent2);">Day 06 — memory: aws.md</code></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- EXPLORE FURTHER -->
+  <div class="explore-section">
+    <div class="explore-header">
+      <span class="icon">&#9654;</span>
+      <span class="label">Explore further</span>
+      <span class="sublabel">Only after required work is pushed &#10003;</span>
+    </div>
+    <div class="explore-body">
+      <div style="font-size:11px;color:var(--dim);margin-bottom:4px;">These are optional. Only work on these if your artifact is committed, your report is ready to send, and you have time left.</div>
+
+      <div class="explore-item">
+        <strong>VPC design patterns.</strong> Ask Claude: <code>"Design a production-ready VPC with 2 public subnets and 2 private subnets across 2 AZs. Include an Internet Gateway, NAT Gateway, and all route tables. Explain why this is the standard AWS starting architecture and draw it in ASCII."</code> This is the VPC design you will use in Week 6 with Terraform.
+      </div>
+
+      <div class="explore-item">
+        <strong>IAM permission boundaries.</strong> Ask Claude: <code>"What is an IAM permission boundary? Give me a scenario where a developer has AdministratorAccess but a permission boundary prevents them from creating IAM users. Show the policy documents for both."</code> This is an advanced IAM concept that comes up in security reviews.
+      </div>
+
+      <div class="explore-item">
+        <strong>S3 lifecycle policies.</strong> Ask Claude: <code>"I have an S3 bucket that stores application logs. After 30 days I want logs moved to Glacier, after 365 days I want them deleted. Write the lifecycle policy JSON and explain each transition."</code> Cost optimization through lifecycle management is a standard DevOps task.
+      </div>
+    </div>
+  </div>
+
+</div><!-- /main -->
+
+<!-- SIDEBAR -->
+<div class="sidebar">
+
+  <div class="widget">
+    <div class="widget-title">Progress</div>
+    <div class="progress-count" id="prog-count">0 / 8</div>
+    <div style="margin-bottom:8px;">
+      <div class="progress-bar"><div class="progress-fill" id="prog-fill" style="width:0%"></div></div>
+      <div class="progress-label" id="prog-label">Discovery chain</div>
+    </div>
+  </div>
+
+  <div class="widget">
+    <div class="widget-title">Interview Questions</div>
+    <div class="progress-count" id="iq-count">0 / 10</div>
+    <div style="margin-bottom:8px;">
+      <div class="progress-bar"><div class="progress-fill" id="iq-fill" style="width:0%;background:linear-gradient(90deg,var(--accent2),var(--accent))"></div></div>
+      <div class="progress-label" id="iq-label">Self-verify your understanding</div>
+    </div>
+  </div>
+
+  <div class="widget">
+    <div class="widget-title">Today's Artifact</div>
+    <div class="as-row"><div class="as-dot" id="dot-aws"></div><div class="as-name">memory/aws.md</div></div>
+  </div>
+
+  <div class="widget">
+    <div class="widget-title">Connects To</div>
+    <div style="display:flex;flex-direction:column;gap:6px;">
+      <div class="conn-row"><span class="conn-dir">&larr; Day 5</span><span style="font-size:11px;color:var(--muted);">Cloud Concepts (theory)</span></div>
+      <div class="conn-row"><span class="conn-dir">&rarr; Day 7</span><span style="font-size:11px;color:var(--muted);">Docker Core</span></div>
+      <div class="conn-row"><span class="conn-dir">&rarr; Day 9</span><span style="font-size:11px;color:var(--muted);">Docker Lab (deploy to EC2)</span></div>
+      <div class="conn-row"><span class="conn-dir">&rarr; Week 6</span><span style="font-size:11px;color:var(--muted);">Terraform (IaC for this setup)</span></div>
+    </div>
+  </div>
+
+  <div class="widget" style="background:rgba(251,191,36,.04);border-color:rgba(251,191,36,.2);">
+    <div class="widget-title" style="color:var(--yellow);">Required vs Explore</div>
+    <div style="font-size:11px;color:var(--muted);line-height:1.6;">
+      <strong style="color:var(--green);">Required:</strong> Q1-Q8 + artifact + interview Qs + commit + report<br><br>
+      <strong style="color:var(--yellow);">Explore after:</strong> VPC design patterns, IAM permission boundaries, S3 lifecycle policies<br><br>
+      <span style="color:var(--dim);">Explore only after required is pushed.</span>
+    </div>
+  </div>
+
+  <div class="report-box">
+    <div class="report-title">End-of-day report</div>
+    <div class="report-step"><span class="report-step-num">1.</span> Fill daily log + context block</div>
+    <div class="report-step"><span class="report-step-num">2.</span> git commit + push</div>
+    <div class="report-step"><span class="report-step-num">3.</span> Fill <code style="font-size:10px;color:var(--accent);">templates/daily-report-template.md</code> &rarr; paste to trainer chat</div>
+  </div>
+
+</div><!-- /sidebar -->
+</div><!-- /layout -->
+
+<script>
+const chainDone = new Array(8).fill(false);
+
+function toggleChain(el, idx) {
+  chainDone[idx] = !chainDone[idx];
+  el.classList.toggle('done', chainDone[idx]);
+  const n = chainDone.filter(Boolean).length;
+  document.getElementById('prog-count').textContent = n + ' / 8';
+  document.getElementById('prog-fill').style.width = (n/8*100) + '%';
+  document.getElementById('prog-label').textContent = n === 8 ? 'All complete — write your artifact' : 'Discovery chain';
+  if (n >= 7) document.getElementById('dot-aws').classList.add('done');
+}
+
+function toggleIQ(el) {
+  el.classList.toggle('answered');
+  const n = document.querySelectorAll('.iq-item.answered').length;
+  document.getElementById('iq-count').textContent = n + ' / 10';
+  document.getElementById('iq-fill').style.width = (n/10*100) + '%';
+  document.getElementById('iq-label').textContent = n === 10 ? 'All questions attempted' : 'Self-verify your understanding';
+}
+
+function toggleCrit(el) { el.classList.toggle('done'); }
+</script>
+</body>
+</html>
