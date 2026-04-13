@@ -1,0 +1,635 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Day 6 Extended — AWS Architecture Practice · ProOps2026</title>
+<style>
+:root {
+  --bg:#0b0d14; --surface:#13161f; --surface2:#1c2030; --border:#252a3a;
+  --accent:#6c8ef7; --accent2:#a78bfa;
+  --green:#34d399; --yellow:#fbbf24; --orange:#fb923c;
+  --red:#f87171; --teal:#22d3ee; --blue:#60a5fa;
+  --text:#e8edf5; --muted:#7c87a0; --dim:#3a4258;
+}
+* { box-sizing:border-box; margin:0; padding:0; }
+body { background:var(--bg); color:var(--text); font-family:'Segoe UI',system-ui,sans-serif; font-size:15px; line-height:1.6; }
+
+nav { background:var(--surface);border-bottom:1px solid var(--border);padding:0 32px;height:50px;display:flex;align-items:center;gap:6px;position:sticky;top:0;z-index:200; }
+nav .brand { font-weight:800;font-size:14px;color:var(--accent);margin-right:12px; }
+nav a { color:var(--muted);text-decoration:none;font-size:12px;font-weight:600;padding:5px 12px;border-radius:6px;transition:all .15s;white-space:nowrap; }
+nav a:hover { color:var(--text);background:var(--surface2); }
+nav .spacer { flex:1; }
+nav .badge { background:rgba(52,211,153,.12);border:1px solid rgba(52,211,153,.25);color:var(--green);font-size:11px;font-weight:700;padding:3px 12px;border-radius:20px; }
+
+.layout { display:grid;grid-template-columns:1fr 260px;gap:32px;max-width:1100px;margin:0 auto;padding:40px 32px; }
+.main { min-width:0; }
+.sidebar { position:sticky;top:70px;height:fit-content;display:flex;flex-direction:column;gap:14px; }
+
+.day-header { margin-bottom:32px; }
+.day-meta { display:flex;align-items:center;gap:10px;margin-bottom:12px; }
+.day-pill { font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;padding:3px 12px;border-radius:20px;background:rgba(108,142,247,.12);border:1px solid rgba(108,142,247,.25);color:var(--accent); }
+.day-tag { font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;padding:3px 12px;border-radius:20px;background:rgba(52,211,153,.08);border:1px solid rgba(52,211,153,.2);color:var(--green); }
+.day-title { font-size:26px;font-weight:800;letter-spacing:-.3px;margin-bottom:8px; }
+.day-question { font-size:15px;color:var(--accent2);font-style:italic;border-left:3px solid var(--accent2);padding-left:14px;margin-bottom:16px;line-height:1.6; }
+.day-why { font-size:13px;color:var(--muted);line-height:1.7;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:14px 16px; }
+.day-why strong { color:var(--text); }
+
+.section-block { margin-bottom:32px; }
+.sec-label { font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:var(--dim);margin-bottom:14px;display:flex;align-items:center;gap:10px; }
+.sec-label::after { content:'';flex:1;height:1px;background:var(--border); }
+
+/* Architecture diagram */
+.arch-box { background:var(--surface);border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:14px; }
+.arch-head { padding:12px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px; }
+.arch-head-title { font-size:12px;font-weight:700;color:var(--text);flex:1; }
+.arch-body { padding:20px 24px;font-family:'Cascadia Code','Fira Code',monospace;font-size:11.5px;line-height:1.9;color:var(--muted); }
+.arch-body .vpc    { color:var(--accent); }
+.arch-body .pub    { color:var(--green); }
+.arch-body .priv   { color:var(--blue); }
+.arch-body .db     { color:var(--accent2); }
+.arch-body .s3     { color:var(--yellow); }
+.arch-body .eip    { color:var(--orange); }
+.arch-body .nat    { color:var(--teal); }
+.arch-body .vpn    { color:var(--red); }
+.arch-body .dim    { color:var(--dim); }
+.arch-body .new    { background:rgba(52,211,153,.08);border:1px solid rgba(52,211,153,.2);border-radius:4px;padding:0 6px;color:var(--green);font-size:10px;margin-left:6px; }
+
+/* DOD table */
+.dod-table { width:100%;border-collapse:collapse;font-size:12px;margin-bottom:14px; }
+.dod-table th { text-align:left;padding:8px 12px;background:var(--surface2);color:var(--dim);font-size:10px;text-transform:uppercase;letter-spacing:1px;border-bottom:1px solid var(--border); }
+.dod-table td { padding:8px 12px;border-bottom:1px solid var(--border);color:var(--muted);vertical-align:top; }
+.dod-table td:first-child { color:var(--text);font-weight:600;white-space:nowrap; }
+.dod-table .tag-day6 { font-size:10px;padding:1px 7px;border-radius:10px;background:rgba(108,142,247,.1);border:1px solid rgba(108,142,247,.2);color:var(--accent);white-space:nowrap; }
+.dod-table .tag-new  { font-size:10px;padding:1px 7px;border-radius:10px;background:rgba(52,211,153,.1);border:1px solid rgba(52,211,153,.2);color:var(--green);white-space:nowrap; }
+
+/* Steps */
+.step-list { display:flex;flex-direction:column;gap:14px; }
+.step { display:grid;grid-template-columns:28px 1fr;gap:14px;padding:14px 16px;background:var(--surface);border:1px solid var(--border);border-radius:10px;cursor:pointer;transition:border-color .15s; }
+.step:hover { border-color:rgba(52,211,153,.3); }
+.step.done { border-color:rgba(52,211,153,.35);background:rgba(52,211,153,.03); }
+.step-num { width:28px;height:28px;border-radius:50%;background:var(--surface2);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:var(--muted);flex-shrink:0;transition:all .15s; }
+.step.done .step-num { background:rgba(52,211,153,.15);border-color:rgba(52,211,153,.4);color:var(--green); }
+.step-title { font-size:13px;font-weight:700;margin-bottom:4px;color:var(--text); }
+.step.done .step-title { color:var(--muted);text-decoration:line-through;text-decoration-color:var(--dim); }
+.step-desc { font-size:12px;color:var(--muted);line-height:1.6; }
+.step-cmd { font-size:11px;font-family:'Cascadia Code','Fira Code',monospace;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:8px 12px;color:var(--accent2);line-height:1.7;margin-top:8px; }
+.step-warn { margin-top:8px;padding:7px 12px;background:rgba(251,191,36,.06);border:1px solid rgba(251,191,36,.2);border-radius:6px;font-size:11px;color:var(--yellow);line-height:1.5; }
+.step-hint { font-size:11px;color:var(--dim);margin-top:6px;line-height:1.5; }
+
+/* Criteria */
+.criteria { display:flex;flex-direction:column;gap:8px; }
+.crit { display:flex;gap:10px;align-items:flex-start;padding:10px 14px;background:var(--surface);border:1px solid var(--border);border-radius:8px;font-size:12px;cursor:pointer;transition:border-color .15s; }
+.crit:hover { border-color:rgba(52,211,153,.3); }
+.crit.done { border-color:rgba(52,211,153,.35);background:rgba(52,211,153,.03); }
+.crit-box { width:16px;height:16px;border-radius:4px;border:1.5px solid var(--border);flex-shrink:0;margin-top:1px;display:flex;align-items:center;justify-content:center;transition:all .15s; }
+.crit.done .crit-box { background:var(--green);border-color:var(--green); }
+.crit-check { color:#0b0d14;font-size:10px;font-weight:900;display:none; }
+.crit.done .crit-check { display:block; }
+.crit-text { color:var(--muted);line-height:1.5; }
+.crit.done .crit-text { color:var(--dim); }
+
+/* Widget */
+.widget { background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px; }
+.widget-title { font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--dim);margin-bottom:12px; }
+.progress-bar { height:5px;background:var(--surface2);border-radius:10px;overflow:hidden;margin-bottom:6px; }
+.progress-fill { height:100%;background:linear-gradient(90deg,var(--accent),var(--green));border-radius:10px;transition:width .3s; }
+.progress-label { font-size:11px;color:var(--muted); }
+.progress-count { font-size:22px;font-weight:800;color:var(--text);margin-bottom:2px; }
+.conn-row { font-size:11px;color:var(--muted);display:flex;gap:8px;align-items:flex-start;margin-bottom:4px; }
+.conn-dir { color:var(--dim);flex-shrink:0;width:52px; }
+.report-box { background:rgba(108,142,247,.06);border:1px solid rgba(108,142,247,.2);border-radius:10px;padding:14px 16px; }
+.report-title { font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--accent);margin-bottom:8px; }
+.report-step { font-size:11px;color:var(--muted);margin-bottom:6px;display:flex;gap:8px; }
+.report-step-num { color:var(--accent);font-weight:700;flex-shrink:0; }
+
+.explore-section { margin-bottom:32px; }
+.explore-header { display:flex;align-items:center;gap:12px;padding:12px 16px;background:rgba(251,191,36,.04);border:1px solid rgba(251,191,36,.2);border-radius:10px 10px 0 0;border-bottom:none; }
+.explore-header .icon { font-size:14px;color:var(--yellow); }
+.explore-header .label { font-size:12px;font-weight:700;color:var(--yellow); }
+.explore-header .sublabel { font-size:11px;color:var(--muted);margin-left:auto; }
+.explore-body { padding:14px 16px;background:rgba(251,191,36,.02);border:1px solid rgba(251,191,36,.2);border-radius:0 0 10px 10px;display:flex;flex-direction:column;gap:10px; }
+.explore-item { font-size:12px;color:var(--muted);line-height:1.6;padding-left:14px;position:relative; }
+.explore-item::before { content:'';position:absolute;left:0;top:7px;width:5px;height:5px;border-radius:50%;background:var(--yellow); }
+.explore-item strong { color:var(--text); }
+.explore-item code { font-size:10px;color:var(--accent2);background:var(--surface2);padding:1px 5px;border-radius:3px; }
+</style>
+</head>
+<body>
+
+<nav>
+  <span class="brand">ProOps2026</span>
+  <a href="#arch">Architecture</a>
+  <a href="#steps">Build Steps</a>
+  <a href="#done">Done?</a>
+  <div class="spacer"></div>
+  <span class="badge">Day 6 Extended · Practice</span>
+</nav>
+
+<div class="layout">
+<div class="main">
+
+  <!-- HEADER -->
+  <div class="day-header">
+    <div class="day-meta">
+      <span class="day-pill">Week 2 · Day 6 Extended</span>
+      <span class="day-tag">Practice Lab</span>
+    </div>
+    <div class="day-title">AWS Architecture Practice — Extend Your Day 6 Setup</div>
+    <div class="day-question">
+      How do you harden and extend a basic 3-tier AWS architecture with a static IP, secure outbound internet access, VPN access, and storage — without ever exposing more than necessary to the public internet?
+    </div>
+    <div class="day-why">
+      The architecture you built on Day 6 works — but it has gaps. The public EC2 IP changes every restart. Private instances have no outbound internet. There is no way for a teammate to securely access the private subnet without opening SSH to the world. There is no object storage. <strong>Today you close all four gaps by adding Elastic IP, NAT Gateway, OpenVPN, and S3 with bucket policies — the standard additions made to every production VPC before it is handed to a development team.</strong>
+    </div>
+  </div>
+
+  <!-- TAG REQUIREMENT -->
+  <div style="padding:14px 18px;background:rgba(248,113,113,.06);border:1px solid rgba(248,113,113,.35);border-radius:10px;margin-bottom:14px;">
+    <div style="font-size:12px;font-weight:700;color:var(--red);margin-bottom:8px;">&#9888; Required tags — every resource you create must have these two tags</div>
+    <div style="font-size:12px;color:var(--muted);line-height:1.7;margin-bottom:10px;">
+      The AWS account is configured with a tag enforcement policy. <strong style="color:var(--text);">If you create any resource (EC2, NAT Gateway, Elastic IP, S3 bucket, security group) without these two tags, the request will be denied with a "not authorized" error</strong> — even though you have the correct permissions. This is not a permissions bug. Add the tags first.
+    </div>
+    <div style="display:flex;flex-direction:column;gap:8px;">
+      <div style="padding:8px 14px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;font-size:12px;display:flex;gap:16px;align-items:center;">
+        <span style="color:var(--dim);width:60px;flex-shrink:0;">Tag 1</span>
+        <span style="color:var(--text);font-weight:700;width:80px;flex-shrink:0;">Key: <code style="font-size:11px;color:var(--green);">Owner</code></span>
+        <span style="color:var(--muted);">Value: your name — e.g. <code style="font-size:11px;color:var(--accent2);">duy_nk</code></span>
+      </div>
+      <div style="padding:8px 14px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;font-size:12px;display:flex;gap:16px;align-items:center;">
+        <span style="color:var(--dim);width:60px;flex-shrink:0;">Tag 2</span>
+        <span style="color:var(--text);font-weight:700;width:80px;flex-shrink:0;">Key: <code style="font-size:11px;color:var(--green);">Email</code></span>
+        <span style="color:var(--muted);">Value: your email — e.g. <code style="font-size:11px;color:var(--accent2);">duy_nk@gmail.com</code></span>
+      </div>
+    </div>
+    <div style="margin-top:10px;padding:8px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;font-size:11px;font-family:'Cascadia Code','Fira Code',monospace;color:var(--accent2);line-height:1.8;">
+      # Add tags when launching EC2 via CLI:<br>
+      aws ec2 run-instances ... \<br>
+      &nbsp;&nbsp;--tag-specifications 'ResourceType=instance,Tags=[{Key=Owner,Value=your_name},{Key=Email,Value=your@email.com}]'<br>
+      <br>
+      # Add tags to an existing resource (e.g. Elastic IP, NAT Gateway):<br>
+      aws ec2 create-tags --resources &lt;resource-id&gt; \<br>
+      &nbsp;&nbsp;--tags Key=Owner,Value=your_name Key=Email,Value=your@email.com
+    </div>
+    <div style="margin-top:8px;font-size:11px;color:var(--dim);line-height:1.5;">
+      In the AWS console: every "Launch instance" or "Create" form has a <strong style="color:var(--text);">Tags</strong> section at the bottom. Add both tags before clicking Create. This applies to EC2, NAT Gateway, Elastic IP, S3 bucket, and security group.
+    </div>
+  </div>
+
+  <!-- PREREQUISITE -->
+  <div style="padding:14px 18px;background:rgba(251,191,36,.04);border:1px solid rgba(251,191,36,.25);border-radius:10px;margin-bottom:28px;">
+    <div style="font-size:12px;font-weight:700;color:var(--yellow);margin-bottom:6px;">Before you start — Day 6 must be complete</div>
+    <div style="font-size:12px;color:var(--muted);line-height:1.7;">
+      Today builds directly on top of the Day 6 architecture. You must have the following already running in your AWS account:<br>
+      &bull; VPC <code style="font-size:11px;color:var(--accent2);">10.11.0.0/16</code> with public, private, and database subnets<br>
+      &bull; Internet Gateway attached, route tables configured<br>
+      &bull; EC2 Public, EC2 Private, EC2 Database — all running<br>
+      &bull; Security groups with correct inbound rules from Day 6
+    </div>
+  </div>
+
+  <!-- ARCHITECTURE DIAGRAM -->
+  <div class="section-block" id="arch">
+    <div class="sec-label">Target architecture — what you are building today</div>
+
+    <div class="arch-box">
+      <div class="arch-head">
+        <div class="arch-head-title">Extended Architecture — ap-southeast-1</div>
+        <span style="font-size:10px;color:var(--dim);">Green = new today</span>
+      </div>
+      <div class="arch-body">
+<pre style="font-family:inherit;font-size:inherit;line-height:inherit;">
+<span class="dim">AWS Cloud — ap-southeast-1</span>
+<span class="dim">┌──────────────────────────────────────────────────────────────┐</span>
+<span class="dim">│</span> <span class="vpc">VPC  10.11.0.0/16</span>                                            <span class="dim">│</span>
+<span class="dim">│</span>                                                              <span class="dim">│</span>
+<span class="dim">│  ┌───────────────────────────────────────────────────────┐   │</span>
+<span class="dim">│  │</span> <span class="pub">Public Subnet  10.x.2.0/24 – 10.x.4.0/24</span>            <span class="dim">│   │</span>
+<span class="dim">│  │</span>                                                       <span class="dim">│   │</span>
+<span class="dim">│  │</span>   <span class="eip">[EIP]</span> ── EC2 Public (web)    <span class="eip">[EIP]</span> ── OpenVPN EC2  <span class="new">new</span> <span class="dim">│   │</span>
+<span class="dim">│  │</span>                                        <span class="dim">(UDP 1194)</span>     <span class="dim">│   │</span>
+<span class="dim">│  │</span>   <span class="nat">NAT Gateway</span> <span class="eip">[EIP]</span>                                  <span class="new">new</span> <span class="dim">│   │</span>
+<span class="dim">│  │</span>                                                       <span class="dim">│   │</span>
+<span class="dim">│  │</span>   <span class="dim">Public Route Table</span>                                 <span class="dim">│   │</span>
+<span class="dim">│  │</span>   <span class="dim">0.0.0.0/0 → IGW</span>                                    <span class="dim">│   │</span>
+<span class="dim">│  └──────────────────┬──────────────────────┬────────────┘   │</span>
+<span class="dim">│</span>                     <span class="dim">│</span>                    <span class="vpn">│ VPN tunnel</span>        <span class="dim">│</span>
+<span class="dim">│  ┌──────────────────▼──────────────────────▼────────────┐   │</span>
+<span class="dim">│  │</span> <span class="priv">Private Subnet  10.x.11.0/24 – 10.x.13.0/24</span>         <span class="dim">│   │</span>
+<span class="dim">│  │</span>                                                       <span class="dim">│   │</span>
+<span class="dim">│  │</span>   EC2 Private (app)                                   <span class="dim">│   │</span>
+<span class="dim">│  │</span>                                                       <span class="dim">│   │</span>
+<span class="dim">│  │</span>   <span class="dim">Private Route Table</span>                                <span class="dim">│   │</span>
+<span class="dim">│  │</span>   <span class="nat">0.0.0.0/0 → NAT Gateway</span>                            <span class="new">new</span> <span class="dim">│   │</span>
+<span class="dim">│  └──────────────────────────────┬────────────────────────┘   │</span>
+<span class="dim">│</span>                                 <span class="dim">│</span>                             <span class="dim">│</span>
+<span class="dim">│  ┌──────────────────────────────▼────────────────────────┐   │</span>
+<span class="dim">│  │</span> <span class="db">Database Subnet  10.x.20.0/24 – 10.x.21.0/24</span>        <span class="dim">│   │</span>
+<span class="dim">│  │</span>                                                       <span class="dim">│   │</span>
+<span class="dim">│  │</span>   EC2 Database Private                                <span class="dim">│   │</span>
+<span class="dim">│  │</span>                                                       <span class="dim">│   │</span>
+<span class="dim">│  │</span>   <span class="dim">Database Route Table</span>                               <span class="dim">│   │</span>
+<span class="dim">│  │</span>   <span class="nat">0.0.0.0/0 → NAT Gateway  (outbound only)</span>           <span class="new">new</span> <span class="dim">│   │</span>
+<span class="dim">│  └───────────────────────────────────────────────────────┘   │</span>
+<span class="dim">│</span>                    <span class="dim">Internet Gateway</span>                          <span class="dim">│</span>
+<span class="dim">└─────────────────────────────┬────────────────────────────────┘</span>
+                              <span class="dim">│</span>
+                          Internet
+                              <span class="dim">│</span>
+          <span class="dim">┌───────────────────┼──────────────────────────┐</span>
+        Users            VPN Clients         <span class="s3">S3 (global service)</span>
+     <span class="dim">(port 80/443)</span>      <span class="vpn">(UDP 1194)</span>
+                       <span class="vpn">reach private</span>        <span class="s3">┌─────────────────────┐</span>
+                       <span class="vpn">+ db subnets</span>         <span class="s3">│ Public Bucket       │</span> <span class="new">new</span>
+                                             <span class="s3">│ GetObject: * allow  │</span>
+                                             <span class="s3">│ (static assets)     │</span>
+                                             <span class="s3">│                     │</span>
+                                             <span class="s3">│ Private Bucket      │</span> <span class="new">new</span>
+                                             <span class="s3">│ Public access: deny │</span>
+                                             <span class="s3">│ Allow: VPC CIDR     │</span>
+                                             <span class="s3">│ (app data / logs)   │</span>
+                                             <span class="s3">└─────────────────────┘</span>
+</pre>
+      </div>
+    </div>
+
+    <!-- DOD TABLE -->
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:14px;">
+      <div style="padding:12px 18px;border-bottom:1px solid var(--border);font-size:12px;font-weight:700;color:var(--text);">Define of Done — full architecture</div>
+      <div style="padding:4px 0;">
+        <table class="dod-table">
+          <tr><th>Check</th><th>Requirement</th><th>Tag</th></tr>
+          <tr><td>Internet → EC2 Public port 80/443</td><td>HTTP request returns a response from the public EC2 instance</td><td><span class="tag-day6">Day 6</span></td></tr>
+          <tr><td>EC2 Public → EC2 Private</td><td>Can ping or curl EC2 Private from EC2 Public via private IP</td><td><span class="tag-day6">Day 6</span></td></tr>
+          <tr><td>EC2 Private → EC2 Database</td><td>Can reach EC2 Database on port 5432 from EC2 Private</td><td><span class="tag-day6">Day 6</span></td></tr>
+          <tr><td>EC2 Public — static IP</td><td>Elastic IP assigned. Stop and start EC2 Public — IP does not change. VPN client config still works.</td><td><span class="tag-new">New</span></td></tr>
+          <tr><td>EC2 Private — outbound internet</td><td>From EC2 Private: <code style="font-size:11px;color:var(--accent2);">curl https://google.com</code> succeeds via NAT Gateway</td><td><span class="tag-new">New</span></td></tr>
+          <tr><td>EC2 Database — outbound internet</td><td>From EC2 Database: <code style="font-size:11px;color:var(--accent2);">curl https://google.com</code> succeeds via NAT Gateway. Inbound from internet: blocked.</td><td><span class="tag-new">New</span></td></tr>
+          <tr><td>OpenVPN — client connects</td><td>VPN client connects using downloaded .ovpn config. After connecting, can SSH directly into EC2 Private using its private IP.</td><td><span class="tag-new">New</span></td></tr>
+          <tr><td>S3 public bucket — readable</td><td>Upload a test file. Access its URL from a browser without any credentials — file loads.</td><td><span class="tag-new">New</span></td></tr>
+          <tr><td>S3 private bucket — VPC only</td><td>From EC2 Private: <code style="font-size:11px;color:var(--accent2);">aws s3 ls s3://your-private-bucket</code> works. Same request from your laptop without VPN: Access Denied.</td><td><span class="tag-new">New</span></td></tr>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- BUILD STEPS -->
+  <div class="section-block" id="steps">
+    <div class="sec-label">Build steps — complete in order</div>
+
+    <div style="padding:12px 16px;background:var(--surface);border:1px solid var(--border);border-radius:10px;margin-bottom:14px;font-size:12px;color:var(--muted);line-height:1.7;">
+      Each step is independent but order matters — <strong style="color:var(--text);">NAT Gateway must exist before you update the private route tables. Elastic IP must be allocated before OpenVPN is launched.</strong> Click each step when complete.
+    </div>
+
+    <div class="step-list">
+
+      <!-- STEP 1 -->
+      <div class="step" onclick="toggleStep(this,0)">
+        <div class="step-num">1</div>
+        <div>
+          <div class="step-title">Elastic IP — allocate and associate to EC2 Public</div>
+          <div class="step-desc">Allocate an Elastic IP from the AWS pool and associate it with your EC2 Public instance. After this, stopping and starting EC2 Public will not change its public IP address.</div>
+          <div class="step-cmd">
+# Allocate an Elastic IP<br>
+aws ec2 allocate-address --domain vpc<br>
+<br>
+# Associate it with your EC2 Public instance<br>
+aws ec2 associate-address \<br>
+&nbsp;&nbsp;--instance-id i-xxxxxxxxxxxxxxxxx \<br>
+&nbsp;&nbsp;--allocation-id eipalloc-xxxxxxxxxxxxxxxxx<br>
+<br>
+# Verify<br>
+aws ec2 describe-addresses --query 'Addresses[*].[PublicIp,InstanceId]' --output table
+          </div>
+          <div class="step-warn">Cost note: An Elastic IP that is NOT associated with a running instance is billed (~$0.005/hr). Always associate it immediately or release it when done.</div>
+          <div class="step-hint">Verify: stop EC2 Public, start it again — the public IP in the console must remain the same.</div>
+        </div>
+      </div>
+
+      <!-- STEP 2 -->
+      <div class="step" onclick="toggleStep(this,1)">
+        <div class="step-num">2</div>
+        <div>
+          <div class="step-title">NAT Gateway — create in public subnet, update private route tables</div>
+          <div class="step-desc">Create a NAT Gateway in the public subnet (it needs its own Elastic IP). Then update the route tables for the private and database subnets so that outbound internet traffic routes through the NAT Gateway — not the Internet Gateway.</div>
+          <div class="step-cmd">
+# Allocate an Elastic IP for the NAT Gateway<br>
+aws ec2 allocate-address --domain vpc<br>
+<br>
+# Create NAT Gateway in the public subnet<br>
+aws ec2 create-nat-gateway \<br>
+&nbsp;&nbsp;--subnet-id subnet-xxxxxxxxxxxxxxxxx \<br>
+&nbsp;&nbsp;--allocation-id eipalloc-xxxxxxxxxxxxxxxxx<br>
+<br>
+# Wait for NAT Gateway to become available (~60 seconds)<br>
+aws ec2 describe-nat-gateways --query 'NatGateways[*].[NatGatewayId,State]'<br>
+<br>
+# Add route to private route table<br>
+aws ec2 create-route \<br>
+&nbsp;&nbsp;--route-table-id rtb-xxxxxxxxxxxxxxxxx \<br>
+&nbsp;&nbsp;--destination-cidr-block 0.0.0.0/0 \<br>
+&nbsp;&nbsp;--nat-gateway-id nat-xxxxxxxxxxxxxxxxx<br>
+<br>
+# Repeat for database route table
+          </div>
+          <div class="step-warn">Cost note: NAT Gateway costs ~$0.045/hr plus $0.045 per GB of data processed. Delete it when you finish the lab.</div>
+          <div class="step-hint">Verify: SSH into EC2 Private, run <code style="font-size:11px;color:var(--accent2);">curl https://google.com</code> — it must succeed. If it hangs, the route table is not updated.</div>
+        </div>
+      </div>
+
+      <!-- STEP 3 -->
+      <div class="step" onclick="toggleStep(this,2)">
+        <div class="step-num">3</div>
+        <div>
+          <div class="step-title">OpenVPN EC2 — launch from Marketplace AMI, configure security group</div>
+
+          <!-- VIDEO REFERENCE -->
+          <div style="margin-bottom:10px;padding:12px 14px;background:rgba(108,142,247,.06);border:1px solid rgba(108,142,247,.25);border-radius:8px;">
+            <div style="font-size:11px;font-weight:700;color:var(--accent);margin-bottom:6px;">Reference video — watch before starting this step</div>
+            <div style="font-size:11px;color:var(--muted);line-height:1.7;margin-bottom:8px;">
+              This video demonstrates how to set up OpenVPN on an EC2 instance.
+              <strong style="color:var(--yellow);">The architecture shown in the video is different from Day 6 Extended.</strong>
+              Watch it to understand the OpenVPN setup process — then follow the Day 6 Extended architecture (public subnet, your existing VPC <code style="font-size:10px;color:var(--accent2);">10.11.0.0/16</code>) when you build your own.
+            </div>
+            <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+              <a href="https://drive.google.com/file/d/1Jq5Xc6OlaQcSrxtiNgvPZEAiCSq5GuXB/view?usp=sharing" target="_blank" style="display:inline-block;padding:7px 14px;border-radius:6px;background:rgba(108,142,247,.1);border:1px solid rgba(108,142,247,.3);font-size:11px;font-weight:600;color:var(--accent);text-decoration:none;">Watch on Google Drive</a>
+              <span style="font-size:11px;color:var(--muted);">Jump to <strong style="color:var(--text);">1:13:00 – 1:50:00</strong> — OpenVPN EC2 setup walkthrough</span>
+            </div>
+            <div style="margin-top:8px;padding:6px 10px;background:rgba(251,191,36,.06);border:1px solid rgba(251,191,36,.2);border-radius:5px;font-size:11px;color:var(--yellow);line-height:1.5;">
+              The video uses a different VPC and subnet layout. Do not copy the IP ranges or subnet structure from the video — use your Day 6 VPC (<code style="font-size:10px;color:var(--accent2);">10.11.0.0/16</code>) and place OpenVPN EC2 in your existing public subnet.
+            </div>
+          </div>
+
+          <div class="step-desc">Launch an EC2 instance from the OpenVPN Access Server AMI (AWS Marketplace, free for 2 concurrent connections). Place it in the public subnet. It needs its own Elastic IP so the client config stays valid after restarts.</div>
+          <div class="step-cmd">
+# Find the OpenVPN Access Server AMI in your region<br>
+aws ec2 describe-images \<br>
+&nbsp;&nbsp;--owners aws-marketplace \<br>
+&nbsp;&nbsp;--filters "Name=name,Values=*OpenVPN Access Server*" \<br>
+&nbsp;&nbsp;--query 'Images[*].[ImageId,Name,CreationDate]' \<br>
+&nbsp;&nbsp;--output table | head -20<br>
+<br>
+# Security group rules needed for OpenVPN EC2:<br>
+# Inbound: UDP 1194 (OpenVPN), TCP 943 (admin UI), TCP 443 (client UI), TCP 22 (SSH setup only)<br>
+# Outbound: all (default)<br>
+<br>
+# After launch — SSH in with the ec2-user key to complete setup:<br>
+ssh -i key.pem openvpnas@&lt;openvpn-public-ip&gt;<br>
+# Follow the setup wizard — accept defaults<br>
+# Set the admin password:<br>
+sudo passwd openvpn<br>
+<br>
+# Download client config from:<br>
+# https://&lt;openvpn-public-ip&gt;/  (use your Elastic IP)
+          </div>
+          <div class="step-warn">Use the Elastic IP for the OpenVPN instance — the .ovpn client config contains the server IP. If it changes after a restart, all clients must re-download the config.</div>
+          <div class="step-hint">Verify: install the OpenVPN client, import the .ovpn file, connect. Once connected, try SSH into EC2 Private using its private IP (e.g. 10.11.11.x) directly — no jump host needed.</div>
+        </div>
+      </div>
+
+      <!-- STEP 4 -->
+      <div class="step" onclick="toggleStep(this,3)">
+        <div class="step-num">4</div>
+        <div>
+          <div class="step-title">S3 Public Bucket — static asset hosting with bucket policy</div>
+          <div class="step-desc">Create an S3 bucket for static assets (images, frontend files). Disable "Block all public access" for this bucket only, then attach a bucket policy that allows anyone to read objects. Upload a test file and access it by URL.</div>
+          <div class="step-cmd">
+# Create the bucket (name must be globally unique)<br>
+aws s3 mb s3://proops2026-public-&lt;yourname&gt;<br>
+<br>
+# Disable block public access for this bucket<br>
+aws s3api put-public-access-block \<br>
+&nbsp;&nbsp;--bucket proops2026-public-&lt;yourname&gt; \<br>
+&nbsp;&nbsp;--public-access-block-configuration "BlockPublicAcls=false,IgnorePublicAcls=false,BlockPublicPolicy=false,RestrictPublicBuckets=false"<br>
+<br>
+# Attach public read bucket policy<br>
+aws s3api put-bucket-policy \<br>
+&nbsp;&nbsp;--bucket proops2026-public-&lt;yourname&gt; \<br>
+&nbsp;&nbsp;--policy '{<br>
+&nbsp;&nbsp;&nbsp;&nbsp;"Version":"2012-10-17",<br>
+&nbsp;&nbsp;&nbsp;&nbsp;"Statement":[{<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"Sid":"PublicRead",<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"Effect":"Allow",<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"Principal":"*",<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"Action":"s3:GetObject",<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"Resource":"arn:aws:s3:::proops2026-public-&lt;yourname&gt;/*"<br>
+&nbsp;&nbsp;&nbsp;&nbsp;}]<br>
+&nbsp;&nbsp;}'<br>
+<br>
+# Upload a test file<br>
+echo "hello from s3" &gt; test.txt<br>
+aws s3 cp test.txt s3://proops2026-public-&lt;yourname&gt;/<br>
+<br>
+# Access via URL (no credentials needed):<br>
+# https://proops2026-public-&lt;yourname&gt;.s3.ap-southeast-1.amazonaws.com/test.txt
+          </div>
+          <div class="step-hint">Verify: open the URL in your browser with no AWS credentials — the file must load. This is how static websites, CDN origins, and public asset buckets work.</div>
+        </div>
+      </div>
+
+      <!-- STEP 5 -->
+      <div class="step" onclick="toggleStep(this,4)">
+        <div class="step-num">5</div>
+        <div>
+          <div class="step-title">S3 Private Bucket — deny public access, allow from VPC CIDR only</div>
+          <div class="step-desc">Create a second S3 bucket for application data and logs. Keep all public access blocked. Attach a bucket policy that allows access only from requests originating within the VPC CIDR <code style="font-size:11px;color:var(--accent2);">10.11.0.0/16</code>. Test that EC2 Private can access it but your laptop (outside the VPC) cannot.</div>
+          <div class="step-cmd">
+# Create the private bucket<br>
+aws s3 mb s3://proops2026-private-&lt;yourname&gt;<br>
+<br>
+# Block all public access (this is the default — confirm it is on)<br>
+aws s3api put-public-access-block \<br>
+&nbsp;&nbsp;--bucket proops2026-private-&lt;yourname&gt; \<br>
+&nbsp;&nbsp;--public-access-block-configuration "BlockPublicAcls=true,IgnorePublicAcls=true,BlockPublicPolicy=true,RestrictPublicBuckets=true"<br>
+<br>
+# Attach VPC-only bucket policy<br>
+aws s3api put-bucket-policy \<br>
+&nbsp;&nbsp;--bucket proops2026-private-&lt;yourname&gt; \<br>
+&nbsp;&nbsp;--policy '{<br>
+&nbsp;&nbsp;&nbsp;&nbsp;"Version":"2012-10-17",<br>
+&nbsp;&nbsp;&nbsp;&nbsp;"Statement":[{<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"Sid":"VPCOnly",<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"Effect":"Deny",<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"Principal":"*",<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"Action":"s3:*",<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"Resource":["arn:aws:s3:::proops2026-private-&lt;yourname&gt;","arn:aws:s3:::proops2026-private-&lt;yourname&gt;/*"],<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"Condition":{"NotIpAddress":{"aws:SourceIp":"10.11.0.0/16"}}<br>
+&nbsp;&nbsp;&nbsp;&nbsp;}]<br>
+&nbsp;&nbsp;}'<br>
+<br>
+# Upload a test file from your laptop<br>
+echo "private data" &gt; private.txt<br>
+aws s3 cp private.txt s3://proops2026-private-&lt;yourname&gt;/<br>
+<br>
+# From EC2 Private (SSH in) — this must SUCCEED:<br>
+aws s3 ls s3://proops2026-private-&lt;yourname&gt; --region ap-southeast-1<br>
+<br>
+# From your laptop without VPN — this must return Access Denied:<br>
+aws s3 ls s3://proops2026-private-&lt;yourname&gt;
+          </div>
+          <div class="step-warn">The aws s3 cp from your laptop to upload the initial file will succeed because the upload request originates from your IP, not the VPC. The policy blocks reads from outside the VPC. Test with aws s3 ls, not cp.</div>
+          <div class="step-hint">Verify: connect to VPN, then run <code style="font-size:11px;color:var(--accent2);">aws s3 ls s3://proops2026-private-yourname</code> from your laptop. With VPN on, traffic originates from the VPC CIDR — it should succeed. Disconnect VPN — same command returns Access Denied.</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- DONE CRITERIA -->
+  <div class="section-block" id="done">
+    <div class="sec-label">Before you send your end-of-day report — check these</div>
+    <div class="criteria">
+      <div class="crit" onclick="toggleCrit(this)">
+        <div class="crit-box"><span class="crit-check">&#10003;</span></div>
+        <div class="crit-text">EC2 Public has an Elastic IP. I stopped and started the instance — the IP did not change.</div>
+      </div>
+      <div class="crit" onclick="toggleCrit(this)">
+        <div class="crit-box"><span class="crit-check">&#10003;</span></div>
+        <div class="crit-text">NAT Gateway created in the public subnet. Private and database route tables both have <code style="font-size:11px;color:var(--accent2);">0.0.0.0/0 → NAT Gateway</code>.</div>
+      </div>
+      <div class="crit" onclick="toggleCrit(this)">
+        <div class="crit-box"><span class="crit-check">&#10003;</span></div>
+        <div class="crit-text">From EC2 Private: <code style="font-size:11px;color:var(--accent2);">curl https://google.com</code> succeeds. From EC2 Database: same result.</div>
+      </div>
+      <div class="crit" onclick="toggleCrit(this)">
+        <div class="crit-box"><span class="crit-check">&#10003;</span></div>
+        <div class="crit-text">OpenVPN EC2 is running in the public subnet with its own Elastic IP. I connected using the OpenVPN client and .ovpn config.</div>
+      </div>
+      <div class="crit" onclick="toggleCrit(this)">
+        <div class="crit-box"><span class="crit-check">&#10003;</span></div>
+        <div class="crit-text">While connected to VPN: I SSH'd directly into EC2 Private using its private IP — no jump host, no bastion.</div>
+      </div>
+      <div class="crit" onclick="toggleCrit(this)">
+        <div class="crit-box"><span class="crit-check">&#10003;</span></div>
+        <div class="crit-text">S3 public bucket: I accessed the test file URL in a browser with no credentials — it loaded.</div>
+      </div>
+      <div class="crit" onclick="toggleCrit(this)">
+        <div class="crit-box"><span class="crit-check">&#10003;</span></div>
+        <div class="crit-text">S3 private bucket: <code style="font-size:11px;color:var(--accent2);">aws s3 ls</code> from EC2 Private succeeds. Same command from my laptop without VPN returns Access Denied.</div>
+      </div>
+      <div class="crit" onclick="toggleCrit(this)">
+        <div class="crit-box"><span class="crit-check">&#10003;</span></div>
+        <div class="crit-text">I can explain in one sentence: what makes a subnet public vs private, what NAT Gateway enables, and why the private bucket policy uses <code style="font-size:11px;color:var(--accent2);">NotIpAddress</code> with a Deny effect.</div>
+      </div>
+      <div class="crit" onclick="toggleCrit(this)">
+        <div class="crit-box"><span class="crit-check">&#10003;</span></div>
+        <div class="crit-text">Daily log filled — Tomorrow's Context Block names what I built today and what the first Day 7 task is.</div>
+      </div>
+      <div class="crit" onclick="toggleCrit(this)">
+        <div class="crit-box"><span class="crit-check">&#10003;</span></div>
+        <div class="crit-text">Git commit pushed: <code style="font-size:11px;color:var(--accent2);">Day 06 extended — AWS architecture practice</code></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- EXPLORE FURTHER -->
+  <div class="explore-section">
+    <div class="explore-header">
+      <span class="icon">&#9654;</span>
+      <span class="label">Explore further</span>
+      <span class="sublabel">Only after all 5 steps are complete &#10003;</span>
+    </div>
+    <div class="explore-body">
+      <div style="font-size:11px;color:var(--dim);margin-bottom:4px;">These are optional. Only work on these if all 5 steps are done and committed.</div>
+
+      <div class="explore-item">
+        <strong>CloudWatch alarm.</strong> In the AWS console, go to CloudWatch → Alarms → Create Alarm. Select EC2 metric CPUUtilization for EC2 Private. Set threshold to 80%. Create an SNS topic and subscribe your email. Trigger it manually by running <code>stress --cpu 2</code> on EC2 Private (install with <code>sudo apt install stress</code>). You should receive an email. This is the minimum monitoring setup for any production EC2 instance.
+      </div>
+
+      <div class="explore-item">
+        <strong>S3 bucket versioning.</strong> Enable versioning on the private bucket: <code>aws s3api put-bucket-versioning --bucket your-bucket --versioning-configuration Status=Enabled</code>. Upload the same file twice with different content. Then run <code>aws s3api list-object-versions --bucket your-bucket</code> to see both versions. Ask Claude: "what does S3 versioning protect against, and what does it not protect against compared to a backup?"
+      </div>
+
+      <div class="explore-item">
+        <strong>Security group audit.</strong> Ask Claude: <code>"I have an EC2 instance in a public subnet. Walk me through auditing its security group for common misconfigurations — open SSH to 0.0.0.0/0, open RDP, open all ports, unnecessary outbound rules. Show me the AWS CLI commands to list all rules and the corrected version of a misconfigured security group."</code> This is the first check on any security review.
+      </div>
+
+    </div>
+  </div>
+
+</div><!-- /main -->
+
+<!-- SIDEBAR -->
+<div class="sidebar">
+
+  <div class="widget">
+    <div class="widget-title">Build Progress</div>
+    <div class="progress-count" id="prog-count">0 / 5</div>
+    <div style="margin-bottom:8px;">
+      <div class="progress-bar"><div class="progress-fill" id="prog-fill" style="width:0%"></div></div>
+      <div class="progress-label" id="prog-label">Build steps</div>
+    </div>
+  </div>
+
+  <div class="widget">
+    <div class="widget-title">New Today</div>
+    <div style="display:flex;flex-direction:column;gap:6px;">
+      <div style="display:flex;align-items:center;gap:8px;font-size:11px;">
+        <div style="width:7px;height:7px;border-radius:50%;background:var(--orange);flex-shrink:0;"></div>
+        <span style="color:var(--muted);">Elastic IP (×2)</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;font-size:11px;">
+        <div style="width:7px;height:7px;border-radius:50%;background:var(--teal);flex-shrink:0;"></div>
+        <span style="color:var(--muted);">NAT Gateway</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;font-size:11px;">
+        <div style="width:7px;height:7px;border-radius:50%;background:var(--red);flex-shrink:0;"></div>
+        <span style="color:var(--muted);">OpenVPN EC2</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;font-size:11px;">
+        <div style="width:7px;height:7px;border-radius:50%;background:var(--yellow);flex-shrink:0;"></div>
+        <span style="color:var(--muted);">S3 Public Bucket</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;font-size:11px;">
+        <div style="width:7px;height:7px;border-radius:50%;background:var(--yellow);flex-shrink:0;"></div>
+        <span style="color:var(--muted);">S3 Private Bucket</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="widget" style="background:rgba(248,113,113,.04);border-color:rgba(248,113,113,.2);">
+    <div class="widget-title" style="color:var(--red);">Cost reminders</div>
+    <div style="font-size:11px;color:var(--muted);line-height:1.7;">
+      NAT Gateway: ~$0.045/hr<br>
+      Elastic IP (unassociated): ~$0.005/hr<br>
+      OpenVPN EC2 (t3.micro): ~$0.01/hr<br><br>
+      <span style="color:var(--red);">Delete NAT Gateway and release unassociated EIPs when done with the lab.</span>
+    </div>
+  </div>
+
+  <div class="widget">
+    <div class="widget-title">Connects To</div>
+    <div style="display:flex;flex-direction:column;gap:6px;">
+      <div class="conn-row"><span class="conn-dir">&larr; Day 6</span><span style="font-size:11px;color:var(--muted);">Base 3-tier architecture</span></div>
+      <div class="conn-row"><span class="conn-dir">&rarr; Day 7</span><span style="font-size:11px;color:var(--muted);">Docker Core (runs on EC2 Private)</span></div>
+      <div class="conn-row"><span class="conn-dir">&rarr; Day 9</span><span style="font-size:11px;color:var(--muted);">Docker lab deploys to this VPC</span></div>
+      <div class="conn-row"><span class="conn-dir">&rarr; Week 6</span><span style="font-size:11px;color:var(--muted);">Terraform manages this architecture</span></div>
+    </div>
+  </div>
+
+  <div class="report-box">
+    <div class="report-title">End-of-day report</div>
+    <div class="report-step"><span class="report-step-num">1.</span> Fill daily log + context block</div>
+    <div class="report-step"><span class="report-step-num">2.</span> git commit + push</div>
+    <div class="report-step"><span class="report-step-num">3.</span> Fill <code style="font-size:10px;color:var(--accent);">templates/daily-report-template.md</code> &rarr; paste to trainer chat</div>
+  </div>
+
+</div><!-- /sidebar -->
+</div><!-- /layout -->
+
+<script>
+const stepDone = new Array(5).fill(false);
+
+function toggleStep(el, idx) {
+  stepDone[idx] = !stepDone[idx];
+  el.classList.toggle('done', stepDone[idx]);
+  const n = stepDone.filter(Boolean).length;
+  document.getElementById('prog-count').textContent = n + ' / 5';
+  document.getElementById('prog-fill').style.width = (n/5*100) + '%';
+  document.getElementById('prog-label').textContent = n === 5 ? 'All steps complete' : 'Build steps';
+}
+
+function toggleCrit(el) { el.classList.toggle('done'); }
+</script>
+</body>
+</html>
