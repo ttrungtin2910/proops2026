@@ -1,0 +1,1107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Day 8 — Define Your Mock Project: DOP, IRD, Architecture · ProOps2026</title>
+<style>
+:root {
+  --bg:#0b0d14; --surface:#13161f; --surface2:#1c2030; --border:#252a3a;
+  --accent:#6c8ef7; --accent2:#a78bfa;
+  --green:#34d399; --yellow:#fbbf24; --orange:#fb923c;
+  --red:#f87171; --teal:#22d3ee; --blue:#60a5fa;
+  --text:#e8edf5; --muted:#7c87a0; --dim:#3a4258;
+}
+* { box-sizing:border-box; margin:0; padding:0; }
+body { background:var(--bg); color:var(--text); font-family:'Segoe UI',system-ui,sans-serif; font-size:15px; line-height:1.6; }
+
+nav { background:var(--surface);border-bottom:1px solid var(--border);padding:0 32px;height:50px;display:flex;align-items:center;gap:6px;position:sticky;top:0;z-index:200; }
+nav .brand { font-weight:800;font-size:14px;color:var(--accent);margin-right:12px; }
+nav a { color:var(--muted);text-decoration:none;font-size:12px;font-weight:600;padding:5px 12px;border-radius:6px;transition:all .15s;white-space:nowrap; }
+nav a:hover { color:var(--text);background:var(--surface2); }
+nav .spacer { flex:1; }
+nav .badge { background:rgba(167,139,250,.12);border:1px solid rgba(167,139,250,.25);color:var(--accent2);font-size:11px;font-weight:700;padding:3px 12px;border-radius:20px; }
+
+.layout { display:grid;grid-template-columns:1fr 260px;gap:32px;max-width:1100px;margin:0 auto;padding:40px 32px; }
+.main { min-width:0; }
+.sidebar { position:sticky;top:70px;height:fit-content;display:flex;flex-direction:column;gap:14px; }
+
+.day-header { margin-bottom:32px; }
+.day-meta { display:flex;align-items:center;gap:10px;margin-bottom:12px; }
+.day-pill { font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;padding:3px 12px;border-radius:20px;background:rgba(108,142,247,.12);border:1px solid rgba(108,142,247,.25);color:var(--accent); }
+.day-tag { font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;padding:3px 12px;border-radius:20px;background:rgba(167,139,250,.08);border:1px solid rgba(167,139,250,.2);color:var(--accent2); }
+.day-title { font-size:26px;font-weight:800;letter-spacing:-.3px;margin-bottom:8px; }
+.day-question { font-size:15px;color:var(--accent2);font-style:italic;border-left:3px solid var(--accent2);padding-left:14px;margin-bottom:16px;line-height:1.6; }
+.day-why { font-size:13px;color:var(--muted);line-height:1.7;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:14px 16px; }
+.day-why strong { color:var(--text); }
+
+.section-block { margin-bottom:32px; }
+.sec-label { font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:var(--dim);margin-bottom:14px;display:flex;align-items:center;gap:10px; }
+.sec-label::after { content:'';flex:1;height:1px;background:var(--border); }
+
+.chain { display:flex;flex-direction:column;gap:10px; }
+.chain-item { display:grid;grid-template-columns:32px 1fr;gap:14px;padding:14px 16px;background:var(--surface);border:1px solid var(--border);border-radius:10px;cursor:pointer;transition:border-color .15s; }
+.chain-item:hover { border-color:rgba(167,139,250,.4); }
+.chain-item.done { border-color:rgba(52,211,153,.3);background:rgba(52,211,153,.03); }
+.chain-num { width:32px;height:32px;border-radius:50%;background:var(--surface2);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;color:var(--muted);flex-shrink:0;transition:all .15s; }
+.chain-item.done .chain-num { background:rgba(52,211,153,.15);border-color:rgba(52,211,153,.4);color:var(--green); }
+.chain-q { font-size:13px;font-weight:600;margin-bottom:6px;line-height:1.5; }
+.chain-item.done .chain-q { color:var(--muted);text-decoration:line-through;text-decoration-color:var(--dim); }
+.chain-prompt { font-size:11px;font-family:'Cascadia Code','Fira Code',monospace;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:8px 12px;color:var(--accent2);line-height:1.6;margin-top:8px; }
+.chain-hint { font-size:11px;color:var(--dim);margin-top:6px;line-height:1.5; }
+.chain-note { font-size:11px;color:var(--yellow);margin-top:6px;line-height:1.5;padding:6px 10px;background:rgba(251,191,36,.06);border:1px solid rgba(251,191,36,.15);border-radius:5px; }
+
+.artifact-card { background:var(--surface);border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:14px; }
+.artifact-head { padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px; }
+.artifact-title { font-size:13px;font-weight:700;flex:1; }
+.artifact-file { font-family:'Cascadia Code','Fira Code',monospace;font-size:11px;color:var(--green);background:rgba(52,211,153,.08);border:1px solid rgba(52,211,153,.2);padding:2px 10px;border-radius:5px; }
+.artifact-body { padding:16px 18px; }
+.artifact-row { display:flex;gap:10px;margin-bottom:8px;font-size:12px;align-items:flex-start; }
+.artifact-row:last-child { margin-bottom:0; }
+.ar-dot { width:5px;height:5px;border-radius:50%;background:var(--green);flex-shrink:0;margin-top:6px; }
+.ar-text { color:var(--muted);line-height:1.5; }
+.ar-text strong { color:var(--text); }
+.artifact-fail { margin-top:14px;padding:10px 14px;background:rgba(248,113,113,.06);border:1px solid rgba(248,113,113,.2);border-radius:7px;font-size:11px;color:var(--muted);line-height:1.6; }
+.artifact-fail strong { color:var(--red); }
+
+.criteria { display:flex;flex-direction:column;gap:8px; }
+.crit { display:flex;gap:10px;align-items:flex-start;padding:10px 14px;background:var(--surface);border:1px solid var(--border);border-radius:8px;font-size:12px;cursor:pointer;transition:border-color .15s; }
+.crit:hover { border-color:rgba(52,211,153,.3); }
+.crit.done { border-color:rgba(52,211,153,.35);background:rgba(52,211,153,.03); }
+.crit-box { width:16px;height:16px;border-radius:4px;border:1.5px solid var(--border);flex-shrink:0;margin-top:1px;display:flex;align-items:center;justify-content:center;transition:all .15s; }
+.crit.done .crit-box { background:var(--green);border-color:var(--green); }
+.crit-check { color:#0b0d14;font-size:10px;font-weight:900;display:none; }
+.crit.done .crit-check { display:block; }
+.crit-text { color:var(--muted);line-height:1.5; }
+.crit.done .crit-text { color:var(--dim); }
+
+.widget { background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px; }
+.widget-title { font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--dim);margin-bottom:12px; }
+.progress-bar { height:5px;background:var(--surface2);border-radius:10px;overflow:hidden;margin-bottom:6px; }
+.progress-fill { height:100%;background:linear-gradient(90deg,var(--accent2),var(--green));border-radius:10px;transition:width .3s; }
+.progress-label { font-size:11px;color:var(--muted); }
+.progress-count { font-size:22px;font-weight:800;color:var(--text);margin-bottom:2px; }
+.as-row { display:flex;align-items:center;gap:8px;font-size:11px;margin-bottom:4px; }
+.as-dot { width:7px;height:7px;border-radius:50%;background:var(--dim);flex-shrink:0; }
+.as-dot.done { background:var(--green); }
+.as-name { color:var(--muted);flex:1; }
+.conn-row { font-size:11px;color:var(--muted);display:flex;gap:8px;align-items:flex-start; }
+.conn-dir { color:var(--dim);flex-shrink:0;width:48px; }
+.report-box { background:rgba(108,142,247,.06);border:1px solid rgba(108,142,247,.2);border-radius:10px;padding:14px 16px; }
+.report-title { font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--accent);margin-bottom:8px; }
+.report-step { font-size:11px;color:var(--muted);margin-bottom:6px;display:flex;gap:8px; }
+.report-step-num { color:var(--accent);font-weight:700;flex-shrink:0; }
+
+/* Example box */
+.example-box { background:rgba(108,142,247,.04);border:1px solid rgba(108,142,247,.2);border-radius:10px;overflow:hidden;margin-bottom:14px; }
+.example-head { padding:10px 16px;border-bottom:1px solid rgba(108,142,247,.15);display:flex;align-items:center;gap:10px; }
+.example-label { font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:1px;color:var(--accent);background:rgba(108,142,247,.12);border:1px solid rgba(108,142,247,.2);padding:2px 9px;border-radius:12px; }
+.example-title { font-size:12px;font-weight:700;color:var(--text); }
+.example-body { padding:14px 16px;font-size:12px;color:var(--muted);line-height:1.7; }
+.example-body code { font-size:11px;color:var(--accent2);background:var(--surface2);padding:1px 5px;border-radius:3px; }
+.example-body pre { font-family:'Cascadia Code','Fira Code',monospace;font-size:11px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:12px 14px;color:var(--accent2);line-height:1.8;margin:8px 0;overflow-x:auto; }
+.example-body strong { color:var(--text); }
+
+/* Project cards */
+.project-grid { display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px; }
+.project-card { padding:12px 14px;background:var(--surface);border:1px solid var(--border);border-radius:8px;cursor:pointer;transition:border-color .15s; }
+.project-card:hover { border-color:rgba(167,139,250,.35); }
+.project-card.selected { border-color:rgba(52,211,153,.4);background:rgba(52,211,153,.03); }
+.project-name { font-size:12px;font-weight:700;color:var(--text);margin-bottom:4px; }
+.project-card.selected .project-name { color:var(--green); }
+.project-desc { font-size:11px;color:var(--muted);line-height:1.5;margin-bottom:6px; }
+.project-services { font-size:10px;color:var(--dim);font-family:'Cascadia Code','Fira Code',monospace; }
+.project-card.selected .project-services { color:var(--green); }
+
+.explore-section { margin-bottom:32px; }
+.explore-header { display:flex;align-items:center;gap:12px;padding:12px 16px;background:rgba(251,191,36,.04);border:1px solid rgba(251,191,36,.2);border-radius:10px 10px 0 0;border-bottom:none; }
+.explore-header .icon { font-size:14px;color:var(--yellow); }
+.explore-header .label { font-size:12px;font-weight:700;color:var(--yellow); }
+.explore-header .sublabel { font-size:11px;color:var(--muted);margin-left:auto; }
+.explore-body { padding:14px 16px;background:rgba(251,191,36,.02);border:1px solid rgba(251,191,36,.2);border-radius:0 0 10px 10px;display:flex;flex-direction:column;gap:10px; }
+.explore-item { font-size:12px;color:var(--muted);line-height:1.6;padding-left:14px;position:relative; }
+.explore-item::before { content:'';position:absolute;left:0;top:7px;width:5px;height:5px;border-radius:50%;background:var(--yellow); }
+.explore-item strong { color:var(--text); }
+.explore-item code { font-size:10px;color:var(--accent2);background:var(--surface2);padding:1px 5px;border-radius:3px; }
+</style>
+</head>
+<body>
+
+<nav>
+  <span class="brand">ProOps2026</span>
+  <a href="#gitorg">Git Org</a>
+  <a href="#agile">Agile</a>
+  <a href="#concept">DOP/IRD</a>
+  <a href="#example">Example</a>
+  <a href="#projects">Pick Project</a>
+  <a href="#chain">Discovery</a>
+  <a href="#sprint">Sprint 1</a>
+  <a href="#artifact">Artifact</a>
+  <a href="#done">Done?</a>
+  <div class="spacer"></div>
+  <span class="badge">Day 8 · Design</span>
+</nav>
+
+<div class="layout">
+<div class="main">
+
+  <!-- HEADER -->
+  <div class="day-header">
+    <div class="day-meta">
+      <span class="day-pill">Week 2 · Day 8</span>
+      <span class="day-tag">Design</span>
+    </div>
+    <div class="day-title">Define Your Mock Project: DOP, IRD, Architecture</div>
+    <div class="day-question">
+      How do you define a software system precisely enough that an AI agent can implement it — without you writing a single line of code?
+    </div>
+    <div class="day-why">
+      From Day 9 onward, you will containerize, deploy, and operate your own microservice application. But before you can build it, you must define it. <strong>The document system — DOP and IRD — is the contract between your thinking and Claude Code's implementation. A vague DOP produces a vague system. A precise DOP produces working software.</strong> Today you own the design. Claude Code owns the implementation. Your job is to make the design specific enough that Claude never has to guess.
+    </div>
+  </div>
+
+  <!-- GROUP WORK -->
+  <div style="padding:14px 18px;background:rgba(167,139,250,.06);border:2px solid rgba(167,139,250,.35);border-radius:10px;margin-bottom:20px;">
+    <div style="font-size:12px;font-weight:700;color:var(--accent2);margin-bottom:8px;">Day 8 is group work — you are designing together</div>
+    <div style="font-size:12px;color:var(--muted);line-height:1.7;margin-bottom:10px;">
+      Today each pair works as one team. You pick one project together, write one DOP-001 and one IRD-001, and produce one architecture diagram. Both names go on the documents. From Day 9 onward, you implement it together in the same repository.
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+      <div style="padding:8px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:7px;font-size:12px;color:var(--muted);">
+        <span style="color:var(--accent2);font-weight:700;">chau_tv</span> &amp; <span style="color:var(--accent2);font-weight:700;">thai_dm</span>
+      </div>
+      <div style="padding:8px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:7px;font-size:12px;color:var(--muted);">
+        <span style="color:var(--accent2);font-weight:700;">hao_nn</span> &amp; <span style="color:var(--accent2);font-weight:700;">quyet_nc</span>
+      </div>
+      <div style="padding:8px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:7px;font-size:12px;color:var(--muted);">
+        <span style="color:var(--accent2);font-weight:700;">kien_pt</span> &amp; <span style="color:var(--accent2);font-weight:700;">tuan_nd</span>
+      </div>
+      <div style="padding:8px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:7px;font-size:12px;color:var(--muted);">
+        <span style="color:var(--accent2);font-weight:700;">luan_nt</span> &amp; <span style="color:var(--accent2);font-weight:700;">quy_bq</span>
+      </div>
+      <div style="padding:8px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:7px;font-size:12px;color:var(--muted);">
+        <span style="color:var(--accent2);font-weight:700;">minh_nn</span> &amp; <span style="color:var(--accent2);font-weight:700;">thao_tt</span>
+      </div>
+      <div style="padding:8px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:7px;font-size:12px;color:var(--muted);">
+        <span style="color:var(--accent2);font-weight:700;">phuong_vn</span> &amp; <span style="color:var(--accent2);font-weight:700;">tin_tt</span>
+      </div>
+      <div style="padding:8px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:7px;font-size:12px;color:var(--muted);grid-column:1/-1;max-width:50%;">
+        <span style="color:var(--accent2);font-weight:700;">tra_pv</span> &amp; <span style="color:var(--accent2);font-weight:700;">minh_dt</span>
+      </div>
+    </div>
+    <div style="margin-top:10px;padding:7px 10px;background:rgba(251,191,36,.06);border:1px solid rgba(251,191,36,.2);border-radius:5px;font-size:11px;color:var(--yellow);">
+      Both names must appear in the DOP-001 and IRD-001 document titles in Notion (e.g. "DOP-001 · Task Manager · chau_tv + thai_dm"). One person creates, the other reviews before finalizing.
+    </div>
+  </div>
+
+  <!-- GIT ORG SETUP -->
+  <div class="section-block" id="gitorg">
+    <div class="sec-label">Step 0 — Create your GitHub Organization before anything else</div>
+
+    <div style="padding:12px 16px;background:rgba(248,113,113,.04);border:1px solid rgba(248,113,113,.25);border-radius:10px;margin-bottom:14px;font-size:12px;color:var(--muted);line-height:1.7;">
+      Do this <strong style="color:var(--red);">before</strong> writing any document or code. Your GitHub Organization is where everything lives for the rest of the program — documents, services, CI/CD. If you skip this step, your partner cannot collaborate and your trainer cannot review your work.
+    </div>
+
+    <!-- ORG STRUCTURE -->
+    <div style="padding:14px 16px;background:var(--surface);border:1px solid var(--border);border-radius:10px;margin-bottom:14px;">
+      <div style="font-size:12px;font-weight:700;color:var(--text);margin-bottom:10px;">One organization. One repository per service.</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;font-size:11px;">
+        <div style="padding:10px 12px;background:rgba(248,113,113,.06);border:1px solid rgba(248,113,113,.15);border-radius:6px;">
+          <div style="font-weight:700;color:var(--red);margin-bottom:4px;">Wrong — one big repo</div>
+          <div style="color:var(--dim);font-family:'Cascadia Code','Fira Code',monospace;line-height:1.8;">
+            github.com/chautv/<br>
+            &nbsp;&nbsp;task-manager/  ← everything in one repo<br>
+            &nbsp;&nbsp;&nbsp;&nbsp;user-service/<br>
+            &nbsp;&nbsp;&nbsp;&nbsp;task-service/<br>
+            &nbsp;&nbsp;&nbsp;&nbsp;api-gateway/
+          </div>
+          <div style="color:var(--muted);margin-top:6px;line-height:1.5;">CI/CD pipelines conflict. You can't deploy one service without touching the others. Teams can't work independently.</div>
+        </div>
+        <div style="padding:10px 12px;background:rgba(52,211,153,.06);border:1px solid rgba(52,211,153,.15);border-radius:6px;">
+          <div style="font-weight:700;color:var(--green);margin-bottom:4px;">Correct — org with one repo per service</div>
+          <div style="color:var(--dim);font-family:'Cascadia Code','Fira Code',monospace;line-height:1.8;">
+            github.com/<strong style="color:var(--green);">proops2026-taskmanager/</strong><br>
+            &nbsp;&nbsp;docs          ← DOP, IRD, architecture<br>
+            &nbsp;&nbsp;user-service  ← service 1<br>
+            &nbsp;&nbsp;task-service  ← service 2<br>
+            &nbsp;&nbsp;api-gateway   ← gateway
+          </div>
+          <div style="color:var(--muted);margin-top:6px;line-height:1.5;">Each service has its own pipeline. Deploy user-service without touching task-service. Trainer sees all repos in one org.</div>
+        </div>
+      </div>
+
+      <!-- STEP BY STEP -->
+      <div style="font-size:12px;font-weight:700;color:var(--text);margin-bottom:8px;">Setup steps (both team members do this together)</div>
+      <div style="display:flex;flex-direction:column;gap:8px;font-size:12px;">
+
+        <div style="display:grid;grid-template-columns:28px 1fr;gap:12px;align-items:start;padding:10px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;">
+          <div style="width:28px;height:28px;border-radius:50%;background:rgba(108,142,247,.15);border:1px solid rgba(108,142,247,.3);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:var(--accent);flex-shrink:0;">1</div>
+          <div>
+            <div style="font-weight:700;color:var(--text);margin-bottom:3px;">Person A — Create the GitHub Organization</div>
+            <div style="color:var(--muted);line-height:1.6;">Go to <strong style="color:var(--text);">github.com → + → New organization → Free plan</strong><br>
+            Name it: <code style="font-size:11px;color:var(--green);background:rgba(52,211,153,.08);padding:1px 6px;border-radius:3px;">proops2026-[your-project-short-name]</code><br>
+            Examples: <code style="font-size:11px;color:var(--dim);">proops2026-taskmanager</code> · <code style="font-size:11px;color:var(--dim);">proops2026-deploytracker</code> · <code style="font-size:11px;color:var(--dim);">proops2026-blogcms</code></div>
+          </div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:28px 1fr;gap:12px;align-items:start;padding:10px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;">
+          <div style="width:28px;height:28px;border-radius:50%;background:rgba(108,142,247,.15);border:1px solid rgba(108,142,247,.3);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:var(--accent);flex-shrink:0;">2</div>
+          <div>
+            <div style="font-weight:700;color:var(--text);margin-bottom:3px;">Invite your partner and trainers as Owner</div>
+            <div style="color:var(--muted);line-height:1.6;">Org Settings → Members → Invite member → set role to <strong style="color:var(--text);">Owner</strong><br>
+            Invite: <strong style="color:var(--text);">your partner's GitHub username</strong> + <strong style="color:var(--text);">all trainer GitHub usernames below</strong></div>
+            <div style="margin-top:8px;padding:8px 12px;background:rgba(251,191,36,.06);border:1px solid rgba(251,191,36,.2);border-radius:6px;font-size:11px;color:var(--yellow);">
+              Trainer GitHub accounts to invite:<br>
+              <code style="color:var(--text);">huynguyen102</code> &nbsp;·&nbsp; <em style="color:var(--dim);">(additional trainer handles will be shared in Discord — invite all of them)</em>
+            </div>
+          </div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:28px 1fr;gap:12px;align-items:start;padding:10px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;">
+          <div style="width:28px;height:28px;border-radius:50%;background:rgba(108,142,247,.15);border:1px solid rgba(108,142,247,.3);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:var(--accent);flex-shrink:0;">3</div>
+          <div>
+            <div style="font-weight:700;color:var(--text);margin-bottom:3px;">Create the <code style="font-size:11px;color:var(--accent2);">docs</code> repository — push the starter repo here</div>
+            <div style="color:var(--muted);line-height:1.6;">In the org, create a new repo named <code style="font-size:11px;color:var(--green);">docs</code> (public, no template).<br>
+            Clone the starter repo from the program, replace the example content with your project, push.</div>
+            <div style="margin-top:6px;background:rgba(108,142,247,.06);border:1px solid rgba(108,142,247,.15);border-radius:6px;padding:8px 10px;font-family:'Cascadia Code','Fira Code',monospace;font-size:11px;color:var(--accent2);line-height:1.8;">
+              git clone [starter-repo-url] docs<br>
+              cd docs<br>
+              git remote set-url origin https://github.com/proops2026-[yourproject]/docs.git<br>
+              git push -u origin main
+            </div>
+          </div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:28px 1fr;gap:12px;align-items:start;padding:10px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;">
+          <div style="width:28px;height:28px;border-radius:50%;background:rgba(108,142,247,.15);border:1px solid rgba(108,142,247,.3);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:var(--accent);flex-shrink:0;">4</div>
+          <div>
+            <div style="font-weight:700;color:var(--text);margin-bottom:3px;">Create empty repositories for each service</div>
+            <div style="color:var(--muted);line-height:1.6;">Create one repo per service in the org — empty for now. You push code on Day 9.<br>
+            Name each repo after the service exactly as defined in your DOP-001:</div>
+            <div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap;">
+              <code style="font-size:11px;color:var(--dim);background:var(--surface);border:1px solid var(--border);padding:3px 8px;border-radius:4px;">user-service</code>
+              <code style="font-size:11px;color:var(--dim);background:var(--surface);border:1px solid var(--border);padding:3px 8px;border-radius:4px;">task-service</code>
+              <code style="font-size:11px;color:var(--dim);background:var(--surface);border:1px solid var(--border);padding:3px 8px;border-radius:4px;">api-gateway</code>
+              <span style="font-size:11px;color:var(--dim);padding:3px 0;">… one per service in your DOP</span>
+            </div>
+          </div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:28px 1fr;gap:12px;align-items:start;padding:10px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;">
+          <div style="width:28px;height:28px;border-radius:50%;background:rgba(52,211,153,.15);border:1px solid rgba(52,211,153,.3);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:var(--green);flex-shrink:0;">5</div>
+          <div>
+            <div style="font-weight:700;color:var(--text);margin-bottom:3px;">Share the org URL in your end-of-day report</div>
+            <div style="color:var(--muted);line-height:1.6;">Include <code style="font-size:11px;color:var(--green);">https://github.com/proops2026-[yourproject]</code> in your daily report. The trainer verifies access before Day 9 begins.</div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- AGILE VIDEO -->
+  <div class="section-block" id="agile">
+    <div class="sec-label">Watch first — Scrum &amp; Agile fundamentals</div>
+
+    <div style="padding:14px 16px;background:rgba(251,191,36,.04);border:1px solid rgba(251,191,36,.25);border-radius:10px;margin-bottom:14px;font-size:12px;color:var(--muted);line-height:1.7;">
+      Today you practice the agile process <strong style="color:var(--text);">manually</strong> — writing user stories, defining epics, and splitting tasks between your team. Days 9–11 will introduce automation (Linear issues generated from DOP + IRD via <code style="font-size:11px;color:var(--accent2);">/create-linear-issue</code>). But automation without understanding is just magic you can't debug. Learn the process by hand first, then automate it.
+    </div>
+
+    <div style="background:rgba(251,191,36,.04);border:1px solid rgba(251,191,36,.3);border-radius:10px;overflow:hidden;margin-bottom:10px;">
+      <div style="display:flex;align-items:center;gap:12px;padding:12px 16px;border-bottom:1px solid rgba(251,191,36,.15);background:rgba(251,191,36,.06);">
+        <div style="width:8px;height:8px;border-radius:50%;background:var(--yellow);flex-shrink:0;"></div>
+        <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:1px;color:var(--yellow);">Theory — Scrum &amp; Agile</div>
+        <div style="margin-left:auto;font-size:11px;color:var(--muted);font-family:'Cascadia Code','Fira Code',monospace;">1:11:00 → end of video</div>
+      </div>
+      <div style="padding:14px 16px;">
+        <a href="https://drive.google.com/file/d/1G27rU46uWr96wNG4FsQdrXqgaEjrWOmI/view?usp=sharing" target="_blank"
+           style="display:inline-flex;align-items:center;gap:8px;padding:8px 16px;background:rgba(251,191,36,.1);border:1px solid rgba(251,191,36,.3);border-radius:7px;color:var(--yellow);font-size:12px;font-weight:600;text-decoration:none;margin-bottom:12px;">
+          &#9654; Open video — jump to 1:11:00
+        </a>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:11px;color:var(--muted);line-height:1.6;">
+          <div style="padding:8px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;">
+            <div style="font-weight:700;color:var(--text);margin-bottom:3px;">What to look for</div>
+            Sprint cycle: Product Backlog → Sprint Planning → Sprint → Review → Retro. What each meeting produces.
+          </div>
+          <div style="padding:8px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;">
+            <div style="font-weight:700;color:var(--text);margin-bottom:3px;">Key terms to lock in</div>
+            Epic, User Story, Task, Story Points, Sprint Backlog, Definition of Done — you will use these in the Sprint Planning section below.
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- AGILE CONCEPT -->
+    <div style="padding:14px 16px;background:var(--surface);border:1px solid var(--border);border-radius:10px;margin-bottom:0;">
+      <div style="font-size:12px;font-weight:700;color:var(--text);margin-bottom:10px;">The agile hierarchy — from vision to daily task</div>
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:10px;font-size:11px;text-align:center;">
+        <div style="padding:10px 8px;background:rgba(108,142,247,.08);border:1px solid rgba(108,142,247,.2);border-radius:8px;">
+          <div style="font-weight:800;color:var(--accent);margin-bottom:4px;">EPIC</div>
+          <div style="color:var(--dim);line-height:1.5;">A feature area. Maps to a DOP service. e.g., "User Auth", "Task Management"</div>
+        </div>
+        <div style="padding:10px 8px;background:rgba(167,139,250,.08);border:1px solid rgba(167,139,250,.2);border-radius:8px;">
+          <div style="font-weight:800;color:var(--accent2);margin-bottom:4px;">USER STORY</div>
+          <div style="color:var(--dim);line-height:1.5;">"As a [user], I want to [action] so that [value]." Maps to a DOP acceptance criterion.</div>
+        </div>
+        <div style="padding:10px 8px;background:rgba(52,211,153,.08);border:1px solid rgba(52,211,153,.2);border-radius:8px;">
+          <div style="font-weight:800;color:var(--green);margin-bottom:4px;">TASK</div>
+          <div style="color:var(--dim);line-height:1.5;">Concrete work unit. Max 1 day. e.g., "Write POST /tasks endpoint + test". Assigned to one person.</div>
+        </div>
+        <div style="padding:10px 8px;background:rgba(251,191,36,.08);border:1px solid rgba(251,191,36,.2);border-radius:8px;">
+          <div style="font-weight:800;color:var(--yellow);margin-bottom:4px;">SPRINT</div>
+          <div style="color:var(--dim);line-height:1.5;">Fixed time-box of tasks (for this program: 1 week). Produces a working increment.</div>
+        </div>
+      </div>
+      <div style="font-size:11px;color:var(--dim);padding:8px 12px;background:var(--surface2);border-radius:6px;line-height:1.6;">
+        <strong style="color:var(--muted);">For a 2-person team:</strong> one person is Product Owner (owns the DOP — decides what goes into the sprint). The other is Scrum Master (owns the process — keeps the sprint moving). Both are Developers (do the work). On Day 8, the Product Owner drives the DOP/IRD design. The Scrum Master builds the Sprint 1 backlog and assigns tasks. Roles can rotate each sprint.
+      </div>
+    </div>
+  </div>
+
+  <!-- REQUIRED -->
+  <div style="padding:14px 18px;background:rgba(52,211,153,.04);border:1px solid rgba(52,211,153,.25);border-radius:10px;margin-bottom:28px;">
+    <div style="font-size:12px;font-weight:700;color:var(--green);margin-bottom:6px;">What you must complete today</div>
+    <div style="font-size:12px;color:var(--muted);line-height:1.7;">
+      0. Create GitHub org <code style="font-size:11px;color:var(--accent2);">proops2026-[project]</code> — invite partner + trainers as Owner, create <code style="font-size:11px;color:var(--accent2);">docs</code> + service repos<br>
+      1. Watch the Agile video (1:11:00 → end) — lock in Epic, User Story, Task, Sprint<br>
+      2. Read the concept section — understand how DOP and IRD relate to a software system<br>
+      3. Study the end-to-end example — see a complete DOP + IRD + architecture for a real microservice app<br>
+      4. Pick your mock project (or design your own)<br>
+      5. Work through all 8 discovery questions — brainstorm before you write anything<br>
+      6. Run <code style="font-size:11px;color:var(--accent2);">/write-dop</code> → create <strong>DOP-001</strong> in Notion<br>
+      7. Run <code style="font-size:11px;color:var(--accent2);">/write-ird</code> → create <strong>IRD-001</strong> in Notion<br>
+      8. Draw the architecture diagram in Mermaid, save to <code style="font-size:11px;color:var(--accent2);">docs/architecture.md</code><br>
+      9. Run the quality gate — ask Claude Code to read your DOP and IRD and tell you what to build first<br>
+      10. Run Sprint 1 Planning — break DOP into Epics → User Stories → Tasks, assign between 2 team members, save to <code style="font-size:11px;color:var(--accent2);">docs/sprint-01.md</code>
+    </div>
+    <div style="margin-top:10px;padding:8px 12px;border-radius:6px;background:rgba(251,191,36,.06);border:1px solid rgba(251,191,36,.2);font-size:11px;color:var(--yellow);">
+      The document system you write today becomes the foundation for every day from Day 9 to Day 40. Invest time here — it pays back every single day.
+    </div>
+  </div>
+
+  <!-- CONCEPT -->
+  <div class="section-block" id="concept">
+    <div class="sec-label">The document system — what DOP and IRD mean for a software project</div>
+
+    <div style="padding:16px 18px;background:var(--surface);border:1px solid var(--border);border-radius:10px;margin-bottom:14px;">
+      <div style="font-size:12px;font-weight:700;color:var(--text);margin-bottom:12px;">Two documents. Two questions. One system.</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:16px;">
+        <div style="padding:12px 14px;background:rgba(108,142,247,.06);border:1px solid rgba(108,142,247,.2);border-radius:8px;">
+          <div style="font-size:11px;font-weight:800;color:var(--accent);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;">DOP — Definition of Product</div>
+          <div style="font-size:12px;color:var(--muted);line-height:1.7;margin-bottom:8px;">Answers: <strong style="color:var(--text);">What are we building and why?</strong></div>
+          <div style="font-size:11px;color:var(--dim);line-height:1.6;">
+            &bull; What problem does this system solve?<br>
+            &bull; Who uses it? What do they do?<br>
+            &bull; What services exist and what does each own?<br>
+            &bull; What does success look like (acceptance criteria)?
+          </div>
+          <div style="margin-top:8px;padding:6px 8px;background:rgba(108,142,247,.08);border-radius:5px;font-size:10px;color:var(--accent);">Usually 1 DOP for the whole product. Add a new DOP only when the product scope changes significantly.</div>
+        </div>
+        <div style="padding:12px 14px;background:rgba(167,139,250,.06);border:1px solid rgba(167,139,250,.2);border-radius:8px;">
+          <div style="font-size:11px;font-weight:800;color:var(--accent2);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;">IRD — Implementation Requirements</div>
+          <div style="font-size:12px;color:var(--muted);line-height:1.7;margin-bottom:8px;">Answers: <strong style="color:var(--text);">How must THIS service/topic be built?</strong></div>
+          <div style="font-size:11px;color:var(--dim);line-height:1.6;">
+            &bull; What is the API contract for this service?<br>
+            &bull; What does this service's data model look like?<br>
+            &bull; What are the rules specific to this service?<br>
+            &bull; What non-functional requirements apply?
+          </div>
+          <div style="margin-top:8px;padding:6px 8px;background:rgba(167,139,250,.08);border-radius:5px;font-size:10px;color:var(--accent2);">One IRD per service or topic. You will have many IRDs. Each one is small and focused.</div>
+        </div>
+      </div>
+
+      <!-- MULTI-IRD MODEL -->
+      <div style="padding:14px 16px;background:rgba(248,113,113,.04);border:1px solid rgba(248,113,113,.2);border-radius:8px;margin-bottom:14px;">
+        <div style="font-size:12px;font-weight:700;color:var(--red);margin-bottom:8px;">Common mistake: writing one big IRD for the whole system</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;font-size:11px;">
+          <div style="padding:10px 12px;background:rgba(248,113,113,.06);border:1px solid rgba(248,113,113,.15);border-radius:6px;">
+            <div style="font-weight:700;color:var(--red);margin-bottom:4px;">Wrong</div>
+            <div style="color:var(--dim);line-height:1.6;font-family:'Cascadia Code','Fira Code',monospace;">DOP-001.md (product)<br>IRD-001.md (everything)</div>
+            <div style="color:var(--muted);margin-top:6px;line-height:1.5;">IRD-001 grows to 400 lines. Claude loads the whole file for every task. Section for user-service is buried next to Docker config next to task-service API contract. No one reads it.</div>
+          </div>
+          <div style="padding:10px 12px;background:rgba(52,211,153,.06);border:1px solid rgba(52,211,153,.15);border-radius:6px;">
+            <div style="font-weight:700;color:var(--green);margin-bottom:4px;">Correct</div>
+            <div style="color:var(--dim);line-height:1.6;font-family:'Cascadia Code','Fira Code',monospace;">DOP-001.md (product)<br>IRD-001.md (user-service)<br>IRD-002.md (task-service)<br>IRD-003.md (gateway + infra)<br>IRD-004.md (CI/CD) ← Day 11<br>IRD-005.md (monitoring) ← Day 15</div>
+            <div style="color:var(--muted);margin-top:6px;line-height:1.5;">Each IRD is 60–120 lines. Claude loads DOP + the one relevant IRD. Clear, focused, growable.</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- DOCUMENT GROWTH TIMELINE -->
+      <div style="padding:14px 16px;background:var(--surface);border:1px solid var(--border);border-radius:8px;margin-bottom:14px;">
+        <div style="font-size:12px;font-weight:700;color:var(--text);margin-bottom:10px;">How your document system grows over 40 days</div>
+        <div style="display:flex;flex-direction:column;gap:6px;font-size:11px;">
+          <div style="display:grid;grid-template-columns:80px 1fr;gap:12px;align-items:start;">
+            <div style="color:var(--accent);font-weight:700;">Day 8</div>
+            <div style="color:var(--muted);">DOP-001 · IRD-001 (first service) · IRD-002 (second service) · IRD-003 (gateway + infra) — <strong style="color:var(--text);">you write these today</strong></div>
+          </div>
+          <div style="display:grid;grid-template-columns:80px 1fr;gap:12px;align-items:start;">
+            <div style="color:var(--accent2);font-weight:700;">Day 11</div>
+            <div style="color:var(--muted);">IRD-004 — CI/CD pipeline spec (before you build the pipeline)</div>
+          </div>
+          <div style="display:grid;grid-template-columns:80px 1fr;gap:12px;align-items:start;">
+            <div style="color:var(--accent2);font-weight:700;">Day 15</div>
+            <div style="color:var(--muted);">IRD-005 — monitoring &amp; logging spec (before you add observability)</div>
+          </div>
+          <div style="display:grid;grid-template-columns:80px 1fr;gap:12px;align-items:start;">
+            <div style="color:var(--accent2);font-weight:700;">Day 20+</div>
+            <div style="color:var(--muted);">IRD-006, IRD-007 … — one new IRD each time you start a new topic or service</div>
+          </div>
+        </div>
+        <div style="margin-top:10px;padding:7px 10px;background:var(--surface2);border-radius:5px;font-size:11px;color:var(--dim);line-height:1.6;">
+          <strong style="color:var(--muted);">The rule:</strong> Write the IRD before you write the code. If you start coding without an IRD, you are guessing. If an IRD grows past ~150 lines, split it into two.
+        </div>
+      </div>
+
+      <!-- HOW CLAUDE READS THEM -->
+      <div style="padding:14px 16px;background:var(--surface);border:1px solid var(--border);border-radius:8px;margin-bottom:14px;font-size:12px;color:var(--muted);line-height:1.7;">
+        <strong style="color:var(--text);">How Claude Code uses your documents:</strong> Before every implementation task, Claude reads your DOP and the relevant IRD. DOP tells Claude <em>what</em> to build. IRD tells Claude <em>exactly how</em> to build it for this service. If a requirement is missing, Claude will guess — and every wrong guess costs debugging time. The documents are the source of truth, not the chat history. Update the IRD, then implement.
+      </div>
+
+      <div style="padding:10px 14px;background:var(--surface2);border:1px solid var(--border);border-radius:7px;font-size:12px;color:var(--muted);line-height:1.7;">
+        <strong style="color:var(--text);">Note:</strong> DOP-000 and IRD-000 (from Day 1) define how you study in this training program — a different system. DOP-001 onward is your <strong style="color:var(--text);">mock project</strong>. Do not mix them.
+      </div>
+    </div>
+  </div>
+
+  <!-- END-TO-END EXAMPLE -->
+  <div class="section-block" id="example">
+    <div class="sec-label">End-to-end example — Task Management System</div>
+
+    <div style="padding:10px 14px;background:rgba(108,142,247,.06);border:1px solid rgba(108,142,247,.2);border-radius:8px;font-size:12px;color:var(--muted);margin-bottom:14px;line-height:1.6;">
+      This is a complete worked example. Read it carefully before you write your own. Notice: the DOP defines <em>what</em> with acceptance criteria. The IRD defines <em>how</em> with enough precision that Claude can implement without guessing. The architecture diagram shows how services connect.
+    </div>
+
+    <!-- EXAMPLE DOP -->
+    <div class="example-box">
+      <div class="example-head">
+        <span class="example-label">DOP-001 Example</span>
+        <span class="example-title">Task Management System</span>
+      </div>
+      <div class="example-body">
+        <strong>Problem statement</strong><br>
+        Teams tracking tasks in chat tools (Slack, Discord) lose context — tasks get buried in messages, ownership is unclear, and there is no way to see what is blocked. This system gives teams a central place to create, assign, and track tasks via a REST API.<br><br>
+
+        <strong>Users and use cases</strong><br>
+        &bull; <strong>Team member</strong> — create a task, assign it to a person, mark it done, add a comment<br>
+        &bull; <strong>Team lead</strong> — view all tasks by status, filter by assignee, see overdue tasks<br>
+        &bull; <strong>System (automated)</strong> — receive task events via queue for notification processing<br><br>
+
+        <strong>Services</strong><br>
+        &bull; <strong>api-gateway</strong> — single entry point, routes requests to services, handles auth token validation<br>
+        &bull; <strong>task-service</strong> — owns task CRUD, task status transitions, task assignment<br>
+        &bull; <strong>user-service</strong> — owns user accounts, login, JWT token issuance<br>
+        &bull; <strong>notification-service</strong> — consumes task events from queue, sends email/webhook notifications<br>
+        &bull; <strong>PostgreSQL</strong> — persistent storage for tasks and users (separate databases per service)<br>
+        &bull; <strong>Redis</strong> — session cache and queue (optional for Day 8, required by Day 12)<br><br>
+
+        <strong>Acceptance criteria</strong><br>
+        &bull; A user can register, login, and receive a JWT token<br>
+        &bull; A logged-in user can create a task with title, description, assignee, due date<br>
+        &bull; A task moves through states: TODO → IN_PROGRESS → DONE → CANCELLED<br>
+        &bull; A team lead can list all tasks filtered by status and assignee<br>
+        &bull; When a task is assigned or completed, an event is published to the queue<br>
+        &bull; All API endpoints return JSON and use standard HTTP status codes
+      </div>
+    </div>
+
+    <!-- EXAMPLE IRD -->
+    <div class="example-box">
+      <div class="example-head">
+        <span class="example-label">IRD-001 Example</span>
+        <span class="example-title">Task Management System — Implementation Requirements</span>
+      </div>
+      <div class="example-body">
+        <strong>Technology stack</strong><br>
+        &bull; api-gateway: Node.js (Express) — lightweight proxy + auth middleware<br>
+        &bull; task-service: Node.js (Express) + Prisma ORM<br>
+        &bull; user-service: Node.js (Express) + bcrypt + JWT<br>
+        &bull; notification-service: Node.js (worker process) — no HTTP server<br>
+        &bull; Database: PostgreSQL 15 (one schema per service, same instance for dev)<br>
+        &bull; Queue: Redis Streams (simple, no additional infra)<br><br>
+
+        <strong>API contract — task-service</strong><br>
+<pre>POST   /tasks              → create task      → 201 { id, title, status, assigneeId }
+GET    /tasks              → list tasks       → 200 [{ id, title, status, assigneeId }]
+GET    /tasks/:id          → get task         → 200 { id, title, description, status, ... }
+PATCH  /tasks/:id          → update task      → 200 { id, status, ... }
+DELETE /tasks/:id          → delete task      → 204</pre>
+
+        <strong>Data model — task-service</strong><br>
+<pre>Task {
+  id          UUID primary key
+  title       VARCHAR(255) not null
+  description TEXT
+  status      ENUM(TODO, IN_PROGRESS, DONE, CANCELLED) default TODO
+  assigneeId  UUID references user(id)
+  createdBy   UUID references user(id)
+  dueDate     TIMESTAMP nullable
+  createdAt   TIMESTAMP default now()
+  updatedAt   TIMESTAMP
+}</pre>
+
+        <strong>Service communication rules</strong><br>
+        &bull; All inter-service calls go through api-gateway — services do NOT call each other directly<br>
+        &bull; Events published to queue on: task.created, task.assigned, task.completed<br>
+        &bull; Event schema: <code>{ eventType, taskId, userId, timestamp }</code><br>
+        &bull; notification-service is consumer-only — it never exposes HTTP endpoints<br><br>
+
+        <strong>Non-functional requirements</strong><br>
+        &bull; Each service runs in its own Docker container<br>
+        &bull; Configuration via environment variables only — no hardcoded values<br>
+        &bull; Health check endpoint: <code>GET /health → 200 { status: "ok" }</code> on every HTTP service<br>
+        &bull; Database migrations managed by Prisma — no manual SQL
+      </div>
+    </div>
+
+    <!-- EXAMPLE ARCHITECTURE DIAGRAM -->
+    <div class="example-box">
+      <div class="example-head">
+        <span class="example-label">Architecture Diagram</span>
+        <span class="example-title">Mermaid — save to docs/architecture.md</span>
+      </div>
+      <div class="example-body">
+        <strong>How to read this diagram:</strong> arrows show the direction of calls. Dashed arrows are async events via queue. This diagram answers: who calls who, and how does data flow from a user action to the database.<br><br>
+<pre>```mermaid
+graph TD
+  Client([Client / Browser])
+
+  subgraph Services
+    GW[api-gateway<br/>:3000]
+    TS[task-service<br/>:3001]
+    US[user-service<br/>:3002]
+    NS[notification-service<br/>worker]
+  end
+
+  subgraph Storage
+    PG[(PostgreSQL)]
+    RD[(Redis)]
+  end
+
+  Client -->|HTTP REST| GW
+  GW -->|/tasks/*| TS
+  GW -->|/users/*| US
+  TS -->|reads/writes| PG
+  US -->|reads/writes| PG
+  TS -.->|task.created<br/>task.assigned<br/>task.completed| RD
+  NS -.->|consumes events| RD
+```</pre>
+        Copy this into <code>docs/architecture.md</code> in your repo. Replace the services with your own. GitHub and Notion both render Mermaid diagrams automatically.
+      </div>
+    </div>
+  </div>
+
+  <!-- PROJECT SUGGESTIONS -->
+  <div class="section-block" id="projects">
+    <div class="sec-label">Pick your mock project — or design your own</div>
+
+    <div style="padding:10px 14px;background:var(--surface);border:1px solid var(--border);border-radius:8px;font-size:12px;color:var(--muted);margin-bottom:14px;line-height:1.6;">
+      Choose one of these or propose your own. <strong style="color:var(--text);">Any project works as long as it meets the minimum floor: frontend service + at least one backend service + one database.</strong> Click a card to select it.
+    </div>
+
+    <div class="project-grid">
+      <div class="project-card" onclick="selectProject(this,'task')">
+        <div class="project-name">Task Management System</div>
+        <div class="project-desc">Create, assign, and track tasks across a team. Status transitions, filters by assignee and status.</div>
+        <div class="project-services">api-gateway · task-service · user-service · PostgreSQL · Redis (queue)</div>
+      </div>
+      <div class="project-card" onclick="selectProject(this,'deploy')">
+        <div class="project-name">Deploy Status Checker</div>
+        <div class="project-desc">Monitor deployment status across multiple services. Each deploy has a status, logs, and a health endpoint. Dashboard shows live state.</div>
+        <div class="project-services">api-gateway · deploy-service · log-service · PostgreSQL · Redis (cache)</div>
+      </div>
+      <div class="project-card" onclick="selectProject(this,'blog')">
+        <div class="project-name">Simple Blog / CMS</div>
+        <div class="project-desc">Authors write and publish posts. Readers browse and comment. Posts have categories and tags.</div>
+        <div class="project-services">api-gateway · content-service · user-service · PostgreSQL</div>
+      </div>
+      <div class="project-card" onclick="selectProject(this,'own')">
+        <div class="project-name">Design Your Own</div>
+        <div class="project-desc">Any CRUD application with at least one backend service and one database. Must have a clear problem statement and defined users.</div>
+        <div class="project-services">frontend · backend service(s) · database (required) · queue/cache (optional)</div>
+      </div>
+    </div>
+
+    <div style="padding:10px 14px;background:rgba(248,113,113,.06);border:1px solid rgba(248,113,113,.2);border-radius:7px;font-size:11px;color:var(--muted);line-height:1.6;">
+      <strong style="color:var(--red);">Do not over-engineer.</strong> The goal of Day 8 is to define the system precisely, not to build the most complex system. A simple project with a clear DOP and IRD is better than a complex project with vague documents. You will live with this codebase for the rest of the program — keep it manageable.
+    </div>
+  </div>
+
+  <!-- DISCOVERY CHAIN -->
+  <div class="section-block" id="chain">
+    <div class="sec-label">Discovery Chain — 8 questions, one design session</div>
+
+    <div style="padding:12px 16px;background:var(--surface);border:1px solid var(--border);border-radius:10px;margin-bottom:14px;font-size:12px;color:var(--muted);line-height:1.7;">
+      Work through these questions <strong style="color:var(--text);">in Claude chat — not in the DOP yet.</strong> The answers become the raw material for your DOP and IRD. Brainstorm first. Write documents second. <strong style="color:var(--text);">Do not skip questions — each one removes a gap that will cost you later.</strong>
+    </div>
+
+    <div class="chain">
+
+      <div class="chain-item" onclick="toggleChain(this,0)">
+        <div class="chain-num">1</div>
+        <div class="chain-body">
+          <div class="chain-q">What problem does your application solve — and who has this problem? Write it in two sentences before asking Claude anything.</div>
+          <div class="chain-prompt">I'm defining a microservice application for a DevOps training program. I want to build [your app name]. The problem it solves is [your two sentences]. The users are [list of user types]. Help me evaluate: (1) is the problem statement specific enough — or is it too vague to drive implementation decisions? (2) are the user types concrete enough — does each user type have a distinct set of actions? (3) what gaps or ambiguities do you see that I need to resolve before writing a DOP?</div>
+          <div class="chain-hint">Two sentences: "X people struggle with Y. Our system solves this by Z." If you can't write this, your project is not defined yet.</div>
+          <div class="chain-note">Write your two sentences yourself first. Then paste into Claude. Do not ask Claude to write the problem statement for you.</div>
+        </div>
+      </div>
+
+      <div class="chain-item" onclick="toggleChain(this,1)">
+        <div class="chain-num">2</div>
+        <div class="chain-body">
+          <div class="chain-q">What are the core user actions — and which service owns each one? List them before asking Claude to validate.</div>
+          <div class="chain-prompt">My application has these user types: [list]. For each user type, these are the actions they perform: [list actions per user]. Based on this, I think I need these services: [list your services]. For each service I wrote: what it owns and what it does NOT own. Help me: (1) check if any single service is doing too much — what is the right split? (2) find any action that has no clear service owner, (3) check if my service boundaries follow the principle that each service owns its own data and does not share a database table with another service.</div>
+          <div class="chain-hint">One service = one responsibility = one database schema. If two services share a table, they should be one service.</div>
+          <div class="chain-note">List your services and their responsibilities yourself first. Claude validates — it does not design for you.</div>
+        </div>
+      </div>
+
+      <div class="chain-item" onclick="toggleChain(this,2)">
+        <div class="chain-num">3</div>
+        <div class="chain-body">
+          <div class="chain-q">For each core user action, trace the full CRUD flow end to end — from the user's request to the database write and back.</div>
+          <div class="chain-prompt">I'm tracing the full request flow for my application. Walk me through a complete example for each of these core actions: [list your 3–5 most important actions]. For each action: (1) which HTTP method and endpoint does the client call? (2) which service handles the request? (3) what database operation happens (INSERT, SELECT, UPDATE, DELETE)? (4) what is returned to the client and what HTTP status code? (5) if another service needs to be notified (e.g. for events), how does that happen — synchronous HTTP call or async queue message? I want to see the full flow for each action in a table or step-by-step format.</div>
+          <div class="chain-hint">If you can't trace the flow, the system is not defined. Every gap here becomes a bug later.</div>
+        </div>
+      </div>
+
+      <div class="chain-item" onclick="toggleChain(this,3)">
+        <div class="chain-num">4</div>
+        <div class="chain-body">
+          <div class="chain-q">Design the data model for each service. What tables, what columns, what relationships — before any code is written.</div>
+          <div class="chain-prompt">I'm designing the data model for my microservice application. For each service I have: [list your services]. Help me design the data model for each: (1) what tables does each service own? (2) for each table: what are the columns, data types, constraints (not null, unique, default), and primary key? (3) what are the relationships — foreign keys within the service, and how do cross-service references work (hint: store only the ID, not a foreign key, when referencing another service's data), (4) what indexes are needed for the queries I described in Q3? Write the data model in a format I can paste directly into my IRD.</div>
+          <div class="chain-hint">Cross-service data: store only the ID. Never a foreign key to another service's table. Services must be independently deployable.</div>
+        </div>
+      </div>
+
+      <div class="chain-item" onclick="toggleChain(this,4)">
+        <div class="chain-num">5</div>
+        <div class="chain-body">
+          <div class="chain-q">Define the API contract for each service — method, path, request body, response body, and error codes.</div>
+          <div class="chain-prompt">I need to define the complete API contract for my microservice application. For each service, generate a full API contract table with: HTTP method, path, description, request body (JSON schema), success response (HTTP status + JSON schema), and the two most common error responses (e.g. 400, 404, 401). Services: [list your services and their responsibilities]. Rules: (1) use REST conventions — plural nouns for resources, correct HTTP verbs, (2) all endpoints return JSON, (3) error responses must include a `message` field, (4) authenticated endpoints must note that a JWT Bearer token is required. Format as a table I can paste into my IRD.</div>
+          <div class="chain-hint">The API contract is the agreement between services. If it changes without updating the IRD, the system breaks silently.</div>
+        </div>
+      </div>
+
+      <div class="chain-item" onclick="toggleChain(this,5)">
+        <div class="chain-num">6</div>
+        <div class="chain-body">
+          <div class="chain-q">Draw the architecture — how services connect, how data flows, and where the database sits relative to each service.</div>
+          <div class="chain-prompt">I need to create an architecture diagram for my microservice application using Mermaid syntax. My services are: [list services with ports]. My storage is: [list databases, caches, queues]. The communication patterns are: [list which services call which, and which use async events]. Generate a Mermaid graph diagram that shows: (1) all services as nodes with their port numbers, (2) all storage components (database, cache, queue) as cylinder nodes, (3) arrows showing synchronous HTTP calls between services, (4) dashed arrows showing async event flows through the queue, (5) the client as the entry point. Group services and storage in subgraphs. The diagram must be correct Mermaid syntax that renders on GitHub.</div>
+          <div class="chain-hint">The diagram is the map. If you can't draw it, the system is not yet designed. Save the output to docs/architecture.md.</div>
+        </div>
+      </div>
+
+      <div class="chain-item" onclick="toggleChain(this,6)">
+        <div class="chain-num">7</div>
+        <div class="chain-body">
+          <div class="chain-q">Write DOP-001, IRD-001, IRD-002, and IRD-003 to Notion. One DOP for the whole product. One IRD per service + one IRD for infrastructure.</div>
+          <div class="chain-prompt">I've completed my design brainstorm. I need to write four documents to Notion:
+
+1. DOP-001 (whole product):
+   - Problem statement: [from Q1]
+   - Users and use cases: [from Q1–Q2]
+   - Services and ownership: [from Q2]
+   - Acceptance criteria: [from Q3 — one per core user action]
+
+2. IRD-001 ([your first service name]):
+   - Env vars for this service
+   - API contract (endpoints, request/response schemas, errors)
+   - Data model (SQL table definitions with constraints)
+   - Validation rules specific to this service
+   - Test requirements
+
+3. IRD-002 ([your second service name]):
+   - Same structure as IRD-001 but for this service
+
+4. IRD-003 (gateway + infrastructure):
+   - Routing table (which path → which service, auth required Y/N)
+   - JWT validation middleware logic
+   - Docker Compose service definitions (with health checks and depends_on)
+   - Dockerfile standard pattern
+   - Non-functional requirements (health check, error format, logging, port discipline)
+
+Generate each document separately in the exact format expected by /write-dop and /write-ird. I will run the skills for each one in sequence.</div>
+          <div class="chain-hint">Run /write-dop for DOP-001 first. Then /write-ird three times — once for each IRD. Each IRD is scoped to one service or topic. If an IRD mixes multiple services, split it.</div>
+          <div class="chain-note">Day 8 minimum: DOP-001 + IRD-001 + IRD-002 + IRD-003. On Day 9–10 you add more IRDs as you build more services. The document system grows with the project.</div>
+        </div>
+      </div>
+
+      <div class="chain-item" onclick="toggleChain(this,7)" style="border-color:rgba(52,211,153,.3);">
+        <div class="chain-num" style="background:rgba(52,211,153,.12);border-color:rgba(52,211,153,.3);color:var(--green);">8</div>
+        <div class="chain-body">
+          <div class="chain-q" style="color:var(--green);">Quality gate — ask Claude Code to read your DOP and IRD and tell you what to build first. If the answer is vague, your documents have gaps.</div>
+          <div class="chain-prompt">You are Claude Code with access to my Notion workspace via MCP. Please read my DOP-001 and IRD-001 for my mock project. Based only on what is written in those documents — do not infer or assume anything that is not explicitly stated — answer these questions: (1) what should I build first and why? (2) list every decision you would have to make that is NOT answered by the documents — these are gaps I need to fill, (3) for the first service you would implement, write the first 3 tasks as Linear issues with acceptance criteria derived from the IRD. If you cannot answer (1) confidently from the documents alone, tell me exactly what is missing.</div>
+          <div class="chain-hint">If Claude says "I would need to know X" — go back and add X to your DOP or IRD. Repeat until Claude can answer (1) without hesitation.</div>
+          <div class="chain-note">This is the acceptance test for your documents. If Claude cannot build from them, the documents are not done yet.</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- SPRINT 1 PLANNING -->
+  <div class="section-block" id="sprint">
+    <div class="sec-label">Sprint 1 Planning — manual backlog, before any automation</div>
+
+    <div style="padding:12px 16px;background:var(--surface);border:1px solid var(--border);border-radius:10px;margin-bottom:14px;font-size:12px;color:var(--muted);line-height:1.7;">
+      You have your DOP-001 and IRD-001. Now you run <strong style="color:var(--text);">Sprint 1 Planning</strong> as a team. This session is manual — no Linear, no automation yet. You write the backlog by hand in <code style="font-size:11px;color:var(--accent2);">docs/sprint-01.md</code>. On Day 9, you start implementing it. On Day 10–11, you will automate this exact process using <code style="font-size:11px;color:var(--accent2);">/create-linear-issue</code>.
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:14px;">
+      <div style="padding:12px 14px;background:rgba(108,142,247,.06);border:1px solid rgba(108,142,247,.2);border-radius:8px;">
+        <div style="font-size:11px;font-weight:800;color:var(--accent);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">Step 1 · Epics</div>
+        <div style="font-size:11px;color:var(--muted);line-height:1.6;">One Epic per DOP service. Name it after the service. e.g., "Epic: User Service", "Epic: Task Service". The Epic is the container — everything in it belongs to that service.</div>
+      </div>
+      <div style="padding:12px 14px;background:rgba(167,139,250,.06);border:1px solid rgba(167,139,250,.2);border-radius:8px;">
+        <div style="font-size:11px;font-weight:800;color:var(--accent2);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">Step 2 · User Stories</div>
+        <div style="font-size:11px;color:var(--muted);line-height:1.6;">Take each DOP acceptance criterion. Rewrite it as: <em>"As a [user type], I want to [action] so that [value]."</em> One story per AC. A good story fits in one sprint. If it doesn't, split it.</div>
+      </div>
+      <div style="padding:12px 14px;background:rgba(52,211,153,.06);border:1px solid rgba(52,211,153,.2);border-radius:8px;">
+        <div style="font-size:11px;font-weight:800;color:var(--green);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">Step 3 · Tasks + Assign</div>
+        <div style="font-size:11px;color:var(--muted);line-height:1.6;">Break each user story into concrete tasks ≤ 1 day each. Assign each task to Person A or Person B. Sprint 1 is the first service only — do not put the whole system in Sprint 1.</div>
+      </div>
+    </div>
+
+    <!-- EXAMPLE SPRINT -->
+    <div class="example-box" style="margin-bottom:14px;">
+      <div class="example-head">
+        <span class="example-label">Example</span>
+        <span class="example-title">Sprint 1 backlog — Task Management System (first 2 epics)</span>
+      </div>
+      <div class="example-body">
+        <pre style="font-size:11px;">## Sprint 1 — Task Management System
+**Duration:** Day 9 – Day 11 (3 days)
+**Goal:** Working user-service and task-service with full CRUD via REST API
+
+---
+
+### Epic: User Service
+**User Story US-01:** As a team member, I want to register an account so that I can access the system.
+- [Person A] POST /users endpoint + request validation
+- [Person A] Password hashing with bcrypt
+- [Person B] Users table migration (id, email, password_hash, created_at)
+- [Person B] Unit test: register success + duplicate email error
+
+**User Story US-02:** As a team member, I want to log in so that I receive a JWT token.
+- [Person A] POST /auth/login endpoint
+- [Person A] JWT signing (exp: 24h)
+- [Person B] Unit test: login success + wrong password 401
+
+---
+
+### Epic: Task Service
+**User Story TS-01:** As a team member, I want to create a task so that my team can track it.
+- [Person B] POST /tasks endpoint
+- [Person B] Tasks table migration (id, title, description, status, assignee_id, created_at)
+- [Person A] Integration test: create task → verify stored in DB
+
+**Definition of Done:** All endpoints return correct HTTP status codes.
+All unit tests pass. Docker Compose brings up both services with one command.</pre>
+      </div>
+    </div>
+
+    <!-- SPRINT PROMPT -->
+    <div style="padding:12px 16px;background:var(--surface);border:1px solid var(--border);border-radius:10px;margin-bottom:0;">
+      <div style="font-size:12px;font-weight:700;color:var(--text);margin-bottom:8px;">Use this prompt to generate your Sprint 1 backlog</div>
+      <div class="chain-prompt" style="margin:0;">I have completed DOP-001 and IRD-001 for my mock project. Based on the DOP acceptance criteria and IRD API contract + data model, generate our Sprint 1 backlog for a 2-person team. Rules: (1) Sprint 1 covers the first service only — do not include the whole system, (2) one Epic per service, (3) one User Story per DOP acceptance criterion — written as "As a [user], I want to [action] so that [value]", (4) each story breaks into concrete Tasks of max 1 day, (5) assign each task to either [Person A: your name] or [Person B: partner name] — balance the load, (6) write a Definition of Done for the sprint. Format as markdown that I can save to docs/sprint-01.md.</div>
+      <div style="margin-top:8px;padding:7px 10px;background:rgba(251,191,36,.06);border:1px solid rgba(251,191,36,.2);border-radius:5px;font-size:11px;color:var(--yellow);">
+        Both team members review the backlog together before saving it. If a task is unclear or the load is unbalanced, fix it before pushing to the repo. This is your team contract for Day 9.
+      </div>
+    </div>
+  </div>
+
+  <!-- ARTIFACT -->
+  <div class="section-block" id="artifact">
+    <div class="sec-label">Required artifacts — all six must exist by end of day</div>
+
+    <div style="padding:10px 14px;margin-bottom:14px;background:rgba(167,139,250,.06);border:1px solid rgba(167,139,250,.2);border-radius:8px;font-size:11px;color:var(--muted);line-height:1.6;">
+      <strong style="color:var(--accent2);">One DOP, three IRDs, one diagram, one sprint backlog.</strong> The document system is not a single file — it is a set of small, focused documents that grow with the project. See <code style="color:var(--accent2);">docs/INDEX.md</code> in the starter repo for the full map.
+    </div>
+
+    <div class="artifact-card">
+      <div class="artifact-head">
+        <div class="artifact-title">DOP-001 — Definition of Product</div>
+        <div class="artifact-file">Notion — DOP-001</div>
+      </div>
+      <div class="artifact-body">
+        <div style="font-size:11px;color:var(--muted);margin-bottom:12px;line-height:1.6;">Created via <code style="font-size:11px;color:var(--accent2);">/write-dop</code>. Covers the whole product. One DOP for the whole program.</div>
+        <div class="artifact-row"><div class="ar-dot"></div><div class="ar-text"><strong>Problem statement</strong> — two sentences: who has the problem, what the system does about it</div></div>
+        <div class="artifact-row"><div class="ar-dot"></div><div class="ar-text"><strong>Users and use cases</strong> — each user type with their specific actions listed</div></div>
+        <div class="artifact-row"><div class="ar-dot"></div><div class="ar-text"><strong>Services</strong> — each service named, its responsibility in one sentence, what it owns and does NOT own</div></div>
+        <div class="artifact-row"><div class="ar-dot"></div><div class="ar-text"><strong>Acceptance criteria</strong> — one AC per core user action, written as "given X, when Y, then Z"</div></div>
+        <div class="artifact-fail">
+          <strong>Weak signals:</strong> problem statement that could describe any app &middot; services with no ownership boundary &middot; acceptance criteria that say "the system works correctly"
+        </div>
+      </div>
+    </div>
+
+    <div class="artifact-card">
+      <div class="artifact-head">
+        <div class="artifact-title">IRD-001 — First Service</div>
+        <div class="artifact-file">Notion — IRD-001</div>
+      </div>
+      <div class="artifact-body">
+        <div style="font-size:11px;color:var(--muted);margin-bottom:12px;line-height:1.6;">Created via <code style="font-size:11px;color:var(--accent2);">/write-ird</code>. Scoped to <strong>one service only</strong>. Links back to the DOP ACs this service satisfies.</div>
+        <div class="artifact-row"><div class="ar-dot"></div><div class="ar-text"><strong>Scope header</strong> — which DOP ACs this IRD covers, which services it depends on</div></div>
+        <div class="artifact-row"><div class="ar-dot"></div><div class="ar-text"><strong>API contract</strong> — every endpoint: method, path, request schema, response schema, error codes</div></div>
+        <div class="artifact-row"><div class="ar-dot"></div><div class="ar-text"><strong>Data model</strong> — SQL table with column types, constraints, indexes</div></div>
+        <div class="artifact-row"><div class="ar-dot"></div><div class="ar-text"><strong>Validation rules</strong> — what the service enforces in code (beyond DB constraints)</div></div>
+        <div class="artifact-fail">
+          <strong>Weak signals:</strong> IRD covers more than one service &middot; API contract with no schemas &middot; "tech stack TBD" &middot; no test requirements listed
+        </div>
+      </div>
+    </div>
+
+    <div class="artifact-card">
+      <div class="artifact-head">
+        <div class="artifact-title">IRD-002 — Second Service</div>
+        <div class="artifact-file">Notion — IRD-002</div>
+      </div>
+      <div class="artifact-body">
+        <div style="font-size:11px;color:var(--muted);margin-bottom:12px;line-height:1.6;">Same structure as IRD-001. Scoped to the second service. Each service gets its own IRD.</div>
+        <div class="artifact-row"><div class="ar-dot"></div><div class="ar-text">Same required sections as IRD-001 — scope header, API contract, data model, validation rules, test requirements</div></div>
+        <div class="artifact-row"><div class="ar-dot"></div><div class="ar-text"><strong>Cross-service reference rule</strong> — how this service references entities from the first service (store the ID only, no FK)</div></div>
+        <div class="artifact-fail">
+          <strong>Weak signals:</strong> same content as IRD-001 copy-pasted and renamed &middot; no cross-service reference rule defined
+        </div>
+      </div>
+    </div>
+
+    <div class="artifact-card">
+      <div class="artifact-head">
+        <div class="artifact-title">IRD-003 — Gateway &amp; Infrastructure</div>
+        <div class="artifact-file">Notion — IRD-003</div>
+      </div>
+      <div class="artifact-body">
+        <div style="font-size:11px;color:var(--muted);margin-bottom:12px;line-height:1.6;">Covers everything that cuts across all services: routing, auth middleware, Docker Compose, NFRs.</div>
+        <div class="artifact-row"><div class="ar-dot"></div><div class="ar-text"><strong>Routing table</strong> — which path forwards to which service, auth required Y/N</div></div>
+        <div class="artifact-row"><div class="ar-dot"></div><div class="ar-text"><strong>JWT middleware logic</strong> — step-by-step: how the gateway validates and forwards user identity</div></div>
+        <div class="artifact-row"><div class="ar-dot"></div><div class="ar-text"><strong>Docker Compose spec</strong> — services, volumes, networks, health checks, depends_on</div></div>
+        <div class="artifact-row"><div class="ar-dot"></div><div class="ar-text"><strong>NFRs (non-functional requirements)</strong> — health check, error format, logging, port discipline, no hardcoded config</div></div>
+        <div class="artifact-fail">
+          <strong>Weak signals:</strong> NFRs not written (left as "we'll figure it out") &middot; Docker Compose without health checks &middot; no routing table
+        </div>
+      </div>
+    </div>
+
+    <div class="artifact-card">
+      <div class="artifact-head">
+        <div class="artifact-title">Architecture Diagram</div>
+        <div class="artifact-file">docs/architecture.md</div>
+      </div>
+      <div class="artifact-body">
+        <div style="font-size:11px;color:var(--muted);margin-bottom:12px;line-height:1.6;">Mermaid diagram committed to your repo. GitHub renders it automatically.</div>
+        <div class="artifact-row"><div class="ar-dot"></div><div class="ar-text"><strong>All services</strong> shown as nodes with their port numbers</div></div>
+        <div class="artifact-row"><div class="ar-dot"></div><div class="ar-text"><strong>All storage</strong> (database, cache, queue) shown as cylinder nodes</div></div>
+        <div class="artifact-row"><div class="ar-dot"></div><div class="ar-text"><strong>Synchronous calls</strong> as solid arrows, <strong>async events</strong> as dashed arrows</div></div>
+        <div class="artifact-row"><div class="ar-dot"></div><div class="ar-text"><strong>Client as entry point</strong> — shows where external traffic enters the system</div></div>
+        <div class="artifact-fail">
+          <strong>Weak diagram signals:</strong> services shown but no storage components &middot; no distinction between sync and async communication &middot; diagram does not match the services listed in DOP-001
+        </div>
+      </div>
+    </div>
+
+    <div class="artifact-card" style="border-color:rgba(251,191,36,.25);">
+      <div class="artifact-head" style="border-bottom-color:rgba(251,191,36,.15);">
+        <div class="artifact-title">Sprint 1 Backlog</div>
+        <div class="artifact-file" style="color:var(--yellow);background:rgba(251,191,36,.08);border-color:rgba(251,191,36,.2);">docs/sprint-01.md</div>
+      </div>
+      <div class="artifact-body">
+        <div style="font-size:11px;color:var(--muted);margin-bottom:12px;line-height:1.6;">Written manually by the team during Sprint 1 Planning. This is the Day 9 work contract for both team members.</div>
+        <div class="artifact-row"><div class="ar-dot" style="background:var(--yellow);"></div><div class="ar-text"><strong>Epics</strong> — one per DOP service, named after the service</div></div>
+        <div class="artifact-row"><div class="ar-dot" style="background:var(--yellow);"></div><div class="ar-text"><strong>User Stories</strong> — "As a [user], I want [action] so that [value]" — one per DOP acceptance criterion</div></div>
+        <div class="artifact-row"><div class="ar-dot" style="background:var(--yellow);"></div><div class="ar-text"><strong>Tasks</strong> — concrete, ≤ 1 day each, each assigned to Person A or Person B by name</div></div>
+        <div class="artifact-row"><div class="ar-dot" style="background:var(--yellow);"></div><div class="ar-text"><strong>Sprint 1 scope</strong> — first service only. Not the entire system.</div></div>
+        <div class="artifact-row"><div class="ar-dot" style="background:var(--yellow);"></div><div class="ar-text"><strong>Definition of Done</strong> — what "Sprint 1 complete" means in one paragraph</div></div>
+        <div class="artifact-fail" style="background:rgba(251,191,36,.04);border-color:rgba(251,191,36,.2);">
+          <strong style="color:var(--yellow);">Weak backlog signals:</strong> tasks longer than 1 day &middot; tasks assigned to "both" (ambiguous ownership) &middot; entire system in Sprint 1 &middot; user stories that don't trace back to DOP acceptance criteria &middot; no Definition of Done
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- DONE CRITERIA -->
+  <div class="section-block" id="done">
+    <div class="sec-label">Before you send your end-of-day report — check these</div>
+    <div class="criteria">
+      <div class="crit" onclick="toggleCrit(this)">
+        <div class="crit-box"><span class="crit-check">&#10003;</span></div>
+        <div class="crit-text">GitHub org created: <code style="font-size:11px;color:var(--accent2);">proops2026-[project]</code> — partner and all trainer accounts invited as Owner.</div>
+      </div>
+      <div class="crit" onclick="toggleCrit(this)">
+        <div class="crit-box"><span class="crit-check">&#10003;</span></div>
+        <div class="crit-text"><code style="font-size:11px;color:var(--accent2);">docs</code> repo exists in the org with starter content pushed. One empty repo per service created.</div>
+      </div>
+      <div class="crit" onclick="toggleCrit(this)">
+        <div class="crit-box"><span class="crit-check">&#10003;</span></div>
+        <div class="crit-text">I read the full example (Task Management System) — DOP, IRD, and architecture diagram — before writing my own.</div>
+      </div>
+      <div class="crit" onclick="toggleCrit(this)">
+        <div class="crit-box"><span class="crit-check">&#10003;</span></div>
+        <div class="crit-text">I wrote my problem statement in two sentences myself before asking Claude anything.</div>
+      </div>
+      <div class="crit" onclick="toggleCrit(this)">
+        <div class="crit-box"><span class="crit-check">&#10003;</span></div>
+        <div class="crit-text">DOP-001 is in Notion with problem statement, users, services with ownership boundaries, and acceptance criteria.</div>
+      </div>
+      <div class="crit" onclick="toggleCrit(this)">
+        <div class="crit-box"><span class="crit-check">&#10003;</span></div>
+        <div class="crit-text">IRD-001 is in Notion — scoped to first service only — with API contract (request/response schemas), data model (SQL), and test requirements.</div>
+      </div>
+      <div class="crit" onclick="toggleCrit(this)">
+        <div class="crit-box"><span class="crit-check">&#10003;</span></div>
+        <div class="crit-text">IRD-002 is in Notion — scoped to second service only — same structure as IRD-001 plus the cross-service reference rule.</div>
+      </div>
+      <div class="crit" onclick="toggleCrit(this)">
+        <div class="crit-box"><span class="crit-check">&#10003;</span></div>
+        <div class="crit-text">IRD-003 is in Notion — covers gateway routing table, JWT middleware steps, Docker Compose spec with health checks, and NFRs.</div>
+      </div>
+      <div class="crit" onclick="toggleCrit(this)">
+        <div class="crit-box"><span class="crit-check">&#10003;</span></div>
+        <div class="crit-text"><code style="font-size:11px;color:var(--accent2);">docs/architecture.md</code> exists in my repo with a valid Mermaid diagram that matches my DOP services.</div>
+      </div>
+      <div class="crit" onclick="toggleCrit(this)">
+        <div class="crit-box"><span class="crit-check">&#10003;</span></div>
+        <div class="crit-text">I ran the quality gate (Q8) — Claude Code read my DOP and IRD and told me what to build first without asking for clarification.</div>
+      </div>
+      <div class="crit" onclick="toggleCrit(this)">
+        <div class="crit-box"><span class="crit-check">&#10003;</span></div>
+        <div class="crit-text">Any gap Claude found in Q8 has been resolved — DOP-001 and IRD-001 updated in Notion.</div>
+      </div>
+      <div class="crit" onclick="toggleCrit(this)">
+        <div class="crit-box"><span class="crit-check">&#10003;</span></div>
+        <div class="crit-text"><code style="font-size:11px;color:var(--accent2);">docs/sprint-01.md</code> exists with Epics, User Stories, Tasks assigned by name, and a Definition of Done.</div>
+      </div>
+      <div class="crit" onclick="toggleCrit(this)">
+        <div class="crit-box"><span class="crit-check">&#10003;</span></div>
+        <div class="crit-text">Both team members reviewed the sprint backlog and agreed on task assignments — no task is assigned to "both".</div>
+      </div>
+      <div class="crit" onclick="toggleCrit(this)">
+        <div class="crit-box"><span class="crit-check">&#10003;</span></div>
+        <div class="crit-text">Daily log filled — Tomorrow's Context Block names the first task each person will start and why it is the right first task.</div>
+      </div>
+      <div class="crit" onclick="toggleCrit(this)">
+        <div class="crit-box"><span class="crit-check">&#10003;</span></div>
+        <div class="crit-text">Git commit pushed: <code style="font-size:11px;color:var(--accent2);">Day 08 — docs: DOP-001 + IRD-001/002/003 + architecture + sprint-01</code></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- EXPLORE FURTHER -->
+  <div class="explore-section">
+    <div class="explore-header">
+      <span class="icon">&#9654;</span>
+      <span class="label">Explore further</span>
+      <span class="sublabel">Only after DOP, IRD, and diagram are pushed &#10003;</span>
+    </div>
+    <div class="explore-body">
+      <div style="font-size:11px;color:var(--dim);margin-bottom:4px;">These are optional. Only work on these if all three artifacts are committed and your report is ready to send.</div>
+
+      <div class="explore-item">
+        <strong>Create your first Linear issue from the IRD.</strong> Run <code>/create-linear-issue</code> in Claude Code. Give it the context of your IRD-001 and ask it to create the first implementation ticket for the first service — with acceptance criteria derived from your API contract. This is the bridge from document system to daily work.
+      </div>
+
+      <div class="explore-item">
+        <strong>Sequence diagram for one user action.</strong> Ask Claude: <code>"Generate a Mermaid sequence diagram for the [your most complex action] flow — from the client HTTP request through the api-gateway, to the service, to the database, and back. Include the exact HTTP methods, paths, and status codes at each step."</code> Sequence diagrams are how you verify your IRD is internally consistent.
+      </div>
+
+      <div class="explore-item">
+        <strong>Error scenario design.</strong> Ask Claude: <code>"For each service in my IRD, identify the three most likely failure scenarios — database connection lost, invalid input, downstream service timeout. For each: what HTTP status code should the service return, what should the error response body look like, and how should the calling service handle it?"</code> Error handling decisions made now save debugging time in Week 4.
+      </div>
+
+    </div>
+  </div>
+
+</div><!-- /main -->
+
+<!-- SIDEBAR -->
+<div class="sidebar">
+
+  <div class="widget">
+    <div class="widget-title">Progress</div>
+    <div class="progress-count" id="prog-count">0 / 8</div>
+    <div style="margin-bottom:8px;">
+      <div class="progress-bar"><div class="progress-fill" id="prog-fill" style="width:0%"></div></div>
+      <div class="progress-label" id="prog-label">Discovery chain</div>
+    </div>
+  </div>
+
+  <div class="widget">
+    <div class="widget-title">Today's Artifacts</div>
+    <div class="as-row"><div class="as-dot" id="dot-dop"></div><div class="as-name">DOP-001 (Notion)</div></div>
+    <div class="as-row"><div class="as-dot" id="dot-ird1"></div><div class="as-name">IRD-001 · service 1 (Notion)</div></div>
+    <div class="as-row"><div class="as-dot" id="dot-ird2"></div><div class="as-name">IRD-002 · service 2 (Notion)</div></div>
+    <div class="as-row"><div class="as-dot" id="dot-ird3"></div><div class="as-name">IRD-003 · gateway + infra (Notion)</div></div>
+    <div class="as-row"><div class="as-dot" id="dot-arch"></div><div class="as-name">docs/architecture.md</div></div>
+    <div class="as-row"><div class="as-dot" id="dot-sprint"></div><div class="as-name">docs/sprint-01.md</div></div>
+    <div style="margin-top:8px;padding:6px 8px;background:rgba(167,139,250,.06);border-radius:5px;font-size:10px;color:var(--dim);line-height:1.5;">More IRDs added on Day 9+ as you build more services and features.</div>
+  </div>
+
+  <div class="widget" style="background:rgba(248,113,113,.04);border-color:rgba(248,113,113,.2);">
+    <div class="widget-title" style="color:var(--red);">Quality Gate</div>
+    <div style="font-size:11px;color:var(--muted);line-height:1.7;">
+      Ask Claude Code:<br>
+      <em style="color:var(--dim);">"Read my DOP-001 and IRD-001. What should I build first?"</em><br><br>
+      If Claude asks a clarifying question → your documents have a gap. Fix it. Repeat until Claude answers without hesitation.
+    </div>
+  </div>
+
+  <div class="widget">
+    <div class="widget-title">Document System</div>
+    <div style="font-size:11px;color:var(--muted);line-height:1.7;">
+      <strong style="color:var(--text);">DOP-000</strong> <span style="color:var(--dim);">→ training program<br>(Day 1, already done)</span><br><br>
+      <strong style="color:var(--accent2);">DOP-001</strong> <span style="color:var(--dim);">→ mock project<br>(today)</span><br><br>
+      These are two separate systems. Do not mix them.
+    </div>
+  </div>
+
+  <div class="widget">
+    <div class="widget-title">Connects To</div>
+    <div style="display:flex;flex-direction:column;gap:6px;">
+      <div class="conn-row"><span class="conn-dir">&larr; Day 7</span><span style="font-size:11px;color:var(--muted);">Docker Core (containers for these services)</span></div>
+      <div class="conn-row"><span class="conn-dir">&rarr; Day 9</span><span style="font-size:11px;color:var(--muted);">Implement Sprint 1 tasks — Dockerize first service</span></div>
+      <div class="conn-row"><span class="conn-dir">&rarr; Day 10–11</span><span style="font-size:11px;color:var(--muted);">Automate ticket creation from DOP/IRD via Linear</span></div>
+      <div class="conn-row"><span class="conn-dir">&rarr; Day 22</span><span style="font-size:11px;color:var(--muted);">CI/CD pipeline for this codebase</span></div>
+      <div class="conn-row"><span class="conn-dir">&rarr; Day 40</span><span style="font-size:11px;color:var(--muted);">Final demo uses this system</span></div>
+    </div>
+  </div>
+
+  <div class="report-box">
+    <div class="report-title">End-of-day report</div>
+    <div class="report-step"><span class="report-step-num">1.</span> Fill daily log + context block</div>
+    <div class="report-step"><span class="report-step-num">2.</span> git commit + push to <code style="font-size:10px;color:var(--accent);">docs</code> repo in org</div>
+    <div class="report-step"><span class="report-step-num">3.</span> Fill <code style="font-size:10px;color:var(--accent);">templates/daily-report-template.md</code> &rarr; paste to trainer chat</div>
+    <div style="margin-top:8px;padding:7px 10px;background:rgba(248,113,113,.06);border:1px solid rgba(248,113,113,.2);border-radius:5px;font-size:10px;color:var(--red);line-height:1.5;">
+      Include your GitHub org URL in the report. Trainer must have access before Day 9.
+    </div>
+  </div>
+
+</div><!-- /sidebar -->
+</div><!-- /layout -->
+
+<script>
+const chainDone = new Array(8).fill(false);
+
+function toggleChain(el, idx) {
+  chainDone[idx] = !chainDone[idx];
+  el.classList.toggle('done', chainDone[idx]);
+  const n = chainDone.filter(Boolean).length;
+  document.getElementById('prog-count').textContent = n + ' / 8';
+  document.getElementById('prog-fill').style.width = (n/8*100) + '%';
+  document.getElementById('prog-label').textContent = n === 8 ? 'All complete — run quality gate' : 'Discovery chain';
+  if (n >= 5) document.getElementById('dot-arch').classList.add('done');
+  if (n >= 6) document.getElementById('dot-dop').classList.add('done');
+  if (n >= 7) document.getElementById('dot-ird').classList.add('done');
+}
+
+function toggleCrit(el) { el.classList.toggle('done'); }
+
+function selectProject(el, key) {
+  document.querySelectorAll('.project-card').forEach(c => c.classList.remove('selected'));
+  el.classList.add('selected');
+}
+</script>
+</body>
+</html>

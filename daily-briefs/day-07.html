@@ -1,0 +1,589 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Day 7 — Docker Core: Dockerfile, Image, Build, Run, Exec · ProOps2026</title>
+<style>
+:root {
+  --bg:#0b0d14; --surface:#13161f; --surface2:#1c2030; --border:#252a3a;
+  --accent:#6c8ef7; --accent2:#a78bfa;
+  --green:#34d399; --yellow:#fbbf24; --orange:#fb923c;
+  --red:#f87171; --teal:#22d3ee; --blue:#60a5fa;
+  --text:#e8edf5; --muted:#7c87a0; --dim:#3a4258;
+}
+* { box-sizing:border-box; margin:0; padding:0; }
+body { background:var(--bg); color:var(--text); font-family:'Segoe UI',system-ui,sans-serif; font-size:15px; line-height:1.6; }
+
+nav { background:var(--surface);border-bottom:1px solid var(--border);padding:0 32px;height:50px;display:flex;align-items:center;gap:6px;position:sticky;top:0;z-index:200; }
+nav .brand { font-weight:800;font-size:14px;color:var(--accent);margin-right:12px; }
+nav a { color:var(--muted);text-decoration:none;font-size:12px;font-weight:600;padding:5px 12px;border-radius:6px;transition:all .15s;white-space:nowrap; }
+nav a:hover { color:var(--text);background:var(--surface2); }
+nav .spacer { flex:1; }
+nav .badge { background:rgba(251,191,36,.12);border:1px solid rgba(251,191,36,.25);color:var(--yellow);font-size:11px;font-weight:700;padding:3px 12px;border-radius:20px; }
+
+.layout { display:grid;grid-template-columns:1fr 260px;gap:32px;max-width:1100px;margin:0 auto;padding:40px 32px; }
+.main { min-width:0; }
+.sidebar { position:sticky;top:70px;height:fit-content;display:flex;flex-direction:column;gap:14px; }
+
+.day-header { margin-bottom:32px; }
+.day-meta { display:flex;align-items:center;gap:10px;margin-bottom:12px; }
+.day-pill { font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;padding:3px 12px;border-radius:20px;background:rgba(108,142,247,.12);border:1px solid rgba(108,142,247,.25);color:var(--accent); }
+.day-tag { font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;padding:3px 12px;border-radius:20px;background:rgba(251,191,36,.08);border:1px solid rgba(251,191,36,.2);color:var(--yellow); }
+.day-title { font-size:26px;font-weight:800;letter-spacing:-.3px;margin-bottom:8px; }
+.day-question { font-size:15px;color:var(--accent2);font-style:italic;border-left:3px solid var(--accent2);padding-left:14px;margin-bottom:16px;line-height:1.6; }
+.day-why { font-size:13px;color:var(--muted);line-height:1.7;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:14px 16px; }
+.day-why strong { color:var(--text); }
+
+.section-block { margin-bottom:32px; }
+.sec-label { font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:var(--dim);margin-bottom:14px;display:flex;align-items:center;gap:10px; }
+.sec-label::after { content:'';flex:1;height:1px;background:var(--border); }
+
+.chain { display:flex;flex-direction:column;gap:10px; }
+.chain-item { display:grid;grid-template-columns:32px 1fr;gap:14px;padding:14px 16px;background:var(--surface);border:1px solid var(--border);border-radius:10px;cursor:pointer;transition:border-color .15s; }
+.chain-item:hover { border-color:rgba(167,139,250,.4); }
+.chain-item.done { border-color:rgba(52,211,153,.3);background:rgba(52,211,153,.03); }
+.chain-num { width:32px;height:32px;border-radius:50%;background:var(--surface2);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;color:var(--muted);flex-shrink:0;transition:all .15s; }
+.chain-item.done .chain-num { background:rgba(52,211,153,.15);border-color:rgba(52,211,153,.4);color:var(--green); }
+.chain-q { font-size:13px;font-weight:600;margin-bottom:6px;line-height:1.5; }
+.chain-item.done .chain-q { color:var(--muted);text-decoration:line-through;text-decoration-color:var(--dim); }
+.chain-prompt { font-size:11px;font-family:'Cascadia Code','Fira Code',monospace;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:8px 12px;color:var(--accent2);line-height:1.6;margin-top:8px; }
+.chain-hint { font-size:11px;color:var(--dim);margin-top:6px;line-height:1.5; }
+
+.artifact-card { background:var(--surface);border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:14px; }
+.artifact-head { padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px; }
+.artifact-title { font-size:13px;font-weight:700;flex:1; }
+.artifact-file { font-family:'Cascadia Code','Fira Code',monospace;font-size:11px;color:var(--green);background:rgba(52,211,153,.08);border:1px solid rgba(52,211,153,.2);padding:2px 10px;border-radius:5px; }
+.artifact-body { padding:16px 18px; }
+.artifact-row { display:flex;gap:10px;margin-bottom:8px;font-size:12px;align-items:flex-start; }
+.artifact-row:last-child { margin-bottom:0; }
+.ar-dot { width:5px;height:5px;border-radius:50%;background:var(--green);flex-shrink:0;margin-top:6px; }
+.ar-text { color:var(--muted);line-height:1.5; }
+.ar-text strong { color:var(--text); }
+.artifact-fail { margin-top:14px;padding:10px 14px;background:rgba(248,113,113,.06);border:1px solid rgba(248,113,113,.2);border-radius:7px;font-size:11px;color:var(--muted);line-height:1.6; }
+.artifact-fail strong { color:var(--red); }
+
+.iq-section { margin-bottom:32px; }
+.iq-header { padding:14px 18px;background:rgba(167,139,250,.06);border:1px solid rgba(167,139,250,.25);border-radius:10px 10px 0 0;border-bottom:none; }
+.iq-title { font-size:12px;font-weight:700;color:var(--accent2);margin-bottom:4px; }
+.iq-subtitle { font-size:11px;color:var(--muted);line-height:1.6; }
+.iq-body { padding:14px 18px;background:rgba(167,139,250,.02);border:1px solid rgba(167,139,250,.25);border-radius:0 0 10px 10px;display:flex;flex-direction:column;gap:8px; }
+.iq-item { background:var(--surface);border:1px solid var(--border);border-radius:8px;overflow:hidden;cursor:pointer;transition:border-color .15s; }
+.iq-item:hover { border-color:rgba(167,139,250,.35); }
+.iq-item.answered { border-color:rgba(52,211,153,.3); }
+.iq-q { display:flex;align-items:flex-start;gap:12px;padding:10px 14px; }
+.iq-num { font-size:10px;font-weight:800;color:var(--accent2);background:rgba(167,139,250,.1);border:1px solid rgba(167,139,250,.2);padding:2px 7px;border-radius:4px;flex-shrink:0;margin-top:2px; }
+.iq-item.answered .iq-num { background:rgba(52,211,153,.12);border-color:rgba(52,211,153,.3);color:var(--green); }
+.iq-text { font-size:12px;color:var(--text);line-height:1.6;flex:1; }
+.iq-item.answered .iq-text { color:var(--muted); }
+.iq-check { font-size:11px;color:var(--dim);flex-shrink:0;margin-top:3px; }
+.iq-item.answered .iq-check { color:var(--green); }
+
+.criteria { display:flex;flex-direction:column;gap:8px; }
+.crit { display:flex;gap:10px;align-items:flex-start;padding:10px 14px;background:var(--surface);border:1px solid var(--border);border-radius:8px;font-size:12px;cursor:pointer;transition:border-color .15s; }
+.crit:hover { border-color:rgba(52,211,153,.3); }
+.crit.done { border-color:rgba(52,211,153,.35);background:rgba(52,211,153,.03); }
+.crit-box { width:16px;height:16px;border-radius:4px;border:1.5px solid var(--border);flex-shrink:0;margin-top:1px;display:flex;align-items:center;justify-content:center;transition:all .15s; }
+.crit.done .crit-box { background:var(--green);border-color:var(--green); }
+.crit-check { color:#0b0d14;font-size:10px;font-weight:900;display:none; }
+.crit.done .crit-check { display:block; }
+.crit-text { color:var(--muted);line-height:1.5; }
+.crit.done .crit-text { color:var(--dim); }
+
+.widget { background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px; }
+.widget-title { font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--dim);margin-bottom:12px; }
+.progress-bar { height:5px;background:var(--surface2);border-radius:10px;overflow:hidden;margin-bottom:6px; }
+.progress-fill { height:100%;background:linear-gradient(90deg,var(--accent),var(--green));border-radius:10px;transition:width .3s; }
+.progress-label { font-size:11px;color:var(--muted); }
+.progress-count { font-size:22px;font-weight:800;color:var(--text);margin-bottom:2px; }
+.as-row { display:flex;align-items:center;gap:8px;font-size:11px;margin-bottom:4px; }
+.as-dot { width:7px;height:7px;border-radius:50%;background:var(--dim);flex-shrink:0; }
+.as-dot.done { background:var(--green); }
+.as-name { color:var(--muted);flex:1; }
+.conn-row { font-size:11px;color:var(--muted);display:flex;gap:8px;align-items:flex-start; }
+.conn-dir { color:var(--dim);flex-shrink:0;width:48px; }
+.report-box { background:rgba(108,142,247,.06);border:1px solid rgba(108,142,247,.2);border-radius:10px;padding:14px 16px; }
+.report-title { font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--accent);margin-bottom:8px; }
+.report-step { font-size:11px;color:var(--muted);margin-bottom:6px;display:flex;gap:8px; }
+.report-step-num { color:var(--accent);font-weight:700;flex-shrink:0; }
+
+.explore-section { margin-bottom:32px; }
+.explore-header { display:flex;align-items:center;gap:12px;padding:12px 16px;background:rgba(251,191,36,.04);border:1px solid rgba(251,191,36,.2);border-radius:10px 10px 0 0;border-bottom:none; }
+.explore-header .icon { font-size:14px;color:var(--yellow); }
+.explore-header .label { font-size:12px;font-weight:700;color:var(--yellow); }
+.explore-header .sublabel { font-size:11px;color:var(--muted);margin-left:auto; }
+.explore-body { padding:14px 16px;background:rgba(251,191,36,.02);border:1px solid rgba(251,191,36,.2);border-radius:0 0 10px 10px;display:flex;flex-direction:column;gap:10px; }
+.explore-item { font-size:12px;color:var(--muted);line-height:1.6;padding-left:14px;position:relative; }
+.explore-item::before { content:'';position:absolute;left:0;top:7px;width:5px;height:5px;border-radius:50%;background:var(--yellow); }
+.explore-item strong { color:var(--text); }
+.explore-item code { font-size:10px;color:var(--accent2);background:var(--surface2);padding:1px 5px;border-radius:3px; }
+</style>
+</head>
+<body>
+
+<nav>
+  <span class="brand">ProOps2026</span>
+  <a href="#start">Start</a>
+  <a href="#chain">Discovery</a>
+  <a href="#artifact">Artifact</a>
+  <a href="#interview">Interview Qs</a>
+  <a href="#done">Done?</a>
+  <div class="spacer"></div>
+  <span class="badge">Day 7 · Hands-On</span>
+</nav>
+
+<div class="layout">
+<div class="main">
+
+  <!-- HEADER -->
+  <div class="day-header">
+    <div class="day-meta">
+      <span class="day-pill">Week 2 · Day 7</span>
+      <span class="day-tag">Hands-On</span>
+    </div>
+    <div class="day-title">Docker Core: Dockerfile, Image, Build, Run, Exec</div>
+    <div class="day-question">
+      How do you take an application that runs on one specific machine and make it run identically everywhere — on a laptop, a CI server, and a production cluster?
+    </div>
+    <div class="day-why">
+      "It works on my machine" is the defining problem Docker solves. Every modern deployment pipeline produces a Docker image. Every Kubernetes workload runs a Docker container. <strong>A DevOps engineer who cannot read, write, build, and debug a Dockerfile is missing the foundational skill for container-based operations — which is now the default for almost every production system.</strong>
+    </div>
+  </div>
+
+  <!-- REQUIRED CALLOUT -->
+  <div style="padding:14px 18px;background:rgba(52,211,153,.04);border:1px solid rgba(52,211,153,.25);border-radius:10px;margin-bottom:28px;">
+    <div style="font-size:12px;font-weight:700;color:var(--green);margin-bottom:6px;">What you must complete today</div>
+    <div style="font-size:12px;color:var(--muted);line-height:1.7;">
+      1. Watch the training video sections listed below<br>
+      2. Work through all 8 discovery questions with Claude<br>
+      3. Create <code style="font-size:11px;color:var(--accent2);">memory/docker.md</code> with all 5 required sections<br>
+      4. Try to answer the interview questions at the bottom of this page from your own understanding<br>
+      5. Push commit and send daily report
+    </div>
+    <div style="margin-top:10px;padding:8px 12px;border-radius:6px;background:rgba(251,191,36,.06);border:1px solid rgba(251,191,36,.2);font-size:11px;color:var(--yellow);">
+      After those are done, there is an optional Explore further section at the bottom. Only go there once the artifact is committed and pushed.
+    </div>
+  </div>
+
+  <!-- WATCH FIRST -->
+  <div class="section-block" id="start">
+    <div class="sec-label">Before you start — watch both training videos</div>
+
+    <!-- VIDEO 1 -->
+    <div style="padding:16px 18px;background:rgba(108,142,247,.04);border:1px solid rgba(108,142,247,.25);border-radius:10px;margin-bottom:10px;">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
+        <span style="font-size:10px;font-weight:800;color:var(--accent);background:rgba(108,142,247,.15);border:1px solid rgba(108,142,247,.3);padding:2px 10px;border-radius:20px;letter-spacing:1px;">VIDEO 1</span>
+        <span style="font-size:12px;font-weight:700;color:var(--text);">Theory — Docker Fundamentals</span>
+      </div>
+      <div style="font-size:12px;color:var(--muted);line-height:1.8;margin-bottom:10px;">
+        Covers the core concepts: image vs container, Dockerfile anatomy, layer cache, build/run/exec commands. <strong style="color:var(--text);">Watch this first — the discovery chain is built around what this video explains.</strong>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:12px;">
+        <div style="padding:8px 14px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;font-size:12px;">
+          <strong style="color:var(--accent);">0:13:00 &ndash; 1:51:00</strong> <span style="color:var(--muted);">&mdash; Docker fundamentals: image, container, Dockerfile, layer cache, core commands</span>
+        </div>
+      </div>
+      <a href="https://drive.google.com/file/d/1rARm8STg_gNY8fJoe63aLlmUnaNxEaIO/view?usp=sharing" target="_blank" style="display:inline-block;padding:8px 16px;border-radius:6px;background:rgba(108,142,247,.1);border:1px solid rgba(108,142,247,.3);font-size:12px;font-weight:600;color:var(--accent);text-decoration:none;transition:all .15s;">Watch Video 1 on Google Drive</a>
+    </div>
+
+    <!-- VIDEO 2 -->
+    <div style="padding:16px 18px;background:rgba(52,211,153,.04);border:1px solid rgba(52,211,153,.25);border-radius:10px;margin-bottom:14px;">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
+        <span style="font-size:10px;font-weight:800;color:var(--green);background:rgba(52,211,153,.15);border:1px solid rgba(52,211,153,.3);padding:2px 10px;border-radius:20px;letter-spacing:1px;">VIDEO 2</span>
+        <span style="font-size:12px;font-weight:700;color:var(--text);">Practice — Hands-on Docker</span>
+      </div>
+      <div style="font-size:12px;color:var(--muted);line-height:1.8;margin-bottom:10px;">
+        Hands-on walkthrough: writing Dockerfiles, building images, running and debugging containers. <strong style="color:var(--text);">Watch after Video 1 — then replicate the steps yourself as you work through the discovery chain.</strong>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:12px;">
+        <div style="padding:8px 14px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;font-size:12px;">
+          <strong style="color:var(--green);">0:00 &ndash; 1:06:00</strong> <span style="color:var(--muted);">&mdash; Full practice session: Dockerfile → build → run → debug → exec</span>
+        </div>
+      </div>
+      <a href="https://drive.google.com/file/d/1YzIN_sOKgz10uKXHM8to16wvBrEtugw7/view?usp=sharing" target="_blank" style="display:inline-block;padding:8px 16px;border-radius:6px;background:rgba(52,211,153,.1);border:1px solid rgba(52,211,153,.3);font-size:12px;font-weight:600;color:var(--green);text-decoration:none;transition:all .15s;">Watch Video 2 on Google Drive</a>
+    </div>
+
+    <!-- ENVIRONMENT -->
+    <div style="padding:16px 18px;background:rgba(52,211,153,.04);border:1px solid rgba(52,211,153,.25);border-radius:10px;margin-bottom:14px;">
+      <div style="font-size:12px;font-weight:700;color:var(--green);margin-bottom:8px;">Required environment — Docker must be installed</div>
+      <div style="font-size:12px;color:var(--muted);line-height:1.8;">
+        Today is hands-on. You need a working Docker installation before starting the discovery chain.
+      </div>
+      <div style="margin-top:12px;display:flex;flex-direction:column;gap:8px;">
+        <div style="padding:8px 14px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;font-size:12px;">
+          <strong style="color:var(--green);">Windows</strong> <span style="color:var(--muted);">&mdash; Docker Desktop for Windows (WSL2 backend required). Download at docker.com/products/docker-desktop</span>
+        </div>
+        <div style="padding:8px 14px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;font-size:12px;">
+          <strong style="color:var(--green);">WSL2 / Linux</strong> <span style="color:var(--muted);">&mdash; <code style="font-size:11px;color:var(--accent2);">sudo apt install docker.io && sudo usermod -aG docker $USER</code> — then log out and back in</span>
+        </div>
+        <div style="padding:8px 14px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;font-size:12px;">
+          <strong style="color:var(--green);">Verify</strong> <span style="color:var(--muted);">&mdash; <code style="font-size:11px;color:var(--accent2);">docker run hello-world</code> should print "Hello from Docker!"</span>
+        </div>
+        <div style="padding:8px 14px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;font-size:12px;">
+          <strong style="color:var(--yellow);">No Docker?</strong> <span style="color:var(--muted);">&mdash; Use <a href="https://labs.play-with-docker.com" target="_blank" style="color:var(--accent);">Play With Docker</a> (browser-based, zero install, 4-hour session)</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Session opener -->
+    <div style="padding:12px 16px;background:var(--surface);border:1px solid var(--border);border-radius:10px;font-size:12px;color:var(--muted);line-height:1.7;">
+      After watching the video: open Claude Code in your <code style="font-size:11px;color:var(--accent2);">proops2026/</code> folder. This is a hands-on day — <strong style="color:var(--text);">build and run containers as you work through the discovery chain. Don't just read the answers — run the commands.</strong>
+    </div>
+  </div>
+
+  <!-- DISCOVERY CHAIN -->
+  <div class="section-block" id="chain">
+    <div class="sec-label">Discovery Chain — 8 questions, one containerization scenario</div>
+
+    <div style="padding:12px 16px;background:var(--surface);border:1px solid var(--border);border-radius:10px;margin-bottom:14px;font-size:12px;color:var(--muted);line-height:1.7;">
+      Today's 8 questions follow a single scenario — you receive a Node.js application and must containerize it, debug it, optimize it, and configure it correctly. <strong style="color:var(--text);">Copy each purple prompt, paste into Claude, run the commands, observe the output, then move on.</strong>
+    </div>
+
+    <div class="chain">
+
+      <div class="chain-item" onclick="toggleChain(this,0)">
+        <div class="chain-num">1</div>
+        <div class="chain-body">
+          <div class="chain-q">A developer hands you a Node.js app that runs locally. Without Docker, what five things must be identically configured on every machine — and how does this scale as the team grows?</div>
+          <div class="chain-prompt">I'm a DevOps engineer. A developer hands me a Node.js application that "works on their machine." Walk me through: (1) the five things that must be identically configured on every machine for this app to run — Node.js version, package dependencies (node_modules), environment variables, config file paths, and OS-level libraries — and why each one is a source of environment drift, (2) what happens to this list as the team grows from 5 to 50 engineers — how many combinations of OS + Node version + package manager you're now managing, (3) what "environment parity" means and why it is the core DevOps problem Docker solves. Concrete examples, not theory.</div>
+          <div class="chain-hint">Environment drift is the root cause. Docker solves it by making the environment part of the artifact.</div>
+        </div>
+      </div>
+
+      <div class="chain-item" onclick="toggleChain(this,1)">
+        <div class="chain-num">2</div>
+        <div class="chain-body">
+          <div class="chain-q">You write your first Dockerfile. The <code>COPY</code> command copies node_modules (400MB) every build. What is <code>.dockerignore</code> — and what is the build context?</div>
+          <div class="chain-prompt">I'm writing my first Dockerfile for a Node.js app and every build sends 400MB of node_modules to the Docker daemon. Explain: (1) what the "build context" is — exactly what gets sent to the Docker daemon when you run `docker build`, why it matters, and how to check its size, (2) what a .dockerignore file is, how it works (same syntax as .gitignore), and what I must put in it for a Node.js project, (3) why copying a 400MB node_modules directory is wrong even beyond the size — why I should never copy node_modules from the host into the image, (4) show me the correct Dockerfile for a Node.js app: the right base image, the right order of COPY and RUN npm install, and the correct .dockerignore. Give me the actual files, not pseudocode.</div>
+          <div class="chain-hint">Build context = everything in the directory. .dockerignore = what to exclude. node_modules belongs inside the image, not copied from host.</div>
+        </div>
+      </div>
+
+      <div class="chain-item" onclick="toggleChain(this,2)">
+        <div class="chain-num">3</div>
+        <div class="chain-body">
+          <div class="chain-q">You change one line in <code>app.js</code> and rebuild — it takes 3 minutes again. What is the Docker layer cache, why is it not working, and how do you fix the Dockerfile?</div>
+          <div class="chain-prompt">I built my Docker image in 3 minutes. I changed one line in app.js and rebuilt — it took 3 minutes again. Explain: (1) what the Docker layer cache is — how each Dockerfile instruction creates a layer, how layers are cached by comparing the instruction + context, and what "cache invalidation" means in this context, (2) why changing app.js breaks the cache for ALL subsequent layers including npm install — trace exactly what happens in a broken Dockerfile order, (3) the "dependencies before code" rule — show me the two-step COPY pattern that makes npm install cache-stable: `COPY package*.json ./` then `RUN npm install` then `COPY . .`, (4) show me the before and after Dockerfile side by side with a comment explaining why the order matters. I want to see the exact instruction sequence that makes a one-line app.js change rebuild in under 5 seconds instead of 3 minutes.</div>
+          <div class="chain-hint">Cache breaks at the first changed layer and invalidates everything below. Copy package.json first, code second.</div>
+        </div>
+      </div>
+
+      <div class="chain-item" onclick="toggleChain(this,3)">
+        <div class="chain-num">4</div>
+        <div class="chain-body">
+          <div class="chain-q">You run <code>docker run myapp</code> and the container exits immediately with no error message. What three commands tell you what happened?</div>
+          <div class="chain-prompt">I ran `docker run myapp` and the container exits immediately. There is no error message in the terminal. Walk me through: (1) `docker ps -a` — what this shows (all containers including stopped ones), how to read the STATUS and EXITED columns, and what exit code 1 vs exit code 0 means, (2) `docker logs [container-id]` — how to get the container's stdout/stderr output after it exits, what to look for, and why the container's output goes to logs not the terminal when running in the background, (3) `docker inspect [container-id]` — how to read the State section to find the exit code and the error, (4) the three most common reasons a container exits immediately (wrong CMD, missing environment variable, missing file) and how to diagnose each one. Give me the exact commands and what to look for in the output.</div>
+          <div class="chain-hint">docker ps -a → docker logs → docker inspect. Always check logs before guessing.</div>
+        </div>
+      </div>
+
+      <div class="chain-item" onclick="toggleChain(this,4)">
+        <div class="chain-num">5</div>
+        <div class="chain-body">
+          <div class="chain-q">The app is running but you can't reach it from your browser. It listens on port 3000 inside the container. What does <code>-p 3000:3000</code> do — and why is the container's port not accessible without it?</div>
+          <div class="chain-prompt">My Node.js app is running in a container (`docker ps` shows it running) but I can't reach http://localhost:3000 from my browser. The app listens on port 3000 inside the container. Explain: (1) what Docker's network isolation model means — why each container has its own network namespace, its own localhost, and its own port space, so port 3000 inside the container is NOT the same as port 3000 on my host, (2) what `-p 3000:3000` does — the HOST_PORT:CONTAINER_PORT format, how Docker sets up NAT rules to forward traffic, and what happens if I use `-p 8080:3000`, (3) the difference between `EXPOSE` in the Dockerfile and `-p` in `docker run` — what EXPOSE actually does (documentation only, does NOT publish the port), (4) what `docker port [container-id]` shows and how to verify the port mapping is active. Show me the exact commands.</div>
+          <div class="chain-hint">Container network = isolated namespace. -p = NAT rule from host port to container port. EXPOSE is documentation, not a firewall rule.</div>
+        </div>
+      </div>
+
+      <div class="chain-item" onclick="toggleChain(this,5)">
+        <div class="chain-num">6</div>
+        <div class="chain-body">
+          <div class="chain-q">The database URL is hardcoded in the Dockerfile. What is the right way to pass runtime config to a container — and why is a hardcoded secret a permanent problem even after deletion?</div>
+          <div class="chain-prompt">I notice the database URL is hardcoded as `ENV DB_URL=postgres://user:password@prod-db:5432/app` in my Dockerfile. Explain: (1) exactly why this is a permanent security problem — how Docker image layers work, why removing the ENV instruction in a new layer does NOT remove it from the image history, and what `docker history --no-trunc` reveals, (2) the correct pattern for runtime configuration: passing environment variables via `docker run -e DB_URL=...` or `--env-file .env`, (3) what an env file looks like, how to use it with docker run, and why the .env file must be in .gitignore and .dockerignore, (4) the difference between build-time ARG and runtime ENV — when to use each, (5) for secrets specifically (passwords, API keys): why env vars are not ideal either, and what Docker secrets or mounted secret files solve. Show me the Dockerfile, the docker run command, and the env file format.</div>
+          <div class="chain-hint">Image layers are permanent. A secret baked in is a secret exposed — forever in the image history. Use -e or --env-file at runtime.</div>
+        </div>
+      </div>
+
+      <div class="chain-item" onclick="toggleChain(this,6)">
+        <div class="chain-num">7</div>
+        <div class="chain-body">
+          <div class="chain-q">A bug is occurring inside the running container. You need to examine the filesystem and processes. What is <code>docker exec</code> — and how is it different from SSH?</div>
+          <div class="chain-prompt">A bug is occurring inside a running container and I need to debug it. I tried SSHing in but there is no SSH daemon running. Explain: (1) what `docker exec -it [container-id] /bin/sh` does — how exec attaches a new process to an already-running container's namespaces (PID, network, filesystem), why it doesn't need SSH, (2) what I can do once I'm inside: check the filesystem (`ls -la /app`), view running processes (`ps aux`), check environment variables (`env`), test network connectivity (`curl`, `wget`), inspect logs (`cat /var/log/app.log`), (3) the difference between `docker exec` and `docker run` — exec attaches to a running container, run starts a new one, (4) why production containers often don't have bash installed (Alpine base images use `/bin/sh`, not `/bin/bash`) and what to do when even sh is missing, (5) what `docker cp` does for extracting files from a container without exec. Give me the exact commands for a typical debug session.</div>
+          <div class="chain-hint">exec = new process inside existing container namespaces. No SSH needed. Alpine uses /bin/sh not /bin/bash.</div>
+        </div>
+      </div>
+
+      <div class="chain-item" onclick="toggleChain(this,7)" style="border-color:rgba(52,211,153,.3);">
+        <div class="chain-num" style="background:rgba(52,211,153,.12);border-color:rgba(52,211,153,.3);color:var(--green);">8</div>
+        <div class="chain-body">
+          <div class="chain-q" style="color:var(--green);">Write <code style="font-size:11px;color:var(--accent2);">memory/docker.md</code> — the five Docker concepts every DevOps engineer must explain and use without thinking.</div>
+          <div class="chain-prompt">I'm writing memory/docker.md for my DevOps agent. Generate the full file with these 5 sections:
+
+1. Dockerfile anatomy — FROM, RUN, COPY, WORKDIR, ENV, EXPOSE, CMD, ENTRYPOINT: what each instruction does, a one-line rule for when to use it, and a complete working Dockerfile example for a Node.js app that demonstrates the "dependencies before code" layer cache pattern
+
+2. Layer cache — how Docker caches each instruction as a layer, what triggers cache invalidation, the correct instruction order for stable cache, and how to verify cache hits during a build (look for "CACHED" in output)
+
+3. Core commands — build, run, exec, logs, ps, stop, rm, rmi, pull, tag: the key flags for each (-d, -p, -e, --name, -it, --rm, -f, --no-cache), with a one-line example for each command showing the most common real-world usage
+
+4. Port mapping and network isolation — the HOST:CONTAINER format, what "container has its own network namespace" means in one sentence, the difference between EXPOSE and -p, how to check active port mappings
+
+5. Image vs container distinction — an image is a blueprint (class / ISO file), a container is a running instance (object / running VM): the analogy, what `docker images` vs `docker ps` shows, and the relationship between image layers and container filesystem (copy-on-write layer)
+
+Write it for my agent to act on. My agent needs to write Dockerfiles, debug containers, and explain Docker concepts to developers.</div>
+          <div class="chain-hint">Save the full output into memory/docker.md in your repo</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ARTIFACT -->
+  <div class="section-block" id="artifact">
+    <div class="sec-label">Required artifact — must be pushed with your commit</div>
+    <div class="artifact-card">
+      <div class="artifact-head">
+        <div class="artifact-title">Docker Fundamentals Memory File</div>
+        <div class="artifact-file">memory/docker.md</div>
+      </div>
+      <div class="artifact-body">
+        <div style="font-size:11px;color:var(--muted);margin-bottom:12px;line-height:1.6;">Your agent reads this file every time a task involves containers, Dockerfiles, or container debugging. Write it for Claude to act on, not as a study guide.</div>
+        <div class="artifact-row"><div class="ar-dot"></div><div class="ar-text"><strong>Dockerfile anatomy</strong> — FROM, RUN, COPY, WORKDIR, ENV, EXPOSE, CMD/ENTRYPOINT with a description of what each does and a complete working example.</div></div>
+        <div class="artifact-row"><div class="ar-dot"></div><div class="ar-text"><strong>Layer cache</strong> — how layers are cached, why instruction order matters, the "dependencies before code" rule with before/after Dockerfile comparison.</div></div>
+        <div class="artifact-row"><div class="ar-dot"></div><div class="ar-text"><strong>Core commands</strong> — build, run, exec, logs, ps, stop, rm, rmi — with the key flags for each and one-line real-world examples.</div></div>
+        <div class="artifact-row"><div class="ar-dot"></div><div class="ar-text"><strong>Port mapping</strong> — HOST:CONTAINER format, what "container has its own network namespace" means, difference between EXPOSE and -p.</div></div>
+        <div class="artifact-row"><div class="ar-dot"></div><div class="ar-text"><strong>Image vs container</strong> — image is a blueprint, container is a running instance. The class/object analogy. What docker images vs docker ps shows.</div></div>
+        <div class="artifact-fail">
+          <strong>Weak artifact signals:</strong> Dockerfile with no mention of layer caching or build optimization &middot; commands listed without flags &middot; no mention of .dockerignore &middot; image vs container distinction missing or just one sentence &middot; CMD vs ENTRYPOINT not explained
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- INTERVIEW QUESTIONS -->
+  <div class="iq-section" id="interview">
+    <div class="iq-header">
+      <div class="iq-title">Interview Questions — verify your understanding</div>
+      <div class="iq-subtitle">These are real questions asked in DevOps interviews about Docker. Try to answer each one from memory before looking at your artifact. If you cannot answer confidently, go back and strengthen that section.</div>
+    </div>
+    <div class="iq-body">
+
+      <div class="iq-item" onclick="toggleIQ(this)">
+        <div class="iq-q">
+          <span class="iq-num">Q1</span>
+          <span class="iq-text">What is the difference between a Docker image and a Docker container? Use an analogy.</span>
+          <span class="iq-check">&#10003;</span>
+        </div>
+      </div>
+
+      <div class="iq-item" onclick="toggleIQ(this)">
+        <div class="iq-q">
+          <span class="iq-num">Q2</span>
+          <span class="iq-text">Explain how the Docker layer cache works and why instruction order in a Dockerfile matters for build performance.</span>
+          <span class="iq-check">&#10003;</span>
+        </div>
+      </div>
+
+      <div class="iq-item" onclick="toggleIQ(this)">
+        <div class="iq-q">
+          <span class="iq-num">Q3</span>
+          <span class="iq-text">You run <code>docker run myapp</code> and it exits immediately with no output. Walk me through your debugging steps — in order.</span>
+          <span class="iq-check">&#10003;</span>
+        </div>
+      </div>
+
+      <div class="iq-item" onclick="toggleIQ(this)">
+        <div class="iq-q">
+          <span class="iq-num">Q4</span>
+          <span class="iq-text">What does <code>-p 8080:3000</code> mean? Why can't you reach the app on port 3000 from your host without this flag?</span>
+          <span class="iq-check">&#10003;</span>
+        </div>
+      </div>
+
+      <div class="iq-item" onclick="toggleIQ(this)">
+        <div class="iq-q">
+          <span class="iq-num">Q5</span>
+          <span class="iq-text">What is the difference between <code>CMD</code> and <code>ENTRYPOINT</code> in a Dockerfile?</span>
+          <span class="iq-check">&#10003;</span>
+        </div>
+      </div>
+
+      <div class="iq-item" onclick="toggleIQ(this)">
+        <div class="iq-q">
+          <span class="iq-num">Q6</span>
+          <span class="iq-text">Why is hardcoding a database password in a Dockerfile a permanent security problem — even if you delete it in the next layer?</span>
+          <span class="iq-check">&#10003;</span>
+        </div>
+      </div>
+
+      <div class="iq-item" onclick="toggleIQ(this)">
+        <div class="iq-q">
+          <span class="iq-num">Q7</span>
+          <span class="iq-text">What does <code>docker exec -it [id] /bin/sh</code> do? How is it different from SSH-ing into a server?</span>
+          <span class="iq-check">&#10003;</span>
+        </div>
+      </div>
+
+      <div class="iq-item" onclick="toggleIQ(this)">
+        <div class="iq-q">
+          <span class="iq-num">Q8</span>
+          <span class="iq-text">What is a <code>.dockerignore</code> file? What happens if you don't have one — and what should always be in it for a Node.js project?</span>
+          <span class="iq-check">&#10003;</span>
+        </div>
+      </div>
+
+      <div class="iq-item" onclick="toggleIQ(this)">
+        <div class="iq-q">
+          <span class="iq-num">Q9</span>
+          <span class="iq-text">What does <code>EXPOSE 3000</code> in a Dockerfile actually do? Does it publish the port?</span>
+          <span class="iq-check">&#10003;</span>
+        </div>
+      </div>
+
+      <div class="iq-item" onclick="toggleIQ(this)">
+        <div class="iq-q">
+          <span class="iq-num">Q10</span>
+          <span class="iq-text">You need to pass a database URL to a container at runtime. What are the correct ways to do this — and why is it better than putting it in the Dockerfile?</span>
+          <span class="iq-check">&#10003;</span>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- DONE CRITERIA -->
+  <div class="section-block" id="done">
+    <div class="sec-label">Before you send your end-of-day report — check these</div>
+    <div class="criteria">
+      <div class="crit" onclick="toggleCrit(this)">
+        <div class="crit-box"><span class="crit-check">&#10003;</span></div>
+        <div class="crit-text">I watched the training video sections on Docker concepts, Dockerfile writing, and container debugging.</div>
+      </div>
+      <div class="crit" onclick="toggleCrit(this)">
+        <div class="crit-box"><span class="crit-check">&#10003;</span></div>
+        <div class="crit-text">Docker is installed and <code style="font-size:11px;color:var(--accent2);">docker run hello-world</code> works on my machine.</div>
+      </div>
+      <div class="crit" onclick="toggleCrit(this)">
+        <div class="crit-box"><span class="crit-check">&#10003;</span></div>
+        <div class="crit-text">I worked through all 8 discovery questions and ran the commands — not just read the answers.</div>
+      </div>
+      <div class="crit" onclick="toggleCrit(this)">
+        <div class="crit-box"><span class="crit-check">&#10003;</span></div>
+        <div class="crit-text"><code style="font-size:11px;color:var(--accent2);">memory/docker.md</code> exists in my repo with all 5 required sections.</div>
+      </div>
+      <div class="crit" onclick="toggleCrit(this)">
+        <div class="crit-box"><span class="crit-check">&#10003;</span></div>
+        <div class="crit-text">I can explain the layer cache rule ("dependencies before code") and show what the Dockerfile looks like before and after the fix.</div>
+      </div>
+      <div class="crit" onclick="toggleCrit(this)">
+        <div class="crit-box"><span class="crit-check">&#10003;</span></div>
+        <div class="crit-text">I tried to answer all 10 interview questions from memory. Any I could not answer — I went back and strengthened that section.</div>
+      </div>
+      <div class="crit" onclick="toggleCrit(this)">
+        <div class="crit-box"><span class="crit-check">&#10003;</span></div>
+        <div class="crit-text">Daily log filled — Tomorrow's Context Block is 3 specific sentences written by me, not by Claude.</div>
+      </div>
+      <div class="crit" onclick="toggleCrit(this)">
+        <div class="crit-box"><span class="crit-check">&#10003;</span></div>
+        <div class="crit-text">Git commit pushed: <code style="font-size:11px;color:var(--accent2);">Day 07 — memory: docker.md</code></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- EXPLORE FURTHER -->
+  <div class="explore-section">
+    <div class="explore-header">
+      <span class="icon">&#9654;</span>
+      <span class="label">Explore further</span>
+      <span class="sublabel">Only after required work is pushed &#10003;</span>
+    </div>
+    <div class="explore-body">
+      <div style="font-size:11px;color:var(--dim);margin-bottom:4px;">These are optional. Only work on these if your artifact is committed, your report is ready to send, and you have time left.</div>
+
+      <div class="explore-item">
+        <strong>Multi-stage builds.</strong> Ask Claude: <code>"Show me a multi-stage Dockerfile for a Node.js app: stage 1 installs all devDependencies and runs tests, stage 2 copies only the production build to a clean Alpine image. Explain how this reduces the final image size from ~500MB to ~80MB and why that matters for a CI/CD pipeline."</code> This is the production Docker pattern you will use in Week 5.
+      </div>
+
+      <div class="explore-item">
+        <strong>ENTRYPOINT vs CMD composition.</strong> Ask Claude: <code>"Explain the difference between ENTRYPOINT and CMD using a real example: a container where ENTRYPOINT is `node` and CMD is `server.js`, so `docker run myapp debug.js` overrides CMD but not ENTRYPOINT. Then show me how ENTRYPOINT in exec form vs shell form changes signal handling — and why PID 1 signal handling matters for graceful shutdown."</code> This is the gap that shows up in production Docker setups.
+      </div>
+
+      <div class="explore-item">
+        <strong>Running containers as non-root.</strong> Ask Claude: <code>"Show me how to add a non-root user to a Dockerfile using the USER instruction. Explain what risks running as root inside a container creates — container escape, privilege escalation via volume mounts — and what the minimum permissions look like for a Node.js application. Include the `--read-only` flag and what it does."</code> Security hardening is a standard production requirement.
+      </div>
+
+    </div>
+  </div>
+
+</div><!-- /main -->
+
+<!-- SIDEBAR -->
+<div class="sidebar">
+
+  <div class="widget">
+    <div class="widget-title">Progress</div>
+    <div class="progress-count" id="prog-count">0 / 8</div>
+    <div style="margin-bottom:8px;">
+      <div class="progress-bar"><div class="progress-fill" id="prog-fill" style="width:0%"></div></div>
+      <div class="progress-label" id="prog-label">Discovery chain</div>
+    </div>
+  </div>
+
+  <div class="widget">
+    <div class="widget-title">Interview Questions</div>
+    <div class="progress-count" id="iq-count">0 / 10</div>
+    <div style="margin-bottom:8px;">
+      <div class="progress-bar"><div class="progress-fill" id="iq-fill" style="width:0%;background:linear-gradient(90deg,var(--accent2),var(--accent))"></div></div>
+      <div class="progress-label" id="iq-label">Self-verify your understanding</div>
+    </div>
+  </div>
+
+  <div class="widget">
+    <div class="widget-title">Today's Artifact</div>
+    <div class="as-row"><div class="as-dot" id="dot-docker"></div><div class="as-name">memory/docker.md</div></div>
+  </div>
+
+  <div class="widget">
+    <div class="widget-title">Connects To</div>
+    <div style="display:flex;flex-direction:column;gap:6px;">
+      <div class="conn-row"><span class="conn-dir">&larr; Day 6</span><span style="font-size:11px;color:var(--muted);">AWS Hands-on (EC2 = deployment target)</span></div>
+      <div class="conn-row"><span class="conn-dir">&rarr; Day 8</span><span style="font-size:11px;color:var(--muted);">Docker Advanced (Compose, volumes, networking)</span></div>
+      <div class="conn-row"><span class="conn-dir">&rarr; Day 9</span><span style="font-size:11px;color:var(--muted);">Docker Lab (deploy to EC2)</span></div>
+      <div class="conn-row"><span class="conn-dir">&rarr; Day 22</span><span style="font-size:11px;color:var(--muted);">CI/CD pipeline (build &amp; push image)</span></div>
+    </div>
+  </div>
+
+  <div class="widget" style="background:rgba(251,191,36,.04);border-color:rgba(251,191,36,.2);">
+    <div class="widget-title" style="color:var(--yellow);">Required vs Explore</div>
+    <div style="font-size:11px;color:var(--muted);line-height:1.6;">
+      <strong style="color:var(--green);">Required:</strong> Q1-Q8 + artifact + interview Qs + commit + report<br><br>
+      <strong style="color:var(--yellow);">Explore after:</strong> Multi-stage builds, ENTRYPOINT vs CMD, non-root containers<br><br>
+      <span style="color:var(--dim);">Explore only after required is pushed.</span>
+    </div>
+  </div>
+
+  <div class="report-box">
+    <div class="report-title">End-of-day report</div>
+    <div class="report-step"><span class="report-step-num">1.</span> Fill daily log + context block</div>
+    <div class="report-step"><span class="report-step-num">2.</span> git commit + push</div>
+    <div class="report-step"><span class="report-step-num">3.</span> Fill <code style="font-size:10px;color:var(--accent);">templates/daily-report-template.md</code> &rarr; paste to trainer chat</div>
+  </div>
+
+</div><!-- /sidebar -->
+</div><!-- /layout -->
+
+<script>
+const chainDone = new Array(8).fill(false);
+
+function toggleChain(el, idx) {
+  chainDone[idx] = !chainDone[idx];
+  el.classList.toggle('done', chainDone[idx]);
+  const n = chainDone.filter(Boolean).length;
+  document.getElementById('prog-count').textContent = n + ' / 8';
+  document.getElementById('prog-fill').style.width = (n/8*100) + '%';
+  document.getElementById('prog-label').textContent = n === 8 ? 'All complete — write your artifact' : 'Discovery chain';
+  if (n >= 7) document.getElementById('dot-docker').classList.add('done');
+}
+
+function toggleIQ(el) {
+  el.classList.toggle('answered');
+  const n = document.querySelectorAll('.iq-item.answered').length;
+  document.getElementById('iq-count').textContent = n + ' / 10';
+  document.getElementById('iq-fill').style.width = (n/10*100) + '%';
+  document.getElementById('iq-label').textContent = n === 10 ? 'All questions attempted' : 'Self-verify your understanding';
+}
+
+function toggleCrit(el) { el.classList.toggle('done'); }
+</script>
+</body>
+</html>
