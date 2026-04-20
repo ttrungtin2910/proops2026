@@ -1,0 +1,615 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Day 10 — Agent Checkpoint: Memory Review · ProOps2026</title>
+<style>
+:root {
+  --bg:#0b0d14; --surface:#13161f; --surface2:#1c2030; --border:#252a3a;
+  --accent:#6c8ef7; --accent2:#a78bfa;
+  --green:#34d399; --yellow:#fbbf24; --orange:#fb923c;
+  --red:#f87171; --teal:#22d3ee; --blue:#60a5fa;
+  --text:#e8edf5; --muted:#7c87a0; --dim:#3a4258;
+}
+* { box-sizing:border-box; margin:0; padding:0; }
+body { background:var(--bg); color:var(--text); font-family:'Segoe UI',system-ui,sans-serif; font-size:15px; line-height:1.6; }
+
+nav { background:var(--surface);border-bottom:1px solid var(--border);padding:0 32px;height:50px;display:flex;align-items:center;gap:6px;position:sticky;top:0;z-index:200; }
+nav .brand { font-weight:800;font-size:14px;color:var(--accent);margin-right:12px; }
+nav a { color:var(--muted);text-decoration:none;font-size:12px;font-weight:600;padding:5px 12px;border-radius:6px;transition:all .15s;white-space:nowrap; }
+nav a:hover { color:var(--text);background:var(--surface2); }
+nav .spacer { flex:1; }
+nav .badge { background:rgba(167,139,250,.12);border:1px solid rgba(167,139,250,.25);color:var(--accent2);font-size:11px;font-weight:700;padding:3px 12px;border-radius:20px; }
+
+.layout { display:grid;grid-template-columns:1fr 260px;gap:32px;max-width:1100px;margin:0 auto;padding:40px 32px; }
+.main { min-width:0; }
+.sidebar { position:sticky;top:70px;height:fit-content;display:flex;flex-direction:column;gap:14px; }
+
+.day-header { margin-bottom:32px; }
+.day-meta { display:flex;align-items:center;gap:10px;margin-bottom:12px; }
+.day-pill { font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;padding:3px 12px;border-radius:20px;background:rgba(108,142,247,.12);border:1px solid rgba(108,142,247,.25);color:var(--accent); }
+.day-tag { font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;padding:3px 12px;border-radius:20px;background:rgba(167,139,250,.08);border:1px solid rgba(167,139,250,.2);color:var(--accent2); }
+.day-title { font-size:26px;font-weight:800;letter-spacing:-.3px;margin-bottom:8px; }
+.day-question { font-size:15px;color:var(--accent2);font-style:italic;border-left:3px solid var(--accent2);padding-left:14px;margin-bottom:16px;line-height:1.6; }
+.day-why { font-size:13px;color:var(--muted);line-height:1.7;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:14px 16px; }
+.day-why strong { color:var(--text); }
+
+.section-block { margin-bottom:32px; }
+.sec-label { font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:var(--dim);margin-bottom:14px;display:flex;align-items:center;gap:10px; }
+.sec-label::after { content:'';flex:1;height:1px;background:var(--border); }
+
+.chain { display:flex;flex-direction:column;gap:10px; }
+.chain-item { display:grid;grid-template-columns:32px 1fr;gap:14px;padding:14px 16px;background:var(--surface);border:1px solid var(--border);border-radius:10px;cursor:pointer;transition:border-color .15s; }
+.chain-item:hover { border-color:rgba(167,139,250,.4); }
+.chain-item.done { border-color:rgba(52,211,153,.3);background:rgba(52,211,153,.03); }
+.chain-num { width:32px;height:32px;border-radius:50%;background:var(--surface2);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;color:var(--muted);flex-shrink:0;transition:all .15s; }
+.chain-item.done .chain-num { background:rgba(52,211,153,.15);border-color:rgba(52,211,153,.4);color:var(--green); }
+.chain-q { font-size:13px;font-weight:600;margin-bottom:6px;line-height:1.5; }
+.chain-item.done .chain-q { color:var(--muted);text-decoration:line-through;text-decoration-color:var(--dim); }
+.chain-prompt { font-size:11px;font-family:'Cascadia Code','Fira Code',monospace;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:8px 12px;color:var(--accent2);line-height:1.6;margin-top:8px; }
+.chain-hint { font-size:11px;color:var(--dim);margin-top:6px;line-height:1.5; }
+.chain-note { font-size:11px;color:var(--yellow);margin-top:6px;line-height:1.5;padding:6px 10px;background:rgba(251,191,36,.06);border:1px solid rgba(251,191,36,.15);border-radius:5px; }
+
+.artifact-card { background:var(--surface);border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:14px; }
+.artifact-head { padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px; }
+.artifact-title { font-size:13px;font-weight:700;flex:1; }
+.artifact-file { font-family:'Cascadia Code','Fira Code',monospace;font-size:11px;color:var(--green);background:rgba(52,211,153,.08);border:1px solid rgba(52,211,153,.2);padding:2px 10px;border-radius:5px; }
+.artifact-body { padding:16px 18px; }
+.artifact-row { display:flex;gap:10px;margin-bottom:8px;font-size:12px;align-items:flex-start; }
+.artifact-row:last-child { margin-bottom:0; }
+.ar-dot { width:5px;height:5px;border-radius:50%;background:var(--green);flex-shrink:0;margin-top:6px; }
+.ar-text { color:var(--muted);line-height:1.5; }
+.ar-text strong { color:var(--text); }
+.artifact-fail { margin-top:14px;padding:10px 14px;background:rgba(248,113,113,.06);border:1px solid rgba(248,113,113,.2);border-radius:7px;font-size:11px;color:var(--muted);line-height:1.6; }
+.artifact-fail strong { color:var(--red); }
+
+.iq-section { margin-bottom:32px; }
+.iq-header { padding:14px 18px;background:rgba(167,139,250,.06);border:1px solid rgba(167,139,250,.25);border-radius:10px 10px 0 0;border-bottom:none; }
+.iq-title { font-size:12px;font-weight:700;color:var(--accent2);margin-bottom:4px; }
+.iq-subtitle { font-size:11px;color:var(--muted);line-height:1.6; }
+.iq-body { padding:14px 18px;background:rgba(167,139,250,.02);border:1px solid rgba(167,139,250,.25);border-radius:0 0 10px 10px;display:flex;flex-direction:column;gap:8px; }
+.iq-item { background:var(--surface);border:1px solid var(--border);border-radius:8px;overflow:hidden;cursor:pointer;transition:border-color .15s; }
+.iq-item:hover { border-color:rgba(167,139,250,.35); }
+.iq-item.answered { border-color:rgba(52,211,153,.3); }
+.iq-q { display:flex;align-items:flex-start;gap:12px;padding:10px 14px; }
+.iq-num { font-size:10px;font-weight:800;color:var(--accent2);background:rgba(167,139,250,.1);border:1px solid rgba(167,139,250,.2);padding:2px 7px;border-radius:4px;flex-shrink:0;margin-top:2px; }
+.iq-item.answered .iq-num { background:rgba(52,211,153,.12);border-color:rgba(52,211,153,.3);color:var(--green); }
+.iq-text { font-size:12px;color:var(--text);line-height:1.6;flex:1; }
+.iq-item.answered .iq-text { color:var(--muted); }
+.iq-check { font-size:11px;color:var(--dim);flex-shrink:0;margin-top:3px; }
+.iq-item.answered .iq-check { color:var(--green); }
+
+.criteria { display:flex;flex-direction:column;gap:8px; }
+.crit { display:flex;gap:10px;align-items:flex-start;padding:10px 14px;background:var(--surface);border:1px solid var(--border);border-radius:8px;font-size:12px;cursor:pointer;transition:border-color .15s; }
+.crit:hover { border-color:rgba(52,211,153,.3); }
+.crit.done { border-color:rgba(52,211,153,.35);background:rgba(52,211,153,.03); }
+.crit-box { width:16px;height:16px;border-radius:4px;border:1.5px solid var(--border);flex-shrink:0;margin-top:1px;display:flex;align-items:center;justify-content:center;transition:all .15s; }
+.crit.done .crit-box { background:var(--green);border-color:var(--green); }
+.crit-check { color:#0b0d14;font-size:10px;font-weight:900;display:none; }
+.crit.done .crit-check { display:block; }
+.crit-text { color:var(--muted);line-height:1.5; }
+.crit.done .crit-text { color:var(--dim); }
+
+.widget { background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px; }
+.widget-title { font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--dim);margin-bottom:12px; }
+.progress-bar { height:5px;background:var(--surface2);border-radius:10px;overflow:hidden;margin-bottom:6px; }
+.progress-fill { height:100%;background:linear-gradient(90deg,var(--accent),var(--green));border-radius:10px;transition:width .3s; }
+.progress-label { font-size:11px;color:var(--muted); }
+.progress-count { font-size:22px;font-weight:800;color:var(--text);margin-bottom:2px; }
+.as-row { display:flex;align-items:center;gap:8px;font-size:11px;margin-bottom:4px; }
+.as-dot { width:7px;height:7px;border-radius:50%;background:var(--dim);flex-shrink:0; }
+.as-dot.done { background:var(--green); }
+.as-name { color:var(--muted);flex:1; }
+.conn-row { font-size:11px;color:var(--muted);display:flex;gap:8px;align-items:flex-start; }
+.conn-dir { color:var(--dim);flex-shrink:0;width:48px; }
+.report-box { background:rgba(108,142,247,.06);border:1px solid rgba(108,142,247,.2);border-radius:10px;padding:14px 16px; }
+.report-title { font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--accent);margin-bottom:8px; }
+.report-step { font-size:11px;color:var(--muted);margin-bottom:6px;display:flex;gap:8px; }
+.report-step-num { color:var(--accent);font-weight:700;flex-shrink:0; }
+
+.explore-section { margin-bottom:32px; }
+.explore-header { display:flex;align-items:center;gap:12px;padding:12px 16px;background:rgba(251,191,36,.04);border:1px solid rgba(251,191,36,.2);border-radius:10px 10px 0 0;border-bottom:none; }
+.explore-header .icon { font-size:14px;color:var(--yellow); }
+.explore-header .label { font-size:12px;font-weight:700;color:var(--yellow); }
+.explore-header .sublabel { font-size:11px;color:var(--muted);margin-left:auto; }
+.explore-body { padding:14px 16px;background:rgba(251,191,36,.02);border:1px solid rgba(251,191,36,.2);border-radius:0 0 10px 10px;display:flex;flex-direction:column;gap:10px; }
+.explore-item { font-size:12px;color:var(--muted);line-height:1.6;padding-left:14px;position:relative; }
+.explore-item::before { content:'';position:absolute;left:0;top:7px;width:5px;height:5px;border-radius:50%;background:var(--yellow); }
+.explore-item strong { color:var(--text); }
+.explore-item code { font-size:10px;color:var(--accent2);background:var(--surface2);padding:1px 5px;border-radius:3px; }
+</style>
+</head>
+<body>
+
+<nav>
+  <span class="brand">ProOps2026</span>
+  <a href="#concept">Concept</a>
+  <a href="#chain">Discovery</a>
+  <a href="#artifact">Artifact</a>
+  <a href="#interview">Interview Qs</a>
+  <a href="#done">Done?</a>
+  <div class="spacer"></div>
+  <span class="badge">Day 10 · Checkpoint</span>
+</nav>
+
+<div class="layout">
+<div class="main">
+
+  <!-- HEADER -->
+  <div class="day-header">
+    <div class="day-meta">
+      <span class="day-pill">Week 2 · Day 10</span>
+      <span class="day-tag">Checkpoint</span>
+    </div>
+    <div class="day-title">Agent Checkpoint: Memory Review</div>
+    <div class="day-question">
+      Are your memory files good enough to actually help you — or are they just storage?
+    </div>
+    <div class="day-why">
+      You have been writing memory files since Day 1. Today is the first time you will test whether they work. <strong>A memory file is not notes you write for yourself — it is context you provide to Claude so it can give you specific, accurate answers.</strong> A shallow memory file produces generic answers. A deep one produces answers that reference your exact setup, your actual commands, your specific decisions. Today you learn how to tell the difference, and how to fix the files that are not good enough yet. This method — test, find the gap, improve, re-test — is the quality loop you will run every checkpoint from here.
+    </div>
+  </div>
+
+  <!-- REQUIRED -->
+  <div style="padding:14px 18px;background:rgba(52,211,153,.04);border:1px solid rgba(52,211,153,.25);border-radius:10px;margin-bottom:28px;">
+    <div style="font-size:12px;font-weight:700;color:var(--green);margin-bottom:6px;">What you must complete today</div>
+    <div style="font-size:12px;color:var(--muted);line-height:1.7;">
+      1. Read the Concept section — understand what makes a memory file shallow vs deep before testing anything<br>
+      2. Work through Q1–Q5: learn the test method with <code style="font-size:11px;color:var(--accent2);">memory/docker.md</code> as your target file<br>
+      3. Q6: pick one other memory file you wrote and run the same audit on it<br>
+      4. Q7: write <code style="font-size:11px;color:var(--accent2);">memory/gap-analysis.md</code> — a simple table capturing what you found<br>
+      5. Push commit and send daily report
+    </div>
+    <div style="margin-top:10px;padding:8px 12px;border-radius:6px;background:rgba(167,139,250,.06);border:1px solid rgba(167,139,250,.2);font-size:11px;color:var(--accent2);">
+      Today's standard is: audit 2 files well. You do not need to audit all your files today — doing 2 properly is more valuable than skimming 7. The next checkpoint raises the bar once you know the method.
+    </div>
+  </div>
+
+  <!-- CONCEPT -->
+  <div class="section-block" id="concept">
+    <div class="sec-label">Concept — shallow vs deep memory files</div>
+
+    <div style="font-size:13px;color:var(--muted);line-height:1.7;margin-bottom:16px;">
+      Every memory file you write feeds Claude's answers the next time you ask about that topic. <strong style="color:var(--text);">The quality of the file determines the quality of the answer.</strong> Here is what the difference looks like:
+    </div>
+
+    <!-- Comparison -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px;">
+
+      <!-- Shallow -->
+      <div style="border:1px solid rgba(248,113,113,.3);border-radius:10px;overflow:hidden;">
+        <div style="padding:10px 16px;background:rgba(248,113,113,.08);border-bottom:1px solid rgba(248,113,113,.2);">
+          <div style="font-size:11px;font-weight:700;color:var(--red);text-transform:uppercase;letter-spacing:1px;">Shallow memory file</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:2px;">Looks done. Doesn't work.</div>
+        </div>
+        <div style="padding:14px 16px;font-family:'Cascadia Code','Fira Code',monospace;font-size:11px;color:var(--muted);line-height:1.9;background:rgba(248,113,113,.03);">
+          # Docker<br><br>
+          ## What it is<br>
+          Docker is a containerization tool.<br>
+          It packages apps and dependencies together.<br><br>
+          ## Commands<br>
+          - docker build<br>
+          - docker run<br>
+          - docker ps<br>
+          - docker stop<br><br>
+          ## Compose<br>
+          Docker Compose runs multiple containers.
+        </div>
+        <div style="padding:10px 16px;border-top:1px solid rgba(248,113,113,.2);font-size:11px;color:var(--red);line-height:1.6;">
+          Ask Claude "how do I debug a container that crashes on startup?" with this file — you get a generic answer that could apply to anyone.
+        </div>
+      </div>
+
+      <!-- Deep -->
+      <div style="border:1px solid rgba(52,211,153,.3);border-radius:10px;overflow:hidden;">
+        <div style="padding:10px 16px;background:rgba(52,211,153,.08);border-bottom:1px solid rgba(52,211,153,.2);">
+          <div style="font-size:11px;font-weight:700;color:var(--green);text-transform:uppercase;letter-spacing:1px;">Deep memory file</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:2px;">Specific. Actionable. Yours.</div>
+        </div>
+        <div style="padding:14px 16px;font-family:'Cascadia Code','Fira Code',monospace;font-size:11px;color:var(--muted);line-height:1.9;background:rgba(52,211,153,.03);">
+          # Docker<br><br>
+          ## Debug: container exits immediately<br>
+          1. docker logs &lt;name&gt; — read the last error<br>
+          2. docker run -it &lt;image&gt; sh — enter manually<br>
+          3. Common cause: CMD tries to connect to DB<br>&nbsp;&nbsp;&nbsp;before it is ready — add healthcheck<br><br>
+          ## My Compose stack (mock project)<br>
+          Services: api-gateway, user-service, task-service<br>
+          Each service connects to its own DB container<br>
+          Service names must match app env vars exactly<br><br>
+          ## Mistakes I already made<br>
+          - Used localhost instead of service name → fixed
+        </div>
+        <div style="padding:10px 16px;border-top:1px solid rgba(52,211,153,.2);font-size:11px;color:var(--green);line-height:1.6;">
+          Ask Claude the same question — it references your stack, your commands, your specific mistake. Useful.
+        </div>
+      </div>
+
+    </div>
+
+    <!-- What makes the difference -->
+    <div style="padding:14px 18px;background:var(--surface);border:1px solid var(--border);border-radius:10px;">
+      <div style="font-size:12px;font-weight:700;color:var(--text);margin-bottom:10px;">Three questions that reveal whether a memory file is deep enough:</div>
+      <div style="display:flex;flex-direction:column;gap:8px;">
+        <div style="font-size:12px;color:var(--muted);line-height:1.6;padding-left:14px;position:relative;">
+          <div style="position:absolute;left:0;top:7px;width:5px;height:5px;border-radius:50%;background:var(--accent);"></div>
+          <strong style="color:var(--text);">Is it specific to you?</strong> Does it reference your actual project, your actual commands, your actual decisions — or is it generic enough to describe any developer?
+        </div>
+        <div style="font-size:12px;color:var(--muted);line-height:1.6;padding-left:14px;position:relative;">
+          <div style="position:absolute;left:0;top:7px;width:5px;height:5px;border-radius:50%;background:var(--accent);"></div>
+          <strong style="color:var(--text);">Does it include commands?</strong> Not just "use docker logs" — the actual command with flags you run, and what you look for in the output.
+        </div>
+        <div style="font-size:12px;color:var(--muted);line-height:1.6;padding-left:14px;position:relative;">
+          <div style="position:absolute;left:0;top:7px;width:5px;height:5px;border-radius:50%;background:var(--accent);"></div>
+          <strong style="color:var(--text);">Does it capture what went wrong?</strong> Mistakes you hit, problems you solved, things that surprised you — this is where half the value lives, and most people skip it entirely.
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- DISCOVERY CHAIN -->
+  <div class="section-block" id="chain">
+    <div class="sec-label">Discovery chain — 7 questions, 2 files audited</div>
+
+    <div style="padding:12px 16px;background:var(--surface);border:1px solid var(--border);border-radius:10px;margin-bottom:14px;font-size:12px;color:var(--muted);line-height:1.7;">
+      <strong style="color:var(--text);">Q1–Q5 focus on <code style="color:var(--accent2);font-size:11px;">memory/docker.md</code>.</strong> This is your most recent file — you wrote it yesterday, so the content is fresh and the gaps will be obvious. Q6 is where you choose a second file and repeat the same method. Q7 is the output.
+    </div>
+
+    <div class="chain">
+
+      <div class="chain-item" onclick="toggleChain(this,0)">
+        <div class="chain-num">1</div>
+        <div class="chain-body">
+          <div class="chain-q">Before testing anything, ask Claude to describe what a useful memory file looks like from its perspective — what information in a file actually helps it give better answers?</div>
+          <div class="chain-prompt">I am building a memory file system for a DevOps AI agent. The files live in a memory/ folder and I paste their contents at the start of relevant sessions. From your perspective as the AI that reads these files: what kind of information in a memory file actually helps you give better, more specific answers? What are the top 3 types of content that make the biggest difference — and what are 3 things people commonly write that look useful but actually don't help?</div>
+          <div class="chain-hint">Read this answer carefully. Claude will describe specificity, commands with context, and documented decisions as high-value. "Topic overviews" and "tool descriptions" as low-value. This is the rubric you will apply to your own files in the next questions.</div>
+        </div>
+      </div>
+
+      <div class="chain-item" onclick="toggleChain(this,1)">
+        <div class="chain-num">2</div>
+        <div class="chain-body">
+          <div class="chain-q">Open <code>memory/docker.md</code> and read it fully. Before running any test — what do you think its weakest section is, and why?</div>
+          <div class="chain-prompt">Here is my current memory/docker.md:
+
+[paste the full contents of memory/docker.md here]
+
+Based on the rubric we just discussed — specificity, commands with context, documented decisions — identify the single weakest section. Explain specifically what is missing: is it (a) depth — the concept is named but not explained, (b) specificity — no real commands or examples from my actual work, or (c) coverage — a whole topic from my learning is absent entirely?</div>
+          <div class="chain-hint">You are diagnosing before fixing. Do not rewrite anything yet — just understand what is wrong and why. A correct diagnosis leads to a correct fix. A skipped diagnosis leads to a rewrite that still fails the test.</div>
+          <div class="chain-note">Replace [paste the full contents of memory/docker.md here] with the actual file contents before sending. Do not send the prompt with the placeholder still in it.</div>
+        </div>
+      </div>
+
+      <div class="chain-item" onclick="toggleChain(this,2)">
+        <div class="chain-num">3</div>
+        <div class="chain-body">
+          <div class="chain-q">Now run the real test: ask Claude a Docker question that your memory file should be able to answer. Evaluate whether the answer is specific to you, or generic enough to apply to anyone.</div>
+          <div class="chain-prompt">Using only the information in memory/docker.md that I just shared, answer this question as if you are my personal DevOps assistant who only knows what is in that file:
+
+"I have a container that crashes immediately after docker compose up. Walk me through exactly how to debug it — what commands do I run, in what order, and what do I look for in the output of each one?"
+
+Do not use any general Docker knowledge outside of what is in the file. If the file does not have enough information to answer specifically, tell me exactly what is missing.</div>
+          <div class="chain-hint">This is the test. If the answer sounds like a Docker tutorial — generic steps that could come from any blog post — the file failed. If the answer references your actual stack, your specific services, your actual commands, it passed. Be honest about which one you got.</div>
+        </div>
+      </div>
+
+      <div class="chain-item" onclick="toggleChain(this,3)">
+        <div class="chain-num">4</div>
+        <div class="chain-body">
+          <div class="chain-q">The test revealed a gap. Now fix it — rewrite the weakest section so it passes the same test when you run it again.</div>
+          <div class="chain-prompt">Based on the gap you identified, help me rewrite that section of memory/docker.md. The rewritten section should:
+1. Reference my specific project setup (services: [list your services from your DOP])
+2. Include the exact commands I would run, with the real flags, not placeholder syntax
+3. Include at least one "mistake I made / thing that surprised me" entry — something I learned the hard way this week
+4. Be short enough to actually read — no walls of text, use bullets and short lines
+
+Write the replacement section only, not the whole file. I will paste it in myself.</div>
+          <div class="chain-hint">After Claude writes the replacement — read it before you paste it in. Does it actually reference your project? Are the commands real? If it still looks generic, push back: "this still sounds generic — add my specific service names and the actual error I hit."</div>
+        </div>
+      </div>
+
+      <div class="chain-item" onclick="toggleChain(this,4)">
+        <div class="chain-num">5</div>
+        <div class="chain-body">
+          <div class="chain-q">Paste the improved section into <code>memory/docker.md</code> and re-run the same test from Q3. Did the answer get materially better?</div>
+          <div class="chain-prompt">Here is my updated memory/docker.md after the rewrite:
+
+[paste the updated file contents here]
+
+Run the same test as before: using only this file, answer "I have a container that crashes immediately after docker compose up — walk me through exactly how to debug it." Compare this answer to the one you gave before the rewrite. What specifically improved, and is there still a gap?</div>
+          <div class="chain-hint">You are looking for a materially better answer — not just slightly different wording. If the improvement is small, the rewrite addressed the wrong thing. Ask Claude what the remaining gap is and fix it. If the answer is genuinely specific and actionable now, the file passed.</div>
+          <div class="chain-note">A file that passes the test does not mean a perfect file — it means good enough to be useful. "Good enough to be useful" is today's standard. Perfection is a future checkpoint's job.</div>
+        </div>
+      </div>
+
+      <div class="chain-item" onclick="toggleChain(this,5)">
+        <div class="chain-num">6</div>
+        <div class="chain-body">
+          <div class="chain-q">Pick one other memory file you wrote — the one you think is weakest — and run the full audit on it: test it, find the gap, fix the weakest section, re-test.</div>
+          <div class="chain-prompt">I want to audit another memory file using the same method we used for docker.md.
+
+Here is my [file name — e.g. memory/git.md]:
+
+[paste the full contents]
+
+Step 1: Identify the weakest section — depth, specificity, or coverage gap?
+Step 2: Give me a test question this file should be able to answer — something real I would actually ask in a working session.
+Step 3: Answer the test question using only the file contents. Tell me if the answer passes or fails.
+Step 4: Write the replacement for the weakest section, same standards as before — specific to my setup, real commands, at least one "lesson learned" entry.</div>
+          <div class="chain-hint">Which file should you pick? Whichever one you least want to look at — that feeling usually means it is the one that got written the fastest and has the least depth. Common candidates: <code style="font-size:11px;color:var(--accent2);">networking-basics.md</code>, <code style="font-size:11px;color:var(--accent2);">cloud-concepts.md</code>, or <code style="font-size:11px;color:var(--accent2);">git.md</code>.</div>
+        </div>
+      </div>
+
+      <div class="chain-item" onclick="toggleChain(this,6)">
+        <div class="chain-num">7</div>
+        <div class="chain-body">
+          <div class="chain-q">Write <code>memory/gap-analysis.md</code> — a simple table recording what you found today. This becomes your agenda for the Day 20 checkpoint.</div>
+          <div class="chain-prompt">Help me write memory/gap-analysis.md. It should be a simple markdown table with these columns:
+
+| File | What is weak | Gap type | Plan to fix | Fix by |
+
+Fill in one row for each file I audited today (minimum 2 rows). Then add one row for any other memory file you think has a likely gap based on what you know about my Week 1-2 learning — even if I haven't audited it yet.
+
+Gap type should be one of: depth / specificity / coverage / missing entirely
+Plan to fix should be one sentence — specific.
+Fix by: Day 20 (the next checkpoint).
+
+Keep it short. This is a working document, not a report.</div>
+          <div class="chain-hint">This file is not graded on completeness today. Its job is to give future-you (and your mentor) a clear picture of where the gaps are. Three honest rows are more valuable than ten vague ones.</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ARTIFACTS -->
+  <div class="section-block" id="artifact">
+    <div class="sec-label">Artifacts</div>
+
+    <div class="artifact-card">
+      <div class="artifact-head">
+        <div class="artifact-title">memory/docker.md — improved</div>
+        <div class="artifact-file">memory/docker.md</div>
+      </div>
+      <div class="artifact-body">
+        <div class="artifact-row"><div class="ar-dot"></div><div class="ar-text"><strong>At least one section was materially rewritten</strong> — not lightly edited, but genuinely improved with specific commands, your project services, and a lesson-learned entry.</div></div>
+        <div class="artifact-row"><div class="ar-dot"></div><div class="ar-text"><strong>The test from Q3 produces a better answer than before</strong> — you ran it before and after. The improvement is real, not just cosmetic.</div></div>
+        <div class="artifact-row"><div class="ar-dot"></div><div class="ar-text"><strong>Your actual service names appear in the file</strong> — not placeholder names. The file knows your project exists.</div></div>
+        <div class="artifact-fail"><strong>Weak signals:</strong> The file has more content but the test answer is no more specific than before. The "improvement" is additional bullet points that are still generic. No commands with real flags. No mention of anything that went wrong this week.</div>
+      </div>
+    </div>
+
+    <div class="artifact-card">
+      <div class="artifact-head">
+        <div class="artifact-title">One other memory file — audited and improved</div>
+        <div class="artifact-file">memory/[your choice].md</div>
+      </div>
+      <div class="artifact-body">
+        <div class="artifact-row"><div class="ar-dot"></div><div class="ar-text"><strong>You ran the test</strong> — not just read the file. You asked a real question, evaluated whether the answer was specific or generic.</div></div>
+        <div class="artifact-row"><div class="ar-dot"></div><div class="ar-text"><strong>The weakest section was identified and fixed</strong> — or confirmed as solid (a file that passes the test honestly is fine; not every file needs work).</div></div>
+        <div class="artifact-fail"><strong>Weak signals:</strong> You read the file and decided "it looks ok" without actually running the test. A file that was never tested cannot be called audited.</div>
+      </div>
+    </div>
+
+    <div class="artifact-card">
+      <div class="artifact-head">
+        <div class="artifact-title">Gap Analysis</div>
+        <div class="artifact-file">memory/gap-analysis.md</div>
+      </div>
+      <div class="artifact-body">
+        <div class="artifact-row"><div class="ar-dot"></div><div class="ar-text"><strong>A markdown table with at least 3 rows</strong> — minimum 2 from today's audit + at least 1 predicted gap for a file not yet audited.</div></div>
+        <div class="artifact-row"><div class="ar-dot"></div><div class="ar-text"><strong>Each row names a gap type</strong> (depth / specificity / coverage / missing entirely) — not just "needs improvement."</div></div>
+        <div class="artifact-row"><div class="ar-dot"></div><div class="ar-text"><strong>"Fix by Day 20"</strong> is in every row — this file becomes the agenda for the next checkpoint review.</div></div>
+        <div class="artifact-fail"><strong>Weak signals:</strong> Gap descriptions like "add more detail" or "write more content" — these are not specific enough to act on. The fix plan should name the exact thing to add.</div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- INTERVIEW QUESTIONS -->
+  <div class="iq-section" id="interview">
+    <div class="iq-header">
+      <div class="iq-title">Interview Questions</div>
+      <div class="iq-subtitle">Click each question when you can answer it confidently without looking at your files. These test understanding, not recall.</div>
+    </div>
+    <div class="iq-body">
+
+      <div class="iq-item" onclick="toggleIQ(this)">
+        <div class="iq-q">
+          <span class="iq-num">Q1</span>
+          <span class="iq-text">What is the difference between a memory file that "looks complete" and one that is actually useful to an AI agent? Give a concrete example of the same information written both ways.</span>
+          <span class="iq-check">&#10003;</span>
+        </div>
+      </div>
+
+      <div class="iq-item" onclick="toggleIQ(this)">
+        <div class="iq-q">
+          <span class="iq-num">Q2</span>
+          <span class="iq-text">You run a test on a memory file and the agent gives a generic answer. What are the three possible root causes — and how do you diagnose which one it is?</span>
+          <span class="iq-check">&#10003;</span>
+        </div>
+      </div>
+
+      <div class="iq-item" onclick="toggleIQ(this)">
+        <div class="iq-q">
+          <span class="iq-num">Q3</span>
+          <span class="iq-text">Why is "I read the file and it looked fine" not a valid audit? What is the minimum a real audit requires?</span>
+          <span class="iq-check">&#10003;</span>
+        </div>
+      </div>
+
+      <div class="iq-item" onclick="toggleIQ(this)">
+        <div class="iq-q">
+          <span class="iq-num">Q4</span>
+          <span class="iq-text">A teammate says their memory file is done because it has 10 sections covering all the Docker topics. You say it might still be shallow. How do you settle the argument in under 2 minutes?</span>
+          <span class="iq-check">&#10003;</span>
+        </div>
+      </div>
+
+      <div class="iq-item" onclick="toggleIQ(this)">
+        <div class="iq-q">
+          <span class="iq-num">Q5</span>
+          <span class="iq-text">What is the difference between a "depth gap" and a "specificity gap" in a memory file? Give one example of each from your own files today.</span>
+          <span class="iq-check">&#10003;</span>
+        </div>
+      </div>
+
+      <div class="iq-item" onclick="toggleIQ(this)">
+        <div class="iq-q">
+          <span class="iq-num">Q6</span>
+          <span class="iq-text">Why is the "mistakes I made" section one of the most valuable things to add to a memory file — and why do most people skip writing it?</span>
+          <span class="iq-check">&#10003;</span>
+        </div>
+      </div>
+
+      <div class="iq-item" onclick="toggleIQ(this)">
+        <div class="iq-q">
+          <span class="iq-num">Q7</span>
+          <span class="iq-text">You improved a memory file and re-ran the test. The answer is better but still not fully specific. What do you do — rewrite again, or accept it and move on? How do you decide?</span>
+          <span class="iq-check">&#10003;</span>
+        </div>
+      </div>
+
+      <div class="iq-item" onclick="toggleIQ(this)">
+        <div class="iq-q">
+          <span class="iq-num">Q8</span>
+          <span class="iq-text">What is the purpose of gap-analysis.md — why write it down instead of just fixing everything today?</span>
+          <span class="iq-check">&#10003;</span>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- DONE CRITERIA -->
+  <div class="section-block" id="done">
+    <div class="sec-label">Done criteria</div>
+    <div class="criteria">
+      <div class="crit" onclick="toggleCrit(this)">
+        <div class="crit-box"><span class="crit-check">&#10003;</span></div>
+        <div class="crit-text">You asked Claude what makes a memory file useful (Q1) and read the answer — not skimmed it.</div>
+      </div>
+      <div class="crit" onclick="toggleCrit(this)">
+        <div class="crit-box"><span class="crit-check">&#10003;</span></div>
+        <div class="crit-text"><code style="font-size:11px;color:var(--accent2);">memory/docker.md</code> was tested using the Q3 prompt — before and after the rewrite. The answer improved.</div>
+      </div>
+      <div class="crit" onclick="toggleCrit(this)">
+        <div class="crit-box"><span class="crit-check">&#10003;</span></div>
+        <div class="crit-text">At least one section of <code style="font-size:11px;color:var(--accent2);">memory/docker.md</code> was materially rewritten — your project's service names appear in the file.</div>
+      </div>
+      <div class="crit" onclick="toggleCrit(this)">
+        <div class="crit-box"><span class="crit-check">&#10003;</span></div>
+        <div class="crit-text">A second memory file was chosen, tested with a real question, and either improved or confirmed as solid with evidence (the test answer was specific).</div>
+      </div>
+      <div class="crit" onclick="toggleCrit(this)">
+        <div class="crit-box"><span class="crit-check">&#10003;</span></div>
+        <div class="crit-text"><code style="font-size:11px;color:var(--accent2);">memory/gap-analysis.md</code> exists with at least 3 rows — each with a named gap type and a specific fix plan.</div>
+      </div>
+      <div class="crit" onclick="toggleCrit(this)">
+        <div class="crit-box"><span class="crit-check">&#10003;</span></div>
+        <div class="crit-text">Git commit pushed to your GitHub org: <code style="font-size:11px;color:var(--accent2);">Day 10 — memory audit + gap-analysis.md</code></div>
+      </div>
+      <div class="crit" onclick="toggleCrit(this)">
+        <div class="crit-box"><span class="crit-check">&#10003;</span></div>
+        <div class="crit-text">Daily log filled — Tomorrow's Context Block states which gap from gap-analysis.md you plan to address next, and on which day.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- EXPLORE FURTHER -->
+  <div class="explore-section">
+    <div class="explore-header">
+      <span class="icon">&#9654;</span>
+      <span class="label">Explore further</span>
+      <span class="sublabel">Only after gap-analysis.md is committed &#10003;</span>
+    </div>
+    <div class="explore-body">
+      <div style="font-size:11px;color:var(--dim);margin-bottom:4px;">These are optional. Only work on these if all three artifacts are committed and your report is ready to send.</div>
+
+      <div class="explore-item">
+        <strong>Audit all your files.</strong> Use the same method from Q6 on every remaining memory file in one go. Ask Claude: <em>"Here are all my memory files [paste each one]. For each file, run the specificity test, name the gap type, and suggest a one-sentence fix. Output as a table."</em> Add any new rows to gap-analysis.md.
+      </div>
+
+      <div class="explore-item">
+        <strong>Structured memory format.</strong> Some information is better stored as a table or decision tree than prose. Ask Claude: <em>"Look at my memory/docker.md — which sections would be more useful to an AI agent if they were formatted as a table or decision tree rather than prose? Show me the reformatted version of the strongest candidate."</em>
+      </div>
+
+      <div class="explore-item">
+        <strong>Add a "quick reference" block.</strong> The top of each memory file should have a 3-line quick reference so Claude can answer fast questions without reading the whole file. Ask Claude: <em>"Write a 3-line quick reference block for memory/docker.md — the three most useful facts about Docker for someone working on a multi-service Compose stack."</em>
+      </div>
+
+    </div>
+  </div>
+
+</div><!-- /main -->
+
+<!-- SIDEBAR -->
+<div class="sidebar">
+
+  <div class="widget">
+    <div class="widget-title">Progress</div>
+    <div class="progress-count" id="prog-count">0 / 7</div>
+    <div style="margin-bottom:8px;">
+      <div class="progress-bar"><div class="progress-fill" id="prog-fill" style="width:0%"></div></div>
+      <div class="progress-label" id="prog-label">Discovery chain</div>
+    </div>
+  </div>
+
+  <div class="widget">
+    <div class="widget-title">Today's Artifacts</div>
+    <div class="as-row"><div class="as-dot" id="dot-docker"></div><div class="as-name">memory/docker.md improved</div></div>
+    <div class="as-row"><div class="as-dot" id="dot-second"></div><div class="as-name">Second file audited</div></div>
+    <div class="as-row"><div class="as-dot" id="dot-gap"></div><div class="as-name">memory/gap-analysis.md</div></div>
+  </div>
+
+  <div class="widget" style="background:rgba(167,139,250,.04);border-color:rgba(167,139,250,.2);">
+    <div class="widget-title" style="color:var(--accent2);">Today's standard</div>
+    <div style="font-size:11px;color:var(--muted);line-height:1.7;">
+      Audit <strong style="color:var(--text);">2 files well</strong> — not all files quickly.<br><br>
+      The method matters more than the volume today. Once you know how to test and improve a file, you can apply it to everything else on your own schedule.<br><br>
+      <strong style="color:var(--accent2);">Day 20 raises the bar.</strong> Every memory file. Full audit.
+    </div>
+  </div>
+
+  <div class="widget">
+    <div class="widget-title">Connects To</div>
+    <div style="display:flex;flex-direction:column;gap:6px;">
+      <div class="conn-row"><span class="conn-dir">&larr; Day 9</span><span style="font-size:11px;color:var(--muted);">docker.md was written here</span></div>
+      <div class="conn-row"><span class="conn-dir">&rarr; Day 11</span><span style="font-size:11px;color:var(--muted);">Orchestration — new memory file</span></div>
+      <div class="conn-row"><span class="conn-dir">&rarr; Day 20</span><span style="font-size:11px;color:var(--muted);">Full memory audit — gap-analysis.md is the agenda</span></div>
+    </div>
+  </div>
+
+  <div class="report-box">
+    <div class="report-title">End-of-day report</div>
+    <div class="report-step"><span class="report-step-num">1.</span> Fill daily log + context block</div>
+    <div class="report-step"><span class="report-step-num">2.</span> git commit + push to GitHub org</div>
+    <div class="report-step"><span class="report-step-num">3.</span> Fill <code style="font-size:10px;color:var(--accent);">templates/daily-report-template.md</code> &rarr; paste to trainer chat</div>
+    <div style="margin-top:8px;padding:6px 8px;background:rgba(52,211,153,.06);border:1px solid rgba(52,211,153,.2);border-radius:5px;font-size:10px;color:var(--green);line-height:1.5;">
+      Include: commit hash + which 2 files you audited + one honest sentence about what you found
+    </div>
+  </div>
+
+</div><!-- /sidebar -->
+</div><!-- /layout -->
+
+<script>
+const chainDone = new Array(7).fill(false);
+function toggleChain(el, i) {
+  chainDone[i] = !chainDone[i];
+  el.classList.toggle('done', chainDone[i]);
+  const done = chainDone.filter(Boolean).length;
+  document.getElementById('prog-count').textContent = done + ' / 7';
+  document.getElementById('prog-fill').style.width = (done/7*100) + '%';
+  const labels = ['Keep going','Keep going','Halfway','Halfway','Almost there','Almost there','Done!'];
+  document.getElementById('prog-label').textContent = done === 0 ? 'Discovery chain' : labels[done-1];
+  if (done >= 5) document.getElementById('dot-docker').classList.add('done');
+  if (done >= 6) document.getElementById('dot-second').classList.add('done');
+  if (done >= 7) document.getElementById('dot-gap').classList.add('done');
+}
+function toggleIQ(el) { el.classList.toggle('answered'); }
+function toggleCrit(el) { el.classList.toggle('done'); }
+</script>
+</body>
+</html>

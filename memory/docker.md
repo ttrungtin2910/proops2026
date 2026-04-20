@@ -657,7 +657,6 @@ It is the combination of:
 - mistakes already made
 
 ## 19. Day 09 Stack Overlay (Current Project Example)
-
 ### Project name
 
 Day 09 Stack
@@ -693,6 +692,18 @@ Day 09 Stack
 - qna-agent
 - websocket-responder
 - frontend
+
+### Secrets and Configuration — Day 09 Stack
+
+#### Approach: env_file per service
+
+All secrets injected at runtime. Nothing baked into images.
+
+```bash
+# Required before first docker compose up
+cp hook-gateway/.env.example hook-gateway/.env
+cp qna-agent/.env.example qna-agent/.env
+```
 
 ### Root integration commands
 
