@@ -1,655 +1,763 @@
-# Docker
+# Docker — Agent Memory Reference
 
-Agent instructions: This file is your authoritative reference for all Docker work.
-Read the relevant section before writing Dockerfiles, debugging containers, or explaining
-Docker concepts. Never answer from general knowledge when this file covers the topic.
+**Topic**: Docker Core + Compose + Operational Debugging  
+**Purpose**: Reusable Docker memory for any project, with a portable core + project overlay model  
+**Last updated**: 2026-04-17  
 
 ---
 
-## 1. Dockerfile Anatomy
+## 0. How To Use This File
 
-Each instruction creates one image layer (except CMD/ENTRYPOINT which are metadata).
-Order instructions from LEAST to MOST frequently changed — this is the cache rule.
+This memory is split into 2 layers:
 
-### Instruction reference
+1. **Portable Core**
+   - Rules that apply to almost every Docker / Compose project
+   - Reuse across backend, frontend, data, and infra services
 
-| Instruction | What it does | When to use it |
-|-------------|--------------|----------------|
-| `FROM`      | Sets the base image. Everything builds on top of this layer. | Always first. Pin to a specific version tag — never `latest` in production. |
-| `WORKDIR`   | Sets the working directory for all subsequent instructions. Creates the dir if it doesn't exist. | Set once near the top. Prefer `/app` for application code. |
-| `COPY`      | Copies files from build context into the image. Checksums every file — any change invalidates the layer. | Use instead of ADD unless you need tar-extraction or URL fetch. |
-| `RUN`       | Executes a shell command and commits the result as a new layer. | Install packages, compile, run build steps. Chain with `&&` to avoid extra layers. |
-| `ENV`       | Sets environment variables baked into the image. Visible in `docker history` and `docker inspect`. | Non-sensitive runtime config only (NODE_ENV, PORT). Never passwords or API keys. |
-| `ARG`       | Build-time variable, passed via `--build-arg`. Exists only during build, not in the running container. | Build variants (dev vs prod deps), APP_VERSION. Also visible in `docker history` if used in RUN — not safe for secrets. |
-| `EXPOSE`    | Documents which port the app listens on. Does NOT publish the port. Pure metadata. | Always declare for documentation and `-P` auto-mapping. Requires `-p HOST:CONTAINER` at runtime to actually publish. |
-| `CMD`       | Default command to run when the container starts. Overridden by anything passed after the image name in `docker run`. | The application entrypoint. Use exec form `["node", "app.js"]` not shell form `node app.js` — shell form wraps in `/bin/sh -c` which breaks signal handling. |
-| `ENTRYPOINT`| Sets the executable that always runs. CMD becomes default arguments to ENTRYPOINT. Not overridden by `docker run` args (requires `--entrypoint` flag to override). | Use when the container is a dedicated tool. Combine with CMD for default-but-overridable arguments. |
-| `USER`      | Switches to a non-root user for all subsequent instructions and the running container. | Always set before CMD in production images. Running as root inside a container is a security risk. |
-| `VOLUME`    | Declares a mount point. Creates an anonymous volume at that path if no volume is mounted at run time. | Rarely needed — prefer explicit `-v` mounts at run time. |
+2. **Project Overlay**
+   - Replace with the current project's service names, ports, health dependencies, startup order, and known mistakes
+   - This is the part that makes answers specific instead of generic
 
-### ENTRYPOINT + CMD interaction
+Rule:
+- If answering a conceptual or best-practice question → use Portable Core
+- If answering a debugging or operational question → use Project Overlay first, then apply Portable Core rules
 
-```
-ENTRYPOINT ["node"]   CMD ["app.js"]    →  runs: node app.js
-ENTRYPOINT ["node"]   CMD ["server.js"] →  docker run myapp server.js  →  runs: node server.js
-No ENTRYPOINT         CMD ["node","app.js"]  →  docker run myapp /bin/sh  →  overrides to: /bin/sh
-```
+---
 
-### Complete working Dockerfile — Node.js, production-grade
+## 1. Quick Reference (Fast Answer Block)
 
-Demonstrates: pinned base image, dependencies-before-code cache pattern,
-multi-stage build, non-root user, exec-form CMD.
+- Containers are isolated processes, not VMs → they start fast and exit when PID 1 exits
+- Use **service names** for container-to-container communication, never `localhost`
+- Standard debug order: `logs → exit code → health → exec → dependency check`
+- For daily operations, Docker Compose workflows matter more than raw `docker run`
+- A memory file is only useful if it includes **real commands + real execution paths + real mistakes**
+
+---
+
+## 2. Mental Model — Containers vs Virtual Machines
+
+Containers are not lightweight virtual machines.
+
+They are processes running on the host kernel with isolated namespaces:
+
+- **PID namespace** → process isolation
+- **Network namespace** → each container has its own localhost
+- **Filesystem namespace** → layered filesystem
+- **User namespace** (optional) → user isolation
+
+### Practical implications
+
+- No SSH needed → use `docker exec`
+- Containers start quickly → no guest OS boot
+- Container exits when the main process exits
+- Signal handling depends on PID 1 behavior
+- `localhost` inside a container means the container itself, not the host or sibling containers
+
+### Why this matters
+
+This model explains most common Docker failures:
+
+- container exits immediately → wrong CMD / app crash / wrong entrypoint
+- service cannot reach dependency → `localhost` used instead of service name
+- stop/restart behaves badly → shell-form CMD or poor signal handling
+- child processes become zombies → missing init process in PID 1 path
+
+---
+
+## 3. Dockerfile Anatomy (Reusable Rules)
+
+Every Dockerfile instruction creates a read-only layer.  
+Layer order matters for both correctness and build speed.
+
+### Core instructions
+
+| Instruction | Purpose | Rule |
+|---|---|---|
+| `FROM` | Base image | Pin exact tag, never use `latest` |
+| `WORKDIR` | Working directory | Set before COPY/RUN |
+| `COPY` | Copy files into image | Copy only what is needed |
+| `RUN` | Build-time execution | Use for install / compile / prepare |
+| `ENV` | Runtime config | Never store secrets here |
+| `EXPOSE` | Port documentation | Does not publish ports |
+| `LABEL` | Metadata | Use when traceability matters |
+| `HEALTHCHECK` | Container health probe | Strongly recommended for long-running apps |
+| `CMD` | Default start command | Prefer exec form |
+| `ENTRYPOINT` | Fixed executable | Use for tools / controlled runtime entry |
+
+### Core Dockerfile rules
+
+- Pin a specific base image tag
+- Prefer slim / minimal runtime images, but not at the cost of runtime stability
+- Use exec form for `CMD` / `ENTRYPOINT`
+- Prefer non-root execution for deployable app containers
+- Add `HEALTHCHECK` for orchestrated or production-grade workloads
+- Do not bake secrets into image layers
+- Keep runtime image smaller than build image where possible
+
+### CMD vs ENTRYPOINT
+
+Use `CMD` when the image has a default start command that may change.
 
 ```dockerfile
-# ── Stage 1: install production dependencies ──────────────────────────────
-FROM node:18.17.0-alpine3.18 AS deps
+CMD ["node", "./bin/www"]
+```
 
-WORKDIR /app
+Use ENTRYPOINT when the image itself behaves like a fixed executable.
 
-# COPY package files FIRST — this layer only rebuilds when deps change, not on every code edit
-COPY package.json package-lock.json ./
+```dockerfile
+ENTRYPOINT ["python"]
+CMD ["app.py"]
+```
 
-# npm ci: reads lock file strictly, never updates it, faster than npm install, deterministic
-# --omit=dev: excludes devDependencies — jest, eslint, webpack have no place in production
-RUN npm ci --omit=dev
+### Rule
 
+CMD = default command
+ENTRYPOINT = fixed executable
+Prefer exec form, not shell form
+4. .dockerignore Rules
 
-# ── Stage 2: build (TypeScript / bundler) ─────────────────────────────────
-FROM node:18.17.0-alpine3.18 AS builder
+Minimum safe entries:
 
-WORKDIR /app
+node_modules
+.env
+.git
 
-COPY --from=deps /app/node_modules ./node_modules
+Add more based on language and tooling, but do not exclude files the app needs at runtime.
 
-# COPY source AFTER deps — this layer rebuilds every commit, but npm ci above does not
+**Rule:**
+- Exclude build noise, secrets, and VCS files
+- Keep templates, static assets, migrations, and runtime config if required by the app
+
+## 5. Layer Cache (Performance-Critical Mental Model)
+
+Docker caches each instruction as a layer using the instruction + input context hash.
+
+**Rule**
+
+If one layer changes, that layer and all layers below it are invalidated.
+
+### Correct build order pattern
+
+Dependencies before code:
+
+COPY package*.json ./
+RUN npm install
+COPY . .
+### Why this matters
+
+If source code is copied before dependency installation, dependency install re-runs on every code change.
+
+### Reusable language patterns
+
+#### Node / frontend
+
+COPY package*.json ./
+RUN npm ci
 COPY . .
 
-RUN npm run build
+#### Python
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+COPY app/ ./app/
+
+#### .NET
+
+COPY *.csproj ./
+RUN dotnet restore
+COPY . .
+RUN dotnet publish -c Release -o /app/publish
+### Verification
+
+Look for CACHED on repeated builds.
+
+docker build -t image:tag .
+docker build -t image:tag .
+
+#### Force rebuild
+
+docker build --no-cache -t image:tag .
+
+## 6. Core Runtime Commands
+
+### Build and image management
+
+docker build -t image:tag .
+docker build --no-cache -t image:tag .
+docker images
+docker rmi image:tag
+docker rmi -f image:tag
+docker pull image:tag
+docker tag source:tag target:tag
+
+### Container lifecycle
+
+docker run -d -p 3000:3000 --name myapp image:tag
+docker run -it --rm image:tag /bin/sh
+docker run --env-file .env image:tag
+docker run -e KEY=VALUE image:tag
+
+docker ps
+docker ps -a
+docker stop container
+docker rm container
+docker rm -f container
+docker stop container && docker rm container
+
+### Debug commands
+
+docker logs container
+docker logs -f container
+docker logs --tail 50 container
+docker inspect container
+docker inspect container --format='{{.State.ExitCode}}'
+docker inspect container --format='{{.State.Health.Status}}'
+docker port container
+docker stats container --no-stream
+docker exec -it container /bin/sh
+
+### Key flags to remember
+
+Flag	Meaning
+-d	detached mode
+-p HOST:CONTAINER	publish port
+-e KEY=VALUE	single env var
+--env-file .env	bulk env injection
+--name	stable container name
+-it	interactive shell
+--rm	remove on exit
+--no-cache	bypass build cache
+--init	better PID 1 behavior
+--restart unless-stopped	resilient long-running service
+--memory=256m	memory limit
+--cpus=0.5	CPU limit
+--security-opt no-new-privileges:true	block privilege escalation
+
+## 7. Networking Model (Critical Rule)
+
+Each container has its own network namespace.
+
+**Rule**
+- `localhost` = this container itself
+- `service-name` = another container on the Docker network
+- published host port = host-to-container access path
+
+### Wrong vs correct
 
 
-# ── Stage 3: production runtime ───────────────────────────────────────────
-FROM node:18.17.0-alpine3.18 AS production
+Wrong:
 
-# Create non-root user before copying files so ownership is correct
-RUN addgroup --system --gid 1001 nodejs \
-    && adduser --system --uid 1001 --ingroup nodejs appuser
+curl http://localhost:9092
 
-WORKDIR /app
+Correct:
 
-# Copy only what the running app needs — no source TS, no devDeps, no build tools
-COPY --from=deps    /app/node_modules ./node_modules
-COPY --from=builder /app/dist         ./dist
-COPY package.json ./
+curl http://kafka:9092
 
+### Port publishing
+
+docker run -d -p 3000:3000 image:tag
+docker run -d -p 8080:3000 image:tag
+docker port container
+
+### EXPOSE rule
+
+EXPOSE documents an internal port. It does not publish the port.
+
+
+**Mental model:**
+- `EXPOSE` = label on the door
+- `-p` = opening the door
+
+## 8. Image vs Container
+
+### Image
+- immutable
+- read-only layered filesystem
+- built with `docker build`
+- stored locally or in a registry
+- multiple containers can run from one image
+
+### Container
+- running instance of an image
+- has a thin writable layer on top
+- ephemeral unless data is externalized
+- isolated process, network, and filesystem context
+
+### Practical rule
+
+Modifying a container does not change the image.
+If you need repeatability, change the Dockerfile, not the running container.
+
+## 9. Production Standards (Reusable)
+
+### Security
+
+Prefer non-root runtime
+
+RUN addgroup -S appgroup && adduser -S appuser -G appgroup
 USER appuser
 
-# Documentation only — does NOT publish the port
-EXPOSE 3000
+#### Block privilege escalation
 
-# Exec form: node receives SIGTERM directly from Docker, enabling graceful shutdown
-CMD ["node", "dist/server.js"]
-```
+docker run -d \
+  --security-opt no-new-privileges:true \
+  image:tag
 
-### Companion .dockerignore
+#### Never bake secrets into images
 
-Must exist alongside every Dockerfile. Processed before the build context is sent to the
-daemon — reduces context from 400MB to ~2KB for a typical Node.js project.
+**Bad:**
 
-```
-node_modules
-npm-debug.log
-yarn-error.log
+ENV DATABASE_PASSWORD=mysecret
 
-dist
-build
-.next
-.nuxt
+**Good:**
 
-coverage
-.nyc_output
+docker run --env-file .env image:tag
 
-.eslintrc*
-.prettierrc*
-jest.config.*
 
-.git
-.gitignore
-.github
+Verify image history if needed:
 
-Dockerfile
-Dockerfile.*
-.dockerignore
+docker history --no-trunc image:tag
 
-.DS_Store
-Thumbs.db
+### Runtime behavior
 
-.env
-.env.*
-!.env.example
-*.pem
-*.key
-*.cert
-secrets/
+#### HEALTHCHECK
 
-logs
-*.log
+Use for long-running app services, especially under Compose / ECS / Kubernetes.
 
-.idea
-.vscode
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+  CMD wget -qO- http://localhost:3000/ || exit 1
 
-README.md
-docs/
-```
+#### PID 1 / zombie handling
 
----
+Use `--init` if the process may spawn children.
 
-## 2. Layer Cache
+docker run -d --init image:tag
 
-### How it works
+#### Resource limits
 
-Every Dockerfile instruction produces a layer identified by a cache key:
+Recommended for shared hosts or production-like environments.
 
-```
-cache key = hash(instruction text + parent layer hash + file checksums if COPY/ADD)
-```
+docker run -d \
+  --memory=256m \
+  --memory-swap=256m \
+  --cpus=0.5 \
+  --restart unless-stopped \
+  image:tag
 
-Docker evaluates instructions top to bottom. On rebuild:
-- If cache key matches a stored layer → **CACHE HIT** — use stored layer, ~0ms
-- If cache key does not match → **CACHE MISS** — execute instruction, all subsequent layers
-  are also forced to rebuild regardless of whether they changed
+### Restart policy guidance
 
-**One miss invalidates everything below it.** This is the single most important
-fact about Docker layer caching.
-
-### What triggers cache invalidation
+Policy	Use case
+no	dev/test only
+on-failure	restart on crash only
+unless-stopped	preferred for long-running services
+always	special cases only
 
-| Instruction | Invalidated when |
-|-------------|-----------------|
-| `FROM`      | Base image digest changes (new pull) |
-| `RUN`       | The instruction string changes |
-| `COPY`      | Checksum of ANY file in the source path changes |
-| `ADD`       | Same as COPY, plus URL content changes |
-| `ENV`       | The instruction string changes |
-| `WORKDIR`   | The path string changes |
+## 10. Observability & Traceability
 
-### Correct instruction order — stable cache
+### Runtime monitoring
 
-Order from least-volatile to most-volatile:
+docker stats --no-stream
+docker stats container
+docker events
 
-```
-FROM        ← changes: when upgrading Node version (monthly/yearly)
-WORKDIR     ← changes: almost never
-COPY package*.json ./   ← changes: when adding/removing npm packages (weekly)
-RUN npm ci              ← changes: only when package files above change (cache HIT on code edits)
-COPY . .                ← changes: every commit (intentional — this is the volatile layer)
-RUN npm run build       ← changes: every commit (depends on volatile layer above)
-CMD                     ← changes: rarely
-```
-
-### Wrong order — what it costs
+### Image labels
 
-```dockerfile
-# WRONG: code before deps
-COPY . .          ← any file change (including app.js) invalidates this layer
-RUN npm install   ← forced to re-run on EVERY code change — 2-3 minutes wasted
-```
+Recommended when auditability matters.
 
-```dockerfile
-# RIGHT: deps before code
-COPY package*.json ./   ← only package files — stable
-RUN npm ci              ← cache HIT when only app.js changes
-COPY . .                ← volatile, but only COPY (~0.5s), not npm install
-```
-
-**Result: changing one line in app.js goes from 3 minutes to under 5 seconds.**
-
-### Verifying cache hits
-
-```bash
-# Build with plain progress to see CACHED vs executed layers
-docker build --progress=plain -t myapp . 2>&1 | grep -E "CACHED|RUN|COPY"
-
-# Typical output on a code-only change (correct Dockerfile):
-# #3 CACHED          ← COPY package*.json — not changed
-# #4 CACHED          ← RUN npm ci — not changed
-# #5 COPY . .        ← rebuilt (code changed) — fast
-# #6 RUN npm run build ← rebuilt — depends on code
-
-# Force full rebuild (no cache) for clean baseline timing
-docker build --no-cache -t myapp .
-```
-
----
-
-## 3. Core Commands
-
-### docker build
-
-```bash
-docker build [OPTIONS] PATH
-
-# Standard build
-docker build -t myapp:1.2.3 .
-
-# Key flags:
-# -t NAME:TAG       tag the resulting image
-# --no-cache        bypass all layer cache — use for baseline timing or forced fresh install
-# --progress=plain  show full build output (default is "auto" which collapses output)
-# --build-arg K=V   inject ARG values
-# --file, -f        specify Dockerfile path when not named "Dockerfile"
-# --target STAGE    stop at a specific multi-stage build stage
-
-docker build --no-cache --progress=plain -t myapp:latest .
-docker build --build-arg NODE_ENV=development -t myapp:dev .
-docker build --target deps -t myapp:deps-only .     # build only the deps stage
-```
-
-### docker run
-
-```bash
-docker run [OPTIONS] IMAGE [COMMAND]
-
-# Key flags:
-# -d                detach — run container in background, print container ID
-# -p HOST:CONTAINER publish port (creates NAT rule: host traffic → container)
-# -e KEY=VALUE      inject environment variable at runtime
-# --env-file FILE   inject all KEY=VALUE pairs from file
-# --name STRING     assign a name instead of random adjective_noun
-# -it               interactive + tty — use for shells and interactive tools
-# --rm              auto-remove container when it exits — use for one-shot commands
-# -v HOST:CONTAINER mount a host directory or named volume into the container
-# --network NAME    attach to a specific Docker network
-# --memory 512m     set memory limit (triggers OOMKiller if exceeded)
+LABEL maintainer="team@example.com" \
+      version="1.0.0" \
+      git-commit="abc1234" \
+      build-date="2026-04-18"
 
-docker run -d -p 3000:3000 --name myapp --env-file .env myapp:latest
-docker run --rm -it --entrypoint sh myapp:latest      # explore image interactively
-docker run --rm -e DB_URL=postgres://... myapp:latest node migrate.js
-```
+### Log driver example
 
-### docker exec
+docker run -d \
+  --log-driver=awslogs \
+  --log-opt awslogs-group=/myapp/production \
+  --log-opt awslogs-region=ap-southeast-1 \
+  --log-opt awslogs-stream=container-1 \
+  image:tag
 
-```bash
-docker exec [OPTIONS] CONTAINER COMMAND
+**Rule:**
+- local json-file logs are fine for dev
+- externalized logs are preferred for production
 
-# Attaches a NEW PROCESS to an already-running container's namespaces.
-# Does not need SSH. Does not start a new container.
+## 11. Multi-Stage Builds
 
-# Key flags:
-# -it               interactive + tty — required for shell sessions
-# -e KEY=VALUE      set additional env vars for this exec process only
-# -w PATH           set working directory for this exec process
+Use multi-stage builds when compile/build dependencies should not exist in the runtime image.
 
-docker exec -it myapp /bin/sh               # open shell (Alpine — use sh not bash)
-docker exec myapp env | grep DB             # check env vars of running container
-docker exec myapp cat /proc/1/environ | tr '\0' '\n'  # env vars of PID 1 (the app)
-docker exec -it myapp node -e "require('./config')"   # test module loading
-```
+### Standard pattern
 
-### docker logs
+FROM builder-image AS builder
+WORKDIR /src
+COPY . .
+RUN build-command
 
-```bash
-docker logs [OPTIONS] CONTAINER
+FROM runtime-image
+WORKDIR /app
+COPY --from=builder /output .
+CMD ["run-app"]
 
-# Retrieves stdout/stderr captured by Docker daemon.
-# Works on running AND stopped containers.
+### Rules
+- Name the build stage
+- Copy only compiled artifacts into runtime
+- Runtime image should not contain SDK/build tools
+- Do not copy raw source into runtime unless the app truly requires it
 
-# Key flags:
-# --tail N          last N lines only
-# --follow, -f      stream logs in real time (like tail -f)
-# --timestamps      prefix each line with timestamp
-# --since TIME      logs since a timestamp or relative duration (e.g. 30m, 2h)
+### Reusable project examples
+- .NET services → SDK build stage + ASP.NET runtime stage
+- Python services → builder stage optional; runtime should stay minimal
+- frontend → node build stage + nginx runtime stage
 
-docker logs --tail 50 --timestamps myapp
-docker logs -f myapp                        # stream — Ctrl+C to stop
-docker logs --since 10m myapp | grep ERROR  # last 10 minutes, filter errors
-```
+## 12. Compose File Structure
 
-### docker ps
+A Compose file usually contains:
 
-```bash
-docker ps [OPTIONS]
+services:
+  app:
+    image: myapp:tag
+    depends_on:
+      db:
+        condition: service_healthy
+    env_file: .env
+    environment:
+      - DATABASE_HOST=db
+    ports:
+      - "8080:8080"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
-# Key flags:
-# -a                show all containers including stopped ones
-# -q                quiet — print only container IDs (useful in scripts)
-# --format          custom output format
-# --filter          filter by status, name, label, etc.
+networks:
+  default:
+    name: project-net
 
-docker ps                                          # running only
-docker ps -a                                       # all including stopped
-docker ps -a --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
-docker ps -aq --filter status=exited               # IDs of all stopped containers
-```
+volumes:
+  db-data:
 
-### docker stop / docker rm / docker rmi
+### Key Compose fields
 
-```bash
-# Stop a running container gracefully (SIGTERM, wait 10s, then SIGKILL)
-docker stop myapp
-docker stop --time 30 myapp                        # give 30s before SIGKILL
+Field	Purpose
+image	pull prebuilt image
+build	build locally from Dockerfile
+ports	host access
+depends_on	startup dependency relationship
+condition: service_healthy	wait for health, not just start
+env_file	load env vars
+environment	override / inject key runtime vars
+volumes	persistence or file sharing
+healthcheck	service readiness signal
+## 13. Compose Networking
 
-# Remove a stopped container (frees container layer, not the image)
-docker rm myapp
-docker rm -f myapp                                 # force-stop then remove
+Docker Compose creates a bridge network.
+Each service can reach others by service name.
 
-# Remove all stopped containers
-docker rm $(docker ps -aq --filter status=exited)
+Examples:
 
-# Remove an image (frees disk space — only works if no containers use it)
-docker rmi myapp:1.2.3
-docker rmi -f myapp:latest                         # force — removes even if tagged elsewhere
+kafka:9092
+mongodb:27017
+redis:6379
+milvus:19530
 
-# Remove all dangling images (untagged layers from failed/replaced builds)
-docker image prune
-docker image prune -a                              # remove ALL unused images
-```
+**Rule**
 
-### docker pull / docker tag / docker push
+Inside Compose, DNS by service name is the default and preferred approach.
 
-```bash
-# Pull image from registry to local daemon cache
-docker pull node:18.17.0-alpine3.18
+**Wrong:**
 
-# Tag an existing image with a new name (creates alias, does not copy layers)
-docker tag myapp:latest registry.example.com/team/myapp:1.2.3
+curl http://localhost:9092
+curl http://172.20.0.3:9092
 
-# Push to registry (must be tagged with registry hostname for non-Docker Hub)
-docker push registry.example.com/team/myapp:1.2.3
-```
+**Correct:**
 
-### docker cp
+curl http://kafka:9092
 
-```bash
-# Copy files between host and container — works on running AND stopped containers
-# Does not require exec or shell inside the container
+## 14. Volumes
 
-docker cp CONTAINER:SRC HOST_DST
-docker cp HOST_SRC CONTAINER:DST
+### Mental model
+- named volume = Docker-managed persistence
+- bind mount = host-managed file sharing
 
-docker cp myapp:/app/logs/error.log ./error.log       # extract log for analysis
-docker cp myapp:/app/config/ ./container-config/      # extract entire directory
-docker cp ./debug.js myapp:/app/debug.js              # inject script for testing
-docker cp /usr/bin/curl myapp:/tmp/curl               # inject binary into distroless image
-```
+### Examples
 
-### docker inspect
+volumes:
+  - mongo-data:/data/db
+  - ./logs:/app/logs
+  - ./knowledge-base:/workspace/knowledge-base:ro
 
-```bash
-# Returns full JSON metadata about a container or image
+### Useful commands
 
-docker inspect CONTAINER_OR_IMAGE
+docker volume ls
+docker volume inspect mongo-data
+docker volume rm mongo-data
 
-# Extract specific fields with --format (Go template syntax)
-docker inspect --format '{{json .State}}' myapp | python3 -m json.tool
-docker inspect --format '{{.State.ExitCode}}' myapp
-docker inspect --format '{{.State.OOMKilled}}' myapp
-docker inspect --format '{{json .Config.Env}}' myapp
-docker inspect --format '{{json .Config.Cmd}}' myapp
-docker inspect --format '{{.NetworkSettings.IPAddress}}' myapp
-```
+### down vs down -v
 
-### docker port / docker history
+Command	Containers	Named volumes
+docker compose down	removed	kept
+docker compose down -v	removed	deleted
+## 15. Registry Workflow
 
-```bash
-# Show active port mappings for a running container
-docker port myapp
-# 3000/tcp -> 0.0.0.0:3000
+Standard flow:
 
-# Show image build history — reveals every instruction ever executed including ENV values
-# This is why secrets in Dockerfile are a permanent leak
-docker history --no-trunc myapp
-```
+docker build -t repo/service:tag .
+docker login
+docker push repo/service:tag
+docker pull repo/service:tag
 
----
+**Rules**
+- Use meaningful tags
+- Do not rely on `latest`
+- Use `image:` in integration Compose when teammates should pull prebuilt artifacts
+- Use `build:` in local dev Compose when actively changing source code
 
-## 4. Port Mapping and Network Isolation
+## 16. Standard Debug Decision Tree
 
-### Network namespace isolation — one sentence
+Use this flow for any project where a container crashes or behaves incorrectly.
 
-Each container gets its own network namespace: its own `lo` (127.0.0.1), its own `eth0`
-(e.g. 172.17.0.2), and its own port space — so port 3000 inside the container is
-invisible to the host until you explicitly publish it with `-p`.
+### Step 1 — Read logs
 
-### What this means in practice
+docker compose logs service-name
+docker compose logs --tail 50 service-name
+docker compose logs -f service-name
 
-```
-Host machine:
-  eth0: 192.168.1.100
-  lo:   127.0.0.1        ← host's localhost
+**Question:**
+- Did the app fail?
+- Did dependency connection fail?
+- Did the command not start at all?
 
-  docker0 bridge: 172.17.0.1
-    └── Container A:
-          eth0: 172.17.0.2   ← container's real IP (Docker-assigned)
-          lo:   127.0.0.1    ← container's own localhost (NOT the host's)
-          :3000              ← only exists inside this namespace
+### Step 2 — Check exit code
 
-curl localhost:3000 (from host) → reaches HOST's port 3000 → nothing listening → refused
-curl 172.17.0.2:3000 (from host, Linux only) → reaches container directly (no mapping needed)
-```
+docker inspect service-name --format='{{.State.ExitCode}}'
 
-### `-p HOST_PORT:CONTAINER_PORT` — what Docker actually does
+Exit code	Typical meaning
+0	process exited cleanly; command may be wrong for long-running service
+1	app/runtime error
+137	OOM or SIGKILL
+139	segfault/native crash
 
-```bash
-docker run -p 3000:3000 myapp
-```
+### Step 3 — Check health
 
-1. Binds `0.0.0.0:3000` on the host (any interface)
-2. Creates iptables NAT rule: traffic arriving at host:3000 → DNAT → 172.17.0.2:3000
-3. Enables IP forwarding on the host kernel
+docker inspect service-name --format='{{.State.Health.Status}}'
 
-```bash
-# Verify the iptables rule (Linux host, requires sudo)
-sudo iptables -t nat -L DOCKER -n
-# DNAT  tcp  --  0.0.0.0/0  0.0.0.0/0  tcp dpt:3000 to:172.17.0.2:3000
-```
+**Question:**
+- healthy?
+- starting too long?
+- unhealthy because probe is wrong or app is not ready?
 
-### Port mapping variants
+### Step 4 — Enter container
 
-```bash
--p 3000:3000            # host:3000 → container:3000
--p 8080:3000            # host:8080 → container:3000 (app still listens on 3000 internally)
--p 127.0.0.1:3000:3000  # only localhost on host, not accessible from LAN
--p 3000:3000 -p 9229:9229  # multiple ports (app port + Node.js debugger)
--P                      # auto-map all EXPOSE'd ports to random ephemeral host ports
-```
-
-### EXPOSE vs -p — they are completely different
+docker exec -it service-name /bin/sh
 
-```
-EXPOSE 3000   →  metadata only
-              →  written to image manifest
-              →  enables -P auto-mapping
-              →  does NOT create any iptables rule
-              →  does NOT allow any traffic in
-              →  container still unreachable from host
+**Check:**
+- expected files exist?
+- env vars present?
+- command binary exists?
+- process can bind to expected port?
 
--p 3000:3000  →  creates the actual NAT rule
-              →  traffic flows
-              →  EXPOSE not required for -p to work
-```
+### Step 5 — Verify dependencies
 
-**Rule:** `-p` alone is sufficient. `EXPOSE` is convention (document it, but don't rely on it for security — it provides no actual isolation).
+docker exec -it service-name sh -c "curl dependency-name:port"
 
-### App must bind 0.0.0.0, not 127.0.0.1
+**Question:**
+- DNS resolution works?
+- port reachable?
+- dependency actually healthy?
 
-```javascript
-// WRONG — binds only container's loopback, Docker NAT cannot reach it
-app.listen(3000, '127.0.0.1')
+### Step 6 — Decide root cause category
 
-// RIGHT — binds all interfaces in container's namespace, Docker NAT reaches it
-app.listen(3000, '0.0.0.0')
-app.listen(3000)              // defaults to 0.0.0.0
-```
-
-```bash
-# Verify app is bound to 0.0.0.0 inside container
-docker exec myapp ss -tlnp | grep 3000
-# LISTEN  0.0.0.0:3000    ← correct
-# LISTEN  127.0.0.1:3000  ← wrong: fix app code
-```
+Category	Typical signal
+wrong command / entrypoint	exit code 0 or instant exit
+app runtime error	logs show exception
+dependency not ready	connection refused / timeout
+network config error	localhost used instead of service name
+resource exhaustion	exit 137 / OOM
+healthcheck mismatch	container up but marked unhealthy
 
-### Check active port mappings
+## 17. Common Failure Patterns (Reusable)
 
-```bash
-docker port myapp                        # show all mappings for container
-docker port myapp 3000                   # show mapping for specific container port
-docker ps --format "table {{.Names}}\t{{.Ports}}"  # all containers
-ss -tlnp | grep LISTEN                   # verify host is listening (from host)
-```
-
----
+Failure pattern	Symptom	Root cause	Fix
+wrong CMD	container exits immediately	start command not long-running	fix CMD/ENTRYPOINT
+localhost used for dependency	connection refused	wrong network target	use service name
+dependency starts but not ready	app crashes during boot	missing health-based dependency	add healthcheck + healthy dependency waiting
+OOM kill	exit 137	memory limit too low or leak	inspect memory / tune limits
+shell-form CMD	bad signal handling	PID 1 is shell	use exec-form CMD
+source copied into runtime incorrectly	runtime missing built artifacts	wrong multi-stage copy	copy publish/build output only
+## 18. Project Overlay Template (Fill Per Project)
 
-## 5. Image vs Container Distinction
+Replace this section for the active project.
+This is what turns the file from generic memory into specific operational memory.
 
-### The analogy
+### Project name
+
+<project-name>
+
+### Main services
+- <service-1>
+- <service-2>
+- <service-3>
+
+### Infra dependencies
+- <broker>
+- <database>
+- <cache>
+- <vector-db>
+
+### Service-to-service hostnames
+- <service-name>:<port>
+- <dependency-name>:<port>
+
+### Startup order
+- <infra-1>
+- <infra-2>
+- <data-layer>
+- <app-services>
+- <frontend>
+
+### Root integration commands
+
+docker compose pull
+docker compose up -d
+docker compose logs -f
+docker compose ps
+docker compose down
+docker compose down -v
 
-```
-Image     =  class definition  =  ISO file  =  blueprint
-Container =  object instance   =  running VM =  process with isolated namespaces
+### Service-level commands
+
+docker compose up -d --build
+docker compose build <service-name>
+docker compose up -d <service-name>
+docker compose logs -f <service-name>
+docker compose down
+
+### First-time setup
+- copy required .env files
+- verify required DB collections / topics / migrations
+- confirm the correct Compose mode (integration vs service-level)
 
-One image → many simultaneous containers (all independent)
-One class → many objects         (all independent state)
-```
+### Known crash patterns
 
-### What each command shows
+Service	Symptom	Root cause	Fix
+<service>	<symptom>	<root cause>	<fix>
 
-```bash
-docker images              # lists images stored in local daemon cache
-# REPOSITORY   TAG          IMAGE ID       CREATED        SIZE
-# myapp        1.2.3        a3f9c2b81d44   2 hours ago    98MB
-# myapp        latest       a3f9c2b81d44   2 hours ago    98MB   ← same ID, two tags
-# node         18.17.0-...  f7c3e5a12b89   3 days ago     174MB
+### Mistakes already made
+- <mistake 1>
+- <mistake 2>
+- <mistake 3>
 
-docker ps -a               # lists containers (running and stopped)
-# CONTAINER ID   IMAGE          COMMAND         STATUS              NAMES
-# d9e4f5c61a22   myapp:1.2.3   "node dist/..."  Up 2 hours          myapp_prod
-# b2c3d4e51f11   myapp:1.2.3   "node dist/..."  Up 2 hours          myapp_staging
-# a1b2c3d4e5f6   myapp:1.2.3   "node dist/..."  Exited (1) 5m ago   myapp_debug
-```
+**Rule:**
+The most valuable content in this section is not the architecture summary.
+It is the combination of:
+- real service names
+- exact commands
+- real startup order
+- mistakes already made
 
-Two containers running from the same image → identical starting filesystem, independent
-runtime state (processes, memory, written files).
+## 19. Day 09 Stack Overlay (Current Project Example)
 
-### Image layers and the copy-on-write container layer
+### Project name
+
+Day 09 Stack
 
-```
-Image (read-only layers, shared between all containers using this image):
-  Layer 0: node:18.17.0-alpine3.18 base         (174MB, on disk once)
-  Layer 1: WORKDIR /app                          (0MB)
-  Layer 2: COPY package*.json + RUN npm ci       (45MB, on disk once)
-  Layer 3: COPY source files                     (1MB, on disk once)
+### Main services
+- hook-gateway
+- qna-agent
+- websocket-responder
+- frontend
 
-Container A (adds one writable layer on top):
-  Writable layer: files written at runtime       (grows as app writes files, logs, tmp)
-  ↓ reads through to image layers for everything else
+### Infra dependencies
+- zookeeper
+- kafka
+- etcd
+- minio
+- milvus
+- mongodb
+- redis
 
-Container B (adds its own writable layer):
-  Writable layer: independent from Container A
-  ↓ reads through to the same shared image layers
+### Service hostnames
+- kafka:9092
+- milvus:19530
+- mongodb:27017
+- redis:6379
 
-When a container writes to a file that exists in an image layer:
-  → Docker copies the file into the container's writable layer (copy-on-write)
-  → The image layer is unchanged
-  → Other containers see the original file
-```
-
-### Lifecycle: image → container → gone
-
-```bash
-# Image persists until explicitly removed
-docker rmi myapp:1.2.3
-
-# Container's writable layer is lost when the container is removed
-docker rm myapp_debug        # writable layer deleted — any files written at runtime are gone
-                             # image layers untouched — other containers unaffected
-
-# To persist data written at runtime: use volumes
-docker run -v /host/data:/app/data myapp     # mount host directory
-docker run -v mydata:/app/data myapp         # mount named volume (managed by Docker)
-```
-
-### Disk space accounting
-
-```bash
-docker system df            # show disk usage by images, containers, volumes
-# TYPE            TOTAL   ACTIVE  SIZE      RECLAIMABLE
-# Images          8       3       2.1GB     1.4GB (66%)
-# Containers      5       2       45MB      30MB (66%)
-# Volumes         3       2       1.2GB     0B
-
-docker system prune         # remove stopped containers, dangling images, unused networks
-docker system prune -a      # also remove unused images (not just dangling)
-```
-
----
-
-## Secrets and Configuration (cross-cutting concern)
-
-```
-Config tier          Where to set                    Examples
-───────────────────────────────────────────────────────────────
-Build variants       ARG + --build-arg               NODE_ENV, APP_VERSION
-Non-secret runtime   -e or --env-file at docker run  PORT, LOG_LEVEL, FEATURE_FLAGS
-Secrets              Mounted files /run/secrets/      DB_PASSWORD, JWT_SECRET, API_KEY
-                     Docker Secrets (Swarm)
-                     Secrets Manager (AWS/GCP/Vault)
-```
-
-**Never:** `ENV DB_PASSWORD=...` in Dockerfile → permanent in image history, readable
-by anyone with `docker history --no-trunc` or `docker inspect`.
-
-**Never:** `ARG DB_PASSWORD` used inside `RUN ./setup.sh $DB_PASSWORD` → also in history.
-
-**Correct secret injection at runtime:**
-
-```bash
-# Via env var (acceptable for dev, not ideal for prod)
-docker run --env-file .env myapp
-
-# Via mounted file (production pattern)
-docker run -v /run/host-secrets/db_password:/run/secrets/db_password:ro myapp
-
-# App reads from file:
-# fs.readFileSync('/run/secrets/db_password', 'utf8').trim()
-```
-
-**.env must be in both .gitignore AND .dockerignore.** A `.env` committed to git is
-permanent in git history (requires filter-repo to purge). A `.env` not in .dockerignore
-gets copied into the image by `COPY . .` and is readable by anyone with the image.
-
----
-
-## Debugging Cheatsheet
-
-```bash
-# Container exits immediately
-docker ps -a                          # check STATUS and exit code
-docker logs $CID                      # read stdout/stderr — the actual error is here
-docker inspect --format '{{json .State}}' $CID | python3 -m json.tool
-
-# Exit codes:
-# 0   = clean exit (process finished, not a crash)
-# 1   = app error (read logs)
-# 127 = command not found (wrong CMD binary or typo)
-# 137 = SIGKILL — OOMKilled or docker kill
-# 143 = SIGTERM — docker stop
-
-# Can't reach app on localhost
-docker port $CID                      # is port mapping active?
-docker exec $CID ss -tlnp             # is app bound to 0.0.0.0 or 127.0.0.1?
-docker exec $CID curl localhost:3000  # does it work from inside?
-
-# Debug inside running container
-docker exec -it $CID /bin/sh          # Alpine: sh, Debian/Ubuntu: bash
-docker exec $CID env | grep -v PATH   # check env vars
-docker exec $CID ps aux               # check running processes
-docker exec $CID nc -zv db-host 5432  # test network reachability
-
-# No shell in image (distroless)
-PID=$(docker inspect --format '{{.State.Pid}}' $CID)
-sudo nsenter -t $PID --mount --uts --ipc --net --pid -- /bin/sh
-
-# Extract files without shell
-docker cp $CID:/app/logs/error.log ./error.log
-docker cp $CID:/app/config/ ./config-dump/
-```
+### Startup order
+- zookeeper
+- kafka
+- etcd + minio
+- milvus
+- mongodb + redis
+- hook-gateway
+- qna-agent
+- websocket-responder
+- frontend
+
+### Root integration commands
+
+docker compose pull
+docker compose up -d
+docker compose logs -f
+docker compose logs -f hook-gateway
+docker compose logs -f qna-agent
+docker compose ps
+docker compose down
+docker compose down -v
+
+### Service-level commands
+
+docker compose up -d --build
+docker compose build qna-agent
+docker compose up -d qna-agent
+docker compose logs -f qna-agent
+docker compose down
+
+### First-time setup
+
+cp hook-gateway/.env.example hook-gateway/.env
+cp qna-agent/.env.example qna-agent/.env
+
+Also verify the Milvus legal_docs collection exists before starting qna-agent.
+
+### Known crash patterns
+
+Service	Symptom	Root cause	Fix
+hook-gateway	exits immediately	wrong container start command	fix Dockerfile command
+qna-agent	Milvus connection refused	Milvus not healthy yet	require healthy dependency
+websocket-responder	Kafka consumer startup error	broker not ready or topic missing	wait for Kafka health / pre-create topic
+any service	cannot reach sibling service	used localhost instead of service name	use Docker DNS service name
+
+### Mistakes already made
+- Used localhost:9092 for Kafka bootstrap servers
+- Forgot `depends_on: condition: service_healthy`
+- Mixed root integration Compose thinking with service-level Compose thinking
+
+## 20. What Makes This Memory File Actually Useful
+
+A Docker memory file is only useful if it contains all 3 layers:
+
+- **Mental model** — why Docker behaves the way it does
+- **Operational workflow** — what commands to run in what order
+- **Project overlay** — actual services, ports, startup order, and mistakes
+
+If one layer is missing:
+- mental model missing → answers become shallow
+- operational workflow missing → answers become unusable
+- project overlay missing → answers become generic
+
+## 21. Maintenance Rules
+
+Update this file when:
+- a new service is added
+- a startup dependency changes
+- a new crash pattern is discovered
+- a new build/runtime rule is introduced
+- a debugging step is repeated more than twice manually
+
+Do not update this file with:
+- generic Docker definitions already known
+- duplicated commands with no project context
+- one-off experiments that did not become repeatable practice
+
+**Rule:** Only store information that improves future debugging, deployment, or explanation quality.

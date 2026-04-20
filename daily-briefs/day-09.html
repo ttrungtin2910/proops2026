@@ -1,0 +1,521 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Day 9 — Docker Compose: Volumes, Networking, Registry · ProOps2026</title>
+<style>
+:root {
+  --bg:#0b0d14; --surface:#13161f; --surface2:#1c2030; --border:#252a3a;
+  --accent:#6c8ef7; --accent2:#a78bfa;
+  --green:#34d399; --yellow:#fbbf24; --orange:#fb923c;
+  --red:#f87171; --teal:#22d3ee; --blue:#60a5fa;
+  --text:#e8edf5; --muted:#7c87a0; --dim:#3a4258;
+}
+* { box-sizing:border-box; margin:0; padding:0; }
+body { background:var(--bg); color:var(--text); font-family:'Segoe UI',system-ui,sans-serif; font-size:15px; line-height:1.6; }
+
+nav { background:var(--surface);border-bottom:1px solid var(--border);padding:0 32px;height:50px;display:flex;align-items:center;gap:6px;position:sticky;top:0;z-index:200; }
+nav .brand { font-weight:800;font-size:14px;color:var(--accent);margin-right:12px; }
+nav a { color:var(--muted);text-decoration:none;font-size:12px;font-weight:600;padding:5px 12px;border-radius:6px;transition:all .15s;white-space:nowrap; }
+nav a:hover { color:var(--text);background:var(--surface2); }
+nav .spacer { flex:1; }
+nav .badge { background:rgba(251,191,36,.12);border:1px solid rgba(251,191,36,.25);color:var(--yellow);font-size:11px;font-weight:700;padding:3px 12px;border-radius:20px; }
+
+.layout { display:grid;grid-template-columns:1fr 260px;gap:32px;max-width:1100px;margin:0 auto;padding:40px 32px; }
+.main { min-width:0; }
+.sidebar { position:sticky;top:70px;height:fit-content;display:flex;flex-direction:column;gap:14px; }
+
+.day-header { margin-bottom:32px; }
+.day-meta { display:flex;align-items:center;gap:10px;margin-bottom:12px; }
+.day-pill { font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;padding:3px 12px;border-radius:20px;background:rgba(108,142,247,.12);border:1px solid rgba(108,142,247,.25);color:var(--accent); }
+.day-tag { font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;padding:3px 12px;border-radius:20px;background:rgba(251,191,36,.08);border:1px solid rgba(251,191,36,.2);color:var(--yellow); }
+.day-title { font-size:26px;font-weight:800;letter-spacing:-.3px;margin-bottom:8px; }
+.day-question { font-size:15px;color:var(--accent2);font-style:italic;border-left:3px solid var(--accent2);padding-left:14px;margin-bottom:16px;line-height:1.6; }
+.day-why { font-size:13px;color:var(--muted);line-height:1.7;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:14px 16px; }
+.day-why strong { color:var(--text); }
+
+.section-block { margin-bottom:32px; }
+.sec-label { font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:var(--dim);margin-bottom:14px;display:flex;align-items:center;gap:10px; }
+.sec-label::after { content:'';flex:1;height:1px;background:var(--border); }
+
+.chain { display:flex;flex-direction:column;gap:10px; }
+.chain-item { display:grid;grid-template-columns:32px 1fr;gap:14px;padding:14px 16px;background:var(--surface);border:1px solid var(--border);border-radius:10px;cursor:pointer;transition:border-color .15s; }
+.chain-item:hover { border-color:rgba(167,139,250,.4); }
+.chain-item.done { border-color:rgba(52,211,153,.3);background:rgba(52,211,153,.03); }
+.chain-num { width:32px;height:32px;border-radius:50%;background:var(--surface2);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;color:var(--muted);flex-shrink:0;transition:all .15s; }
+.chain-item.done .chain-num { background:rgba(52,211,153,.15);border-color:rgba(52,211,153,.4);color:var(--green); }
+.chain-q { font-size:13px;font-weight:600;margin-bottom:6px;line-height:1.5; }
+.chain-item.done .chain-q { color:var(--muted);text-decoration:line-through;text-decoration-color:var(--dim); }
+.chain-prompt { font-size:11px;font-family:'Cascadia Code','Fira Code',monospace;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:8px 12px;color:var(--accent2);line-height:1.6;margin-top:8px; }
+.chain-hint { font-size:11px;color:var(--dim);margin-top:6px;line-height:1.5; }
+.chain-note { font-size:11px;color:var(--yellow);margin-top:6px;line-height:1.5;padding:6px 10px;background:rgba(251,191,36,.06);border:1px solid rgba(251,191,36,.15);border-radius:5px; }
+
+.artifact-card { background:var(--surface);border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:14px; }
+.artifact-head { padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px; }
+.artifact-title { font-size:13px;font-weight:700;flex:1; }
+.artifact-file { font-family:'Cascadia Code','Fira Code',monospace;font-size:11px;color:var(--green);background:rgba(52,211,153,.08);border:1px solid rgba(52,211,153,.2);padding:2px 10px;border-radius:5px; }
+.artifact-body { padding:16px 18px; }
+.artifact-row { display:flex;gap:10px;margin-bottom:8px;font-size:12px;align-items:flex-start; }
+.artifact-row:last-child { margin-bottom:0; }
+.ar-dot { width:5px;height:5px;border-radius:50%;background:var(--green);flex-shrink:0;margin-top:6px; }
+.ar-text { color:var(--muted);line-height:1.5; }
+.ar-text strong { color:var(--text); }
+.artifact-fail { margin-top:14px;padding:10px 14px;background:rgba(248,113,113,.06);border:1px solid rgba(248,113,113,.2);border-radius:7px;font-size:11px;color:var(--muted);line-height:1.6; }
+.artifact-fail strong { color:var(--red); }
+
+.iq-section { margin-bottom:32px; }
+.iq-header { padding:14px 18px;background:rgba(167,139,250,.06);border:1px solid rgba(167,139,250,.25);border-radius:10px 10px 0 0;border-bottom:none; }
+.iq-title { font-size:12px;font-weight:700;color:var(--accent2);margin-bottom:4px; }
+.iq-subtitle { font-size:11px;color:var(--muted);line-height:1.6; }
+.iq-body { padding:14px 18px;background:rgba(167,139,250,.02);border:1px solid rgba(167,139,250,.25);border-radius:0 0 10px 10px;display:flex;flex-direction:column;gap:8px; }
+.iq-item { background:var(--surface);border:1px solid var(--border);border-radius:8px;overflow:hidden;cursor:pointer;transition:border-color .15s; }
+.iq-item:hover { border-color:rgba(167,139,250,.35); }
+.iq-item.answered { border-color:rgba(52,211,153,.3); }
+.iq-q { display:flex;align-items:flex-start;gap:12px;padding:10px 14px; }
+.iq-num { font-size:10px;font-weight:800;color:var(--accent2);background:rgba(167,139,250,.1);border:1px solid rgba(167,139,250,.2);padding:2px 7px;border-radius:4px;flex-shrink:0;margin-top:2px; }
+.iq-item.answered .iq-num { background:rgba(52,211,153,.12);border-color:rgba(52,211,153,.3);color:var(--green); }
+.iq-text { font-size:12px;color:var(--text);line-height:1.6;flex:1; }
+.iq-item.answered .iq-text { color:var(--muted); }
+.iq-check { font-size:11px;color:var(--dim);flex-shrink:0;margin-top:3px; }
+.iq-item.answered .iq-check { color:var(--green); }
+
+.criteria { display:flex;flex-direction:column;gap:8px; }
+.crit { display:flex;gap:10px;align-items:flex-start;padding:10px 14px;background:var(--surface);border:1px solid var(--border);border-radius:8px;font-size:12px;cursor:pointer;transition:border-color .15s; }
+.crit:hover { border-color:rgba(52,211,153,.3); }
+.crit.done { border-color:rgba(52,211,153,.35);background:rgba(52,211,153,.03); }
+.crit-box { width:16px;height:16px;border-radius:4px;border:1.5px solid var(--border);flex-shrink:0;margin-top:1px;display:flex;align-items:center;justify-content:center;transition:all .15s; }
+.crit.done .crit-box { background:var(--green);border-color:var(--green); }
+.crit-check { color:#0b0d14;font-size:10px;font-weight:900;display:none; }
+.crit.done .crit-check { display:block; }
+.crit-text { color:var(--muted);line-height:1.5; }
+.crit.done .crit-text { color:var(--dim); }
+
+.widget { background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px; }
+.widget-title { font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--dim);margin-bottom:12px; }
+.progress-bar { height:5px;background:var(--surface2);border-radius:10px;overflow:hidden;margin-bottom:6px; }
+.progress-fill { height:100%;background:linear-gradient(90deg,var(--accent),var(--green));border-radius:10px;transition:width .3s; }
+.progress-label { font-size:11px;color:var(--muted); }
+.progress-count { font-size:22px;font-weight:800;color:var(--text);margin-bottom:2px; }
+.as-row { display:flex;align-items:center;gap:8px;font-size:11px;margin-bottom:4px; }
+.as-dot { width:7px;height:7px;border-radius:50%;background:var(--dim);flex-shrink:0; }
+.as-dot.done { background:var(--green); }
+.as-name { color:var(--muted);flex:1; }
+.conn-row { font-size:11px;color:var(--muted);display:flex;gap:8px;align-items:flex-start; }
+.conn-dir { color:var(--dim);flex-shrink:0;width:48px; }
+.report-box { background:rgba(108,142,247,.06);border:1px solid rgba(108,142,247,.2);border-radius:10px;padding:14px 16px; }
+.report-title { font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--accent);margin-bottom:8px; }
+.report-step { font-size:11px;color:var(--muted);margin-bottom:6px;display:flex;gap:8px; }
+.report-step-num { color:var(--accent);font-weight:700;flex-shrink:0; }
+
+.explore-section { margin-bottom:32px; }
+.explore-header { display:flex;align-items:center;gap:12px;padding:12px 16px;background:rgba(251,191,36,.04);border:1px solid rgba(251,191,36,.2);border-radius:10px 10px 0 0;border-bottom:none; }
+.explore-header .icon { font-size:14px;color:var(--yellow); }
+.explore-header .label { font-size:12px;font-weight:700;color:var(--yellow); }
+.explore-header .sublabel { font-size:11px;color:var(--muted);margin-left:auto; }
+.explore-body { padding:14px 16px;background:rgba(251,191,36,.02);border:1px solid rgba(251,191,36,.2);border-radius:0 0 10px 10px;display:flex;flex-direction:column;gap:10px; }
+.explore-item { font-size:12px;color:var(--muted);line-height:1.6;padding-left:14px;position:relative; }
+.explore-item::before { content:'';position:absolute;left:0;top:7px;width:5px;height:5px;border-radius:50%;background:var(--yellow); }
+.explore-item strong { color:var(--text); }
+.explore-item code { font-size:10px;color:var(--accent2);background:var(--surface2);padding:1px 5px;border-radius:3px; }
+</style>
+</head>
+<body>
+
+<nav>
+  <span class="brand">ProOps2026</span>
+  <a href="#chain">Discovery</a>
+  <a href="#artifact">Artifact</a>
+  <a href="#interview">Interview Qs</a>
+  <a href="#done">Done?</a>
+  <div class="spacer"></div>
+  <span class="badge">Day 9 · Hands-On</span>
+</nav>
+
+<div class="layout">
+<div class="main">
+
+  <!-- HEADER -->
+  <div class="day-header">
+    <div class="day-meta">
+      <span class="day-pill">Week 2 · Day 9</span>
+      <span class="day-tag">Hands-On</span>
+    </div>
+    <div class="day-title">Docker Compose: Volumes, Networking, Registry</div>
+    <div class="day-question">
+      How do you run a multi-service application as a single coordinated system — and how do containers share data, talk to each other, and get their images to a registry?
+    </div>
+    <div class="day-why">
+      Real applications are never a single container. A service, a database, and a cache each run in their own container and must communicate reliably. <strong>Docker Compose is the tool that defines this entire system as code — so any engineer can bring up the full stack with one command, on any machine, every time.</strong> Without Compose, every multi-container setup is a manual sequence that no one can reproduce. Without volumes, every database restart loses all data. Without the registry, your CI/CD pipeline has no image to pull. Today you learn all three — then apply them to your own mock project stack.
+    </div>
+  </div>
+
+  <!-- GROUP REMINDER -->
+  <div style="padding:12px 16px;background:rgba(167,139,250,.06);border:1px solid rgba(167,139,250,.3);border-radius:10px;margin-bottom:20px;font-size:12px;color:var(--muted);line-height:1.7;">
+    <strong style="color:var(--accent2);">Group work continues.</strong> You and your partner work in the same GitHub org today. The <code style="font-size:11px;color:var(--accent2);">docker-compose.yml</code> you write lives in your <code style="font-size:11px;color:var(--accent2);">docs</code> repo (or a dedicated <code style="font-size:11px;color:var(--accent2);">infra</code> repo — your call, decide together before starting). At the end of the day, both partners should be able to run <code style="font-size:11px;color:var(--accent2);">docker compose up</code> from their own machine and get the same result.
+  </div>
+
+  <!-- REQUIRED -->
+  <div style="padding:14px 18px;background:rgba(52,211,153,.04);border:1px solid rgba(52,211,153,.25);border-radius:10px;margin-bottom:28px;">
+    <div style="font-size:12px;font-weight:700;color:var(--green);margin-bottom:6px;">What you must complete today</div>
+    <div style="font-size:12px;color:var(--muted);line-height:1.7;">
+      1. Work through discovery questions Q1–Q7 — learn each concept with a generic example first<br>
+      2. Q8 — apply what you learned: write a working <code style="font-size:11px;color:var(--accent2);">docker-compose.yml</code> for your own mock project<br>
+      3. Verify it: <code style="font-size:11px;color:var(--accent2);">docker compose up</code> brings up all services + databases with no errors<br>
+      4. Verify container-to-container connectivity with <code style="font-size:11px;color:var(--accent2);">docker exec</code> + <code style="font-size:11px;color:var(--accent2);">curl</code> — by service name<br>
+      5. Push one service image to Docker Hub with a versioned tag<br>
+      6. Update <code style="font-size:11px;color:var(--accent2);">memory/docker.md</code> with the five Compose sections<br>
+      7. Push commit and send daily report
+    </div>
+    <div style="margin-top:10px;padding:8px 12px;border-radius:6px;background:rgba(251,191,36,.06);border:1px solid rgba(251,191,36,.2);font-size:11px;color:var(--yellow);">
+      The docker-compose.yml you produce today is the foundation your CI/CD pipeline (Day 11) will build on. Get it right now — a broken Compose file compounds into a broken pipeline.
+    </div>
+  </div>
+
+  <!-- DISCOVERY CHAIN -->
+  <div class="section-block" id="chain">
+    <div class="sec-label">Discovery chain — 8 questions, one working stack</div>
+
+    <div style="padding:12px 16px;background:var(--surface);border:1px solid var(--border);border-radius:10px;margin-bottom:14px;font-size:12px;color:var(--muted);line-height:1.7;">
+      <strong style="color:var(--text);">Q1–Q7 teach the concept using a generic example.</strong> Work through them fully before touching your project. Q8 is where you apply everything to your own stack. Do not skip ahead — the concepts must be understood before the application makes sense.
+    </div>
+
+    <div class="chain">
+
+      <div class="chain-item" onclick="toggleChain(this,0)">
+        <div class="chain-num">1</div>
+        <div class="chain-body">
+          <div class="chain-q">You have two services — an API and a PostgreSQL database. Running them with separate <code>docker run</code> commands in the right order works on your machine. Why does this break for everyone else, and what does Docker Compose solve?</div>
+          <div class="chain-prompt">I have two containers: an API service and a PostgreSQL database. I start them with two separate docker run commands, manually setting the right ports, environment variables, and startup order. Explain: (1) what are the three specific problems with this manual approach — reproducibility, startup order, and network configuration, (2) what does a docker-compose.yml file solve for each of those three problems, (3) what is the structure of a docker-compose.yml — what do the services, networks, and volumes top-level keys each control? Show me a minimal working example with just these two services.</div>
+          <div class="chain-hint">After Claude explains, read the minimal example carefully. Every field has a reason — understand what services, networks, and volumes each mean before moving on.</div>
+        </div>
+      </div>
+
+      <div class="chain-item" onclick="toggleChain(this,1)">
+        <div class="chain-num">2</div>
+        <div class="chain-body">
+          <div class="chain-q">You add <code>depends_on: db</code> to your API service. The API still crashes on first run because the database isn't ready yet. What does <code>depends_on</code> actually check — and what is the real solution?</div>
+          <div class="chain-prompt">I added depends_on: db to my API service in docker-compose.yml but the API still crashes on startup because the database isn't ready to accept connections. Explain: (1) what does depends_on actually wait for — container started vs process ready — and why that distinction matters, (2) what is a Docker healthcheck — how do I write a healthcheck for postgres:16-alpine that tests whether it can accept connections using pg_isready, (3) how does depends_on with condition: service_healthy differ from depends_on with no condition, (4) write the complete healthcheck block for a PostgreSQL service and the matching depends_on condition block for the API service that depends on it.</div>
+          <div class="chain-hint">depends_on without a condition is almost always wrong for databases. The healthcheck is what turns it from "container running" to "database ready."</div>
+        </div>
+      </div>
+
+      <div class="chain-item" onclick="toggleChain(this,2)">
+        <div class="chain-num">3</div>
+        <div class="chain-body">
+          <div class="chain-q">You stop the stack with <code>docker compose down</code> and restart it. All data in the database is gone. Why — and how do named volumes fix this?</div>
+          <div class="chain-prompt">I stopped my Compose stack with docker compose down and restarted it. All rows in my PostgreSQL database are gone. Explain: (1) why is the container filesystem ephemeral — what happens to data when a container is removed vs stopped, (2) what is a Docker named volume — where does Docker actually store the data on the host, (3) what is the difference between a named volume and a bind mount — give me the one-line rule for when to use each, (4) write the volumes section of a docker-compose.yml that mounts a named volume to the PostgreSQL data directory /var/lib/postgresql/data. Also show what docker compose down -v does and when you would use it intentionally.</div>
+          <div class="chain-hint">One-line rule to remember: named volume = Docker manages it, for data you want to persist (databases). Bind mount = you manage it, for files you need to read/edit from the host (logs, dev code).</div>
+        </div>
+      </div>
+
+      <div class="chain-item" onclick="toggleChain(this,3)">
+        <div class="chain-num">4</div>
+        <div class="chain-body">
+          <div class="chain-q">Both containers are running, but the API can't connect to the database with hostname <code>db</code>. You try <code>localhost</code> — it also fails. What is Docker Compose's network model and how do you verify it works?</div>
+          <div class="chain-prompt">My API container tries to connect to my database container using the hostname localhost — connection refused. I try the Compose service name db — still fails. Explain: (1) what network does Docker Compose create automatically and what is its name format, (2) how do containers in the same Compose network resolve each other by service name — which DNS mechanism makes this work, (3) why does localhost fail — what does localhost refer to inside a container vs on the host machine, (4) what is the correct DATABASE_URL connection string for a service named db on port 5432 with a database named mydb. Finally: how do I verify connectivity from inside the API container using docker exec and curl — show me the exact commands.</div>
+          <div class="chain-hint">Run the verification — do not just read it. Open a terminal, run docker exec into the API container, and curl the db service by its Compose name. Watch the DNS resolution work.</div>
+          <div class="chain-note">This is the key realization of today: containers in the same Compose network reach each other by service name, not IP, not localhost. Do it with your hands — not just your eyes.</div>
+        </div>
+      </div>
+
+      <div class="chain-item" onclick="toggleChain(this,4)">
+        <div class="chain-num">5</div>
+        <div class="chain-body">
+          <div class="chain-q">Your stack works but the <code>docker-compose.yml</code> has <code>POSTGRES_PASSWORD: mysecret</code> hardcoded. How do you handle secrets and configuration safely?</div>
+          <div class="chain-prompt">My docker-compose.yml has POSTGRES_PASSWORD: mysecret hardcoded. I cannot commit this to the repo. Explain: (1) how does the env_file directive work — how does Compose read environment variables from a .env file into a service, (2) what is the difference between env_file and the environment key in a service definition — when would you use each, (3) what is the .env.example pattern — what goes in .env (gitignored) vs .env.example (committed), (4) rewrite a postgres service definition to use env_file instead of hardcoded values. Show the final docker-compose.yml snippet, the .env file content, and the .env.example file content. Also show the .gitignore entry needed.</div>
+          <div class="chain-hint">The .env file is never committed. The .env.example shows every key with an empty or placeholder value. Every teammate clones the repo, copies .env.example to .env, and fills in real values.</div>
+        </div>
+      </div>
+
+      <div class="chain-item" onclick="toggleChain(this,5)">
+        <div class="chain-num">6</div>
+        <div class="chain-body">
+          <div class="chain-q">Your image works locally. Now push it to Docker Hub so your teammate can pull it on their machine without having the source code. What is the registry workflow?</div>
+          <div class="chain-prompt">My service Docker image builds correctly on my machine. I need to push it to Docker Hub so my teammate can pull it directly without needing my source code. Walk me through: (1) docker login — how to authenticate to Docker Hub from the CLI, (2) docker tag — what is the full image name format (username/repo:tag) and why does the tag matter, (3) docker push — what happens layer by layer when you push, (4) docker pull — how does my teammate pull and run the exact same image, (5) what is the difference between Docker Hub, AWS ECR, and a private self-hosted registry — when would a team choose each? Give me the complete command sequence: build → tag → push → pull, with real placeholder values filled in.</div>
+          <div class="chain-hint">Always tag with a meaningful version — e.g. <code>username/myservice:day09</code>. The <code>:latest</code> tag is ambiguous and causes silent bugs in CI/CD pipelines.</div>
+        </div>
+      </div>
+
+      <div class="chain-item" onclick="toggleChain(this,6)">
+        <div class="chain-num">7</div>
+        <div class="chain-body">
+          <div class="chain-q">Your teammate pulls the image on their M1/M2 Mac and gets <code>exec format error</code>. What is the multi-platform build problem and how do you fix it?</div>
+          <div class="chain-prompt">My teammate pulled my Docker image on their Apple M1 Mac and got "exec format error". I built the image on an Intel x86_64 machine. Explain: (1) why does CPU architecture matter for Docker images — what is the difference between linux/amd64 and linux/arm64, (2) what is docker buildx — how is it different from docker build, (3) what does the --platform flag do when building, (4) what is a multi-platform image manifest and how does Docker Hub automatically serve the right image per platform, (5) give me the exact docker buildx build command to build and push an image for both linux/amd64 and linux/arm64 at the same time.</div>
+          <div class="chain-hint">For this program, <code>linux/amd64</code> is all you need — that is what EC2 and CI runners use. Multi-platform only becomes important when teammates are on M-series Macs or you are deploying to ARM-based servers.</div>
+        </div>
+      </div>
+
+      <div class="chain-item" onclick="toggleChain(this,7)" style="border-color:rgba(52,211,153,.3);">
+        <div class="chain-num" style="background:rgba(52,211,153,.12);border-color:rgba(52,211,153,.3);color:var(--green);">8</div>
+        <div class="chain-body">
+          <div class="chain-q" style="color:var(--green);">Apply it. Write the <code>docker-compose.yml</code> for your actual mock project — all your services, all your databases, running together with one command.</div>
+          <div class="chain-prompt">I've learned Docker Compose concepts (Q1–Q7). Now I need to write a docker-compose.yml for my real project. My project has these services: [list your services from your DOP]. For each service, here is what it needs: [describe: which other services it depends on, which database it uses, which port it listens on, what env vars it needs].
+
+Write a complete docker-compose.yml that: (1) defines all services with build context pointing to each service's repository, (2) uses a named volume for each database, (3) puts all services on a custom named network, (4) uses env_file for every service — show me the matching .env.example too, (5) adds a healthcheck for each database with depends_on condition: service_healthy for services that need the DB ready, (6) only exposes the gateway on a host port — all other services and databases are internal only.
+
+After writing it, tell me: what is the first thing I should check to verify this file is correct before running it?</div>
+          <div class="chain-hint">Read the output carefully before running it. Verify: service names match what your application code uses as hostnames. Port numbers match what each service listens on. Env var names match what the service code reads.</div>
+          <div class="chain-note">If your project docs define infrastructure requirements (gateway routing, port rules, network layout), check that your Compose file matches. If anything differs from your docs, update the docs first — then the file.</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ARTIFACT -->
+  <div class="section-block" id="artifact">
+    <div class="sec-label">Required artifacts — both must exist by end of day</div>
+
+    <div class="artifact-card">
+      <div class="artifact-head">
+        <div class="artifact-title">Working Docker Compose stack</div>
+        <div class="artifact-file">docker-compose.yml</div>
+      </div>
+      <div class="artifact-body">
+        <div style="font-size:11px;color:var(--muted);margin-bottom:12px;line-height:1.6;">Lives in your GitHub org (docs repo or a dedicated infra repo — whichever your team agreed on). Defines your actual project services from your DOP, not a generic example.</div>
+        <div class="artifact-row"><div class="ar-dot"></div><div class="ar-text"><strong>All services from your DOP</strong> — gateway, each service, each database defined as Compose services with correct names</div></div>
+        <div class="artifact-row"><div class="ar-dot"></div><div class="ar-text"><strong>Named volumes</strong> for every stateful service — no database loses data on <code>docker compose down</code></div></div>
+        <div class="artifact-row"><div class="ar-dot"></div><div class="ar-text"><strong>Custom named network</strong> — all services on the same network, reachable by service name</div></div>
+        <div class="artifact-row"><div class="ar-dot"></div><div class="ar-text"><strong>env_file for every service</strong> — no secrets, passwords, or URLs hardcoded anywhere in the file</div></div>
+        <div class="artifact-row"><div class="ar-dot"></div><div class="ar-text"><strong>Healthcheck + <code>depends_on: condition: service_healthy</code></strong> for every database dependency</div></div>
+        <div class="artifact-row"><div class="ar-dot"></div><div class="ar-text"><strong>Only the gateway on a host port</strong> — all other services and databases are internal to the Docker network</div></div>
+        <div class="artifact-row"><div class="ar-dot"></div><div class="ar-text"><strong>Consistent with your project docs</strong> — service names, port numbers, and network layout match what you documented on Day 8. If they differ, update the docs first.</div></div>
+        <div class="artifact-fail">
+          <strong>Weak signals:</strong> hardcoded passwords in plain text &middot; no volumes (data lost on restart) &middot; depends_on with no healthcheck condition &middot; all services exposed on host ports &middot; service names in Compose don't match what the application code uses as hostnames
+        </div>
+      </div>
+    </div>
+
+    <div class="artifact-card">
+      <div class="artifact-head">
+        <div class="artifact-title">Updated Docker memory file</div>
+        <div class="artifact-file">memory/docker.md</div>
+      </div>
+      <div class="artifact-body">
+        <div style="font-size:11px;color:var(--muted);margin-bottom:12px;line-height:1.6;">Extends the Day 7 file. Add the five Compose sections — do not replace existing Day 7 content.</div>
+        <div class="artifact-row"><div class="ar-dot"></div><div class="ar-text"><strong>Compose file structure</strong> — services, networks, volumes sections and key fields</div></div>
+        <div class="artifact-row"><div class="ar-dot"></div><div class="ar-text"><strong>Networking model</strong> — default bridge network, service name DNS, why localhost fails — one sentence each</div></div>
+        <div class="artifact-row"><div class="ar-dot"></div><div class="ar-text"><strong>Volumes</strong> — named volume vs bind mount with one-line rule and syntax</div></div>
+        <div class="artifact-row"><div class="ar-dot"></div><div class="ar-text"><strong>Registry workflow</strong> — build → tag → push → pull command sequence</div></div>
+        <div class="artifact-row"><div class="ar-dot"></div><div class="ar-text"><strong>Four daily commands</strong> — <code>up -d</code>, <code>down</code>, <code>logs -f</code>, <code>exec</code> — what each does in one sentence</div></div>
+        <div class="artifact-fail">
+          <strong>Weak signals:</strong> networking model copied from docs with no personal explanation &middot; "named volume = persistent, bind mount = not" with no rule for when to use each &middot; registry section with no actual command sequence
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- INTERVIEW QUESTIONS -->
+  <div class="iq-section" id="interview">
+    <div class="iq-header">
+      <div class="iq-title">Interview questions — answer these without looking at your notes</div>
+      <div class="iq-subtitle">These are real questions from DevOps and backend engineering interviews. If you cannot answer them without reading, that section of memory/docker.md needs more work.</div>
+    </div>
+    <div class="iq-body">
+      <div class="iq-item" onclick="toggleIQ(this)">
+        <div class="iq-q">
+          <span class="iq-num">Q1</span>
+          <span class="iq-text">What is the difference between <code>docker compose up</code> and <code>docker compose up -d</code>? What happens to the containers if you close the terminal in each case?</span>
+          <span class="iq-check">&#10003;</span>
+        </div>
+      </div>
+      <div class="iq-item" onclick="toggleIQ(this)">
+        <div class="iq-q">
+          <span class="iq-num">Q2</span>
+          <span class="iq-text">Why does <code>localhost</code> not work when one container tries to connect to another container? What should you use instead, and why does it work?</span>
+          <span class="iq-check">&#10003;</span>
+        </div>
+      </div>
+      <div class="iq-item" onclick="toggleIQ(this)">
+        <div class="iq-q">
+          <span class="iq-num">Q3</span>
+          <span class="iq-text">What is the difference between <code>depends_on</code> and <code>depends_on</code> with <code>condition: service_healthy</code>? Give an example of when the simple form is not enough.</span>
+          <span class="iq-check">&#10003;</span>
+        </div>
+      </div>
+      <div class="iq-item" onclick="toggleIQ(this)">
+        <div class="iq-q">
+          <span class="iq-num">Q4</span>
+          <span class="iq-text">What happens to data in a PostgreSQL container when you run <code>docker compose down</code>? What about <code>docker compose down -v</code>? When would you use each?</span>
+          <span class="iq-check">&#10003;</span>
+        </div>
+      </div>
+      <div class="iq-item" onclick="toggleIQ(this)">
+        <div class="iq-q">
+          <span class="iq-num">Q5</span>
+          <span class="iq-text">When should you use a named volume and when should you use a bind mount? Give a concrete example of the correct use case for each.</span>
+          <span class="iq-check">&#10003;</span>
+        </div>
+      </div>
+      <div class="iq-item" onclick="toggleIQ(this)">
+        <div class="iq-q">
+          <span class="iq-num">Q6</span>
+          <span class="iq-text">What is a container registry? Walk me through the complete workflow to push a locally built image to Docker Hub and then pull it on a different machine.</span>
+          <span class="iq-check">&#10003;</span>
+        </div>
+      </div>
+      <div class="iq-item" onclick="toggleIQ(this)">
+        <div class="iq-q">
+          <span class="iq-num">Q7</span>
+          <span class="iq-text">A team member on an M2 Mac runs your Docker image and gets <code>exec format error</code>. What caused this and how do you fix it?</span>
+          <span class="iq-check">&#10003;</span>
+        </div>
+      </div>
+      <div class="iq-item" onclick="toggleIQ(this)">
+        <div class="iq-q">
+          <span class="iq-num">Q8</span>
+          <span class="iq-text">How would you debug a situation where your service container is running but the application inside is not responding? What three commands would you run first?</span>
+          <span class="iq-check">&#10003;</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- DONE CRITERIA -->
+  <div class="section-block" id="done">
+    <div class="sec-label">Before you send your end-of-day report — check these</div>
+    <div class="criteria">
+      <div class="crit" onclick="toggleCrit(this)">
+        <div class="crit-box"><span class="crit-check">&#10003;</span></div>
+        <div class="crit-text"><code style="font-size:11px;color:var(--accent2);">docker compose up</code> from repo root starts the complete stack with no errors — gateway, all services, all databases.</div>
+      </div>
+      <div class="crit" onclick="toggleCrit(this)">
+        <div class="crit-box"><span class="crit-check">&#10003;</span></div>
+        <div class="crit-text">I ran <code style="font-size:11px;color:var(--accent2);">docker exec</code> into a service container and curled another service by its Compose service name — connection succeeded.</div>
+      </div>
+      <div class="crit" onclick="toggleCrit(this)">
+        <div class="crit-box"><span class="crit-check">&#10003;</span></div>
+        <div class="crit-text">I ran <code style="font-size:11px;color:var(--accent2);">docker compose down</code> and <code style="font-size:11px;color:var(--accent2);">up</code> — database data persisted (named volumes working).</div>
+      </div>
+      <div class="crit" onclick="toggleCrit(this)">
+        <div class="crit-box"><span class="crit-check">&#10003;</span></div>
+        <div class="crit-text">No secrets or database passwords hardcoded in <code style="font-size:11px;color:var(--accent2);">docker-compose.yml</code> — all via <code style="font-size:11px;color:var(--accent2);">env_file</code>. <code style="font-size:11px;color:var(--accent2);">.env</code> is gitignored, <code style="font-size:11px;color:var(--accent2);">.env.example</code> is committed.</div>
+      </div>
+      <div class="crit" onclick="toggleCrit(this)">
+        <div class="crit-box"><span class="crit-check">&#10003;</span></div>
+        <div class="crit-text">At least one service image pushed to Docker Hub (or team registry) with a versioned tag — not just <code style="font-size:11px;color:var(--accent2);">:latest</code>.</div>
+      </div>
+      <div class="crit" onclick="toggleCrit(this)">
+        <div class="crit-box"><span class="crit-check">&#10003;</span></div>
+        <div class="crit-text">Service names in <code style="font-size:11px;color:var(--accent2);">docker-compose.yml</code> match the hostnames the application code uses. Port numbers match what each service listens on.</div>
+      </div>
+      <div class="crit" onclick="toggleCrit(this)">
+        <div class="crit-box"><span class="crit-check">&#10003;</span></div>
+        <div class="crit-text">Project docs (infrastructure requirements) are consistent with the Compose file. Any change made during implementation is reflected in the docs.</div>
+      </div>
+      <div class="crit" onclick="toggleCrit(this)">
+        <div class="crit-box"><span class="crit-check">&#10003;</span></div>
+        <div class="crit-text"><code style="font-size:11px;color:var(--accent2);">memory/docker.md</code> updated with all five Compose sections — extends Day 7 content, does not replace it.</div>
+      </div>
+      <div class="crit" onclick="toggleCrit(this)">
+        <div class="crit-box"><span class="crit-check">&#10003;</span></div>
+        <div class="crit-text">Git commit pushed to GitHub org: <code style="font-size:11px;color:var(--accent2);">Day 09 — docker-compose.yml working stack + memory/docker.md updated</code></div>
+      </div>
+      <div class="crit" onclick="toggleCrit(this)">
+        <div class="crit-box"><span class="crit-check">&#10003;</span></div>
+        <div class="crit-text">Daily log filled — Tomorrow's Context Block names the first Sprint 1 task you will implement on Day 10 and why it is the right starting point.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- EXPLORE FURTHER -->
+  <div class="explore-section">
+    <div class="explore-header">
+      <span class="icon">&#9654;</span>
+      <span class="label">Explore further</span>
+      <span class="sublabel">Only after docker-compose.yml and memory/docker.md are committed &#10003;</span>
+    </div>
+    <div class="explore-body">
+      <div style="font-size:11px;color:var(--dim);margin-bottom:4px;">These are optional. Only work on these if all artifacts are committed and your report is ready to send.</div>
+
+      <div class="explore-item">
+        <strong>Compose override files.</strong> Create a <code>docker-compose.override.yml</code> that adds a bind mount for live code reloading in development — without changing the base <code>docker-compose.yml</code>. Ask Claude: <em>"Explain how docker-compose.override.yml merges with docker-compose.yml and what the right pattern is for dev vs prod configuration using override files."</em>
+      </div>
+
+      <div class="explore-item">
+        <strong>ECR instead of Docker Hub.</strong> Push your image to AWS ECR instead of Docker Hub. Ask Claude: <em>"Walk me through the aws ecr get-login-password workflow, how to create a private ECR repository, and how docker tag and docker push work with an ECR URI."</em> ECR is what your CI/CD pipeline will use from Day 11 onward.
+      </div>
+
+      <div class="explore-item">
+        <strong>Image vulnerability scan.</strong> Install Trivy and scan one of your images. Ask Claude: <em>"What is Trivy, how do I run trivy image [my-image] to scan for CVEs, and how should a DevOps engineer triage HIGH vs CRITICAL vulnerabilities in a base image?"</em> You will add this to the CI/CD pipeline later.
+      </div>
+
+    </div>
+  </div>
+
+</div><!-- /main -->
+
+<!-- SIDEBAR -->
+<div class="sidebar">
+
+  <div class="widget">
+    <div class="widget-title">Progress</div>
+    <div class="progress-count" id="prog-count">0 / 8</div>
+    <div style="margin-bottom:8px;">
+      <div class="progress-bar"><div class="progress-fill" id="prog-fill" style="width:0%"></div></div>
+      <div class="progress-label" id="prog-label">Discovery chain</div>
+    </div>
+  </div>
+
+  <div class="widget">
+    <div class="widget-title">Today's Artifacts</div>
+    <div class="as-row"><div class="as-dot" id="dot-compose"></div><div class="as-name">docker-compose.yml (GitHub org)</div></div>
+    <div class="as-row"><div class="as-dot" id="dot-env"></div><div class="as-name">.env.example committed</div></div>
+    <div class="as-row"><div class="as-dot" id="dot-image"></div><div class="as-name">Image pushed to registry</div></div>
+    <div class="as-row"><div class="as-dot" id="dot-docker"></div><div class="as-name">memory/docker.md updated</div></div>
+  </div>
+
+  <div class="widget" style="background:rgba(251,191,36,.04);border-color:rgba(251,191,36,.2);">
+    <div class="widget-title" style="color:var(--yellow);">Concept first, project second</div>
+    <div style="font-size:11px;color:var(--muted);line-height:1.7;">
+      Work through Q1–Q7 fully before writing a single line of your project's Compose file.<br><br>
+      Q8 is where you apply the skill. If you jump to Q8 without understanding Q1–Q4, you are copying without understanding — and you will not be able to debug it when it breaks.
+    </div>
+  </div>
+
+  <div class="widget">
+    <div class="widget-title">Connects To</div>
+    <div style="display:flex;flex-direction:column;gap:6px;">
+      <div class="conn-row"><span class="conn-dir">&larr; Day 7</span><span style="font-size:11px;color:var(--muted);">Dockerfile + image basics</span></div>
+      <div class="conn-row"><span class="conn-dir">&larr; Day 8</span><span style="font-size:11px;color:var(--muted);">IRD-003 is the spec for today</span></div>
+      <div class="conn-row"><span class="conn-dir">&rarr; Day 10</span><span style="font-size:11px;color:var(--muted);">Sprint 1 implementation begins</span></div>
+      <div class="conn-row"><span class="conn-dir">&rarr; Day 11</span><span style="font-size:11px;color:var(--muted);">CI/CD pipeline builds this image</span></div>
+      <div class="conn-row"><span class="conn-dir">&rarr; Day 40</span><span style="font-size:11px;color:var(--muted);">Final demo stack runs via Compose</span></div>
+    </div>
+  </div>
+
+  <div class="report-box">
+    <div class="report-title">End-of-day report</div>
+    <div class="report-step"><span class="report-step-num">1.</span> Fill daily log + context block</div>
+    <div class="report-step"><span class="report-step-num">2.</span> git commit + push to GitHub org</div>
+    <div class="report-step"><span class="report-step-num">3.</span> Fill <code style="font-size:10px;color:var(--accent);">templates/daily-report-template.md</code> &rarr; paste to trainer chat</div>
+    <div style="margin-top:8px;padding:6px 8px;background:rgba(52,211,153,.06);border:1px solid rgba(52,211,153,.2);border-radius:5px;font-size:10px;color:var(--green);line-height:1.5;">
+      Include: docker-compose.yml commit hash + registry image URL (e.g. docker.io/username/service:tag)
+    </div>
+  </div>
+
+</div><!-- /sidebar -->
+</div><!-- /layout -->
+
+<script>
+const chainDone = new Array(8).fill(false);
+function toggleChain(el, i) {
+  chainDone[i] = !chainDone[i];
+  el.classList.toggle('done', chainDone[i]);
+  const done = chainDone.filter(Boolean).length;
+  document.getElementById('prog-count').textContent = done + ' / 8';
+  document.getElementById('prog-fill').style.width = (done/8*100) + '%';
+  const labels = ['Keep going','Keep going','Halfway','Halfway','Almost there','Almost there','Almost there','Done!'];
+  document.getElementById('prog-label').textContent = done === 0 ? 'Discovery chain' : labels[done-1];
+  const dots = ['dot-compose','dot-env','dot-image','dot-docker'];
+  if (done >= 5) document.getElementById('dot-compose').classList.add('done');
+  if (done >= 5) document.getElementById('dot-env').classList.add('done');
+  if (done >= 6) document.getElementById('dot-image').classList.add('done');
+  if (done >= 8) document.getElementById('dot-docker').classList.add('done');
+}
+function toggleIQ(el) { el.classList.toggle('answered'); }
+function toggleCrit(el) { el.classList.toggle('done'); }
+</script>
+</body>
+</html>
