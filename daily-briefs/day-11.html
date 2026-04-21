@@ -1,0 +1,605 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Day 11 — Deploy to EC2 + Orchestration Intro · ProOps2026</title>
+<style>
+:root {
+  --bg:#0b0d14; --surface:#13161f; --surface2:#1c2030; --border:#252a3a;
+  --accent:#6c8ef7; --accent2:#a78bfa;
+  --green:#34d399; --yellow:#fbbf24; --orange:#fb923c;
+  --red:#f87171; --teal:#22d3ee; --blue:#60a5fa;
+  --text:#e8edf5; --muted:#7c87a0; --dim:#3a4258;
+}
+* { box-sizing:border-box; margin:0; padding:0; }
+body { background:var(--bg); color:var(--text); font-family:'Segoe UI',system-ui,sans-serif; font-size:15px; line-height:1.6; }
+
+nav { background:var(--surface);border-bottom:1px solid var(--border);padding:0 32px;height:50px;display:flex;align-items:center;gap:6px;position:sticky;top:0;z-index:200; }
+nav .brand { font-weight:800;font-size:14px;color:var(--accent);margin-right:12px; }
+nav a { color:var(--muted);text-decoration:none;font-size:12px;font-weight:600;padding:5px 12px;border-radius:6px;transition:all .15s;white-space:nowrap; }
+nav a:hover { color:var(--text);background:var(--surface2); }
+nav .spacer { flex:1; }
+nav .badge { background:rgba(52,211,153,.12);border:1px solid rgba(52,211,153,.25);color:var(--green);font-size:11px;font-weight:700;padding:3px 12px;border-radius:20px; }
+
+.layout { display:grid;grid-template-columns:1fr 260px;gap:32px;max-width:1100px;margin:0 auto;padding:40px 32px; }
+.main { min-width:0; }
+.sidebar { position:sticky;top:70px;height:fit-content;display:flex;flex-direction:column;gap:14px; }
+
+.day-header { margin-bottom:32px; }
+.day-meta { display:flex;align-items:center;gap:10px;margin-bottom:12px; }
+.day-pill { font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;padding:3px 12px;border-radius:20px;background:rgba(108,142,247,.12);border:1px solid rgba(108,142,247,.25);color:var(--accent); }
+.day-tag { font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;padding:3px 12px;border-radius:20px;background:rgba(52,211,153,.08);border:1px solid rgba(52,211,153,.2);color:var(--green); }
+.day-title { font-size:26px;font-weight:800;letter-spacing:-.3px;margin-bottom:8px; }
+.day-question { font-size:15px;color:var(--accent2);font-style:italic;border-left:3px solid var(--accent2);padding-left:14px;margin-bottom:16px;line-height:1.6; }
+.day-why { font-size:13px;color:var(--muted);line-height:1.7;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:14px 16px; }
+.day-why strong { color:var(--text); }
+
+.section-block { margin-bottom:32px; }
+.sec-label { font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:var(--dim);margin-bottom:14px;display:flex;align-items:center;gap:10px; }
+.sec-label::after { content:'';flex:1;height:1px;background:var(--border); }
+
+.chain { display:flex;flex-direction:column;gap:10px; }
+.chain-item { display:grid;grid-template-columns:32px 1fr;gap:14px;padding:14px 16px;background:var(--surface);border:1px solid var(--border);border-radius:10px;cursor:pointer;transition:border-color .15s; }
+.chain-item:hover { border-color:rgba(167,139,250,.4); }
+.chain-item.done { border-color:rgba(52,211,153,.3);background:rgba(52,211,153,.03); }
+.chain-num { width:32px;height:32px;border-radius:50%;background:var(--surface2);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;color:var(--muted);flex-shrink:0;transition:all .15s; }
+.chain-item.done .chain-num { background:rgba(52,211,153,.15);border-color:rgba(52,211,153,.4);color:var(--green); }
+.chain-q { font-size:13px;font-weight:600;margin-bottom:6px;line-height:1.5; }
+.chain-item.done .chain-q { color:var(--muted);text-decoration:line-through;text-decoration-color:var(--dim); }
+.chain-prompt { font-size:11px;font-family:'Cascadia Code','Fira Code',monospace;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:8px 12px;color:var(--accent2);line-height:1.6;margin-top:8px; }
+.chain-hint { font-size:11px;color:var(--dim);margin-top:6px;line-height:1.5; }
+.chain-note { font-size:11px;color:var(--yellow);margin-top:6px;line-height:1.5;padding:6px 10px;background:rgba(251,191,36,.06);border:1px solid rgba(251,191,36,.15);border-radius:5px; }
+
+.part-divider { display:flex;align-items:center;gap:14px;margin:20px 0 14px; }
+.part-label { font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:1px;padding:4px 14px;border-radius:20px;white-space:nowrap; }
+.part-line { flex:1;height:1px;background:var(--border); }
+
+.artifact-card { background:var(--surface);border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:14px; }
+.artifact-head { padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px; }
+.artifact-title { font-size:13px;font-weight:700;flex:1; }
+.artifact-file { font-family:'Cascadia Code','Fira Code',monospace;font-size:11px;color:var(--green);background:rgba(52,211,153,.08);border:1px solid rgba(52,211,153,.2);padding:2px 10px;border-radius:5px; }
+.artifact-body { padding:16px 18px; }
+.artifact-row { display:flex;gap:10px;margin-bottom:8px;font-size:12px;align-items:flex-start; }
+.artifact-row:last-child { margin-bottom:0; }
+.ar-dot { width:5px;height:5px;border-radius:50%;background:var(--green);flex-shrink:0;margin-top:6px; }
+.ar-text { color:var(--muted);line-height:1.5; }
+.ar-text strong { color:var(--text); }
+.artifact-fail { margin-top:14px;padding:10px 14px;background:rgba(248,113,113,.06);border:1px solid rgba(248,113,113,.2);border-radius:7px;font-size:11px;color:var(--muted);line-height:1.6; }
+.artifact-fail strong { color:var(--red); }
+
+.iq-section { margin-bottom:32px; }
+.iq-header { padding:14px 18px;background:rgba(167,139,250,.06);border:1px solid rgba(167,139,250,.25);border-radius:10px 10px 0 0;border-bottom:none; }
+.iq-title { font-size:12px;font-weight:700;color:var(--accent2);margin-bottom:4px; }
+.iq-subtitle { font-size:11px;color:var(--muted);line-height:1.6; }
+.iq-body { padding:14px 18px;background:rgba(167,139,250,.02);border:1px solid rgba(167,139,250,.25);border-radius:0 0 10px 10px;display:flex;flex-direction:column;gap:8px; }
+.iq-item { background:var(--surface);border:1px solid var(--border);border-radius:8px;overflow:hidden;cursor:pointer;transition:border-color .15s; }
+.iq-item:hover { border-color:rgba(167,139,250,.35); }
+.iq-item.answered { border-color:rgba(52,211,153,.3); }
+.iq-q { display:flex;align-items:flex-start;gap:12px;padding:10px 14px; }
+.iq-num { font-size:10px;font-weight:800;color:var(--accent2);background:rgba(167,139,250,.1);border:1px solid rgba(167,139,250,.2);padding:2px 7px;border-radius:4px;flex-shrink:0;margin-top:2px; }
+.iq-item.answered .iq-num { background:rgba(52,211,153,.12);border-color:rgba(52,211,153,.3);color:var(--green); }
+.iq-text { font-size:12px;color:var(--text);line-height:1.6;flex:1; }
+.iq-item.answered .iq-text { color:var(--muted); }
+.iq-check { font-size:11px;color:var(--dim);flex-shrink:0;margin-top:3px; }
+.iq-item.answered .iq-check { color:var(--green); }
+
+.criteria { display:flex;flex-direction:column;gap:8px; }
+.crit { display:flex;gap:10px;align-items:flex-start;padding:10px 14px;background:var(--surface);border:1px solid var(--border);border-radius:8px;font-size:12px;cursor:pointer;transition:border-color .15s; }
+.crit:hover { border-color:rgba(52,211,153,.3); }
+.crit.done { border-color:rgba(52,211,153,.35);background:rgba(52,211,153,.03); }
+.crit-box { width:16px;height:16px;border-radius:4px;border:1.5px solid var(--border);flex-shrink:0;margin-top:1px;display:flex;align-items:center;justify-content:center;transition:all .15s; }
+.crit.done .crit-box { background:var(--green);border-color:var(--green); }
+.crit-check { color:#0b0d14;font-size:10px;font-weight:900;display:none; }
+.crit.done .crit-check { display:block; }
+.crit-text { color:var(--muted);line-height:1.5; }
+.crit.done .crit-text { color:var(--dim); }
+
+.widget { background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px; }
+.widget-title { font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--dim);margin-bottom:12px; }
+.progress-bar { height:5px;background:var(--surface2);border-radius:10px;overflow:hidden;margin-bottom:6px; }
+.progress-fill { height:100%;background:linear-gradient(90deg,var(--accent),var(--green));border-radius:10px;transition:width .3s; }
+.progress-label { font-size:11px;color:var(--muted); }
+.progress-count { font-size:22px;font-weight:800;color:var(--text);margin-bottom:2px; }
+.as-row { display:flex;align-items:center;gap:8px;font-size:11px;margin-bottom:4px; }
+.as-dot { width:7px;height:7px;border-radius:50%;background:var(--dim);flex-shrink:0; }
+.as-dot.done { background:var(--green); }
+.as-name { color:var(--muted);flex:1; }
+.conn-row { font-size:11px;color:var(--muted);display:flex;gap:8px;align-items:flex-start; }
+.conn-dir { color:var(--dim);flex-shrink:0;width:48px; }
+.report-box { background:rgba(108,142,247,.06);border:1px solid rgba(108,142,247,.2);border-radius:10px;padding:14px 16px; }
+.report-title { font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--accent);margin-bottom:8px; }
+.report-step { font-size:11px;color:var(--muted);margin-bottom:6px;display:flex;gap:8px; }
+.report-step-num { color:var(--accent);font-weight:700;flex-shrink:0; }
+
+.explore-section { margin-bottom:32px; }
+.explore-header { display:flex;align-items:center;gap:12px;padding:12px 16px;background:rgba(251,191,36,.04);border:1px solid rgba(251,191,36,.2);border-radius:10px 10px 0 0;border-bottom:none; }
+.explore-header .label { font-size:12px;font-weight:700;color:var(--yellow); }
+.explore-header .sublabel { font-size:11px;color:var(--muted);margin-left:auto; }
+.explore-body { padding:14px 16px;background:rgba(251,191,36,.02);border:1px solid rgba(251,191,36,.2);border-radius:0 0 10px 10px;display:flex;flex-direction:column;gap:10px; }
+.explore-item { font-size:12px;color:var(--muted);line-height:1.6;padding-left:14px;position:relative; }
+.explore-item::before { content:'';position:absolute;left:0;top:7px;width:5px;height:5px;border-radius:50%;background:var(--yellow); }
+.explore-item strong { color:var(--text); }
+.explore-item code { font-size:10px;color:var(--accent2);background:var(--surface2);padding:1px 5px;border-radius:3px; }
+</style>
+</head>
+<body>
+
+<nav>
+  <span class="brand">ProOps2026</span>
+  <a href="#concept">Concept</a>
+  <a href="#chain">Discovery</a>
+  <a href="#artifact">Artifact</a>
+  <a href="#interview">Interview Qs</a>
+  <a href="#done">Done?</a>
+  <div class="spacer"></div>
+  <span class="badge">Week 3 · Day 11 · Hands-On</span>
+</nav>
+
+<div class="layout">
+<div class="main">
+
+  <!-- HEADER -->
+  <div class="day-header">
+    <div class="day-meta">
+      <span class="day-pill">Week 3 · Day 11</span>
+      <span class="day-tag">Hands-On</span>
+    </div>
+    <div class="day-title">Deploy to EC2 + Orchestration Intro</div>
+    <div class="day-question">
+      What does it actually take to run your Dockerized stack on a real server — and what breaks the moment you need more than one?
+    </div>
+    <div class="day-why">
+      Your stack works on your laptop. Today it runs on a real EC2 instance in the cloud — the first time your mock project services are accessible from outside your machine. <strong>Getting something working on a real server reveals problems that localhost never shows you</strong>: security groups, missing environment files, pulling images from a registry, processes that need to survive after you close the terminal. Once the stack is running, you will spend 15 minutes with Docker Swarm — not to learn Swarm deeply, but to see with your own eyes exactly why orchestration exists and what it solves.
+    </div>
+  </div>
+
+  <!-- COST CALLOUT -->
+  <div style="padding:12px 16px;background:rgba(251,191,36,.06);border:1px solid rgba(251,191,36,.3);border-radius:10px;margin-bottom:24px;">
+    <div style="font-size:12px;font-weight:700;color:var(--yellow);margin-bottom:6px;">AWS cost — keep it minimal</div>
+    <div style="font-size:12px;color:var(--muted);line-height:1.7;">
+      Your Day 6 AWS resources have been deleted — you are starting fresh today. Spin up a single <code style="font-size:11px;color:var(--accent2);">t3.micro</code> in the default VPC using the default subnet. No new VPC, no NAT Gateway, no Load Balancer, no Elastic IP. Access services directly via the EC2 public IP. <strong style="color:var(--yellow);">Terminate the instance at the end of the day</strong> — you do not need it again after today.
+    </div>
+  </div>
+
+  <!-- REQUIRED -->
+  <div style="padding:14px 18px;background:rgba(52,211,153,.04);border:1px solid rgba(52,211,153,.25);border-radius:10px;margin-bottom:28px;">
+    <div style="font-size:12px;font-weight:700;color:var(--green);margin-bottom:6px;">What you must complete today</div>
+    <div style="font-size:12px;color:var(--muted);line-height:1.7;">
+      <strong style="color:var(--text);">Part 1 — EC2 deploy (Q1–Q5):</strong> SSH into your EC2, install Docker, pull your images, run your stack with Docker Compose, verify services are reachable via public IP.<br>
+      <strong style="color:var(--text);">Part 2 — Swarm intro (Q6–Q7):</strong> Initialize a single-node Swarm on the same EC2, create one service with 2 replicas, kill a container, watch the manager restart it automatically.<br>
+      <strong style="color:var(--text);">Q8:</strong> Write <code style="font-size:11px;color:var(--accent2);">memory/orchestration.md</code> capturing what the five problems are and how orchestration solves each one.<br>
+      Stop your EC2 instance before end of day.
+    </div>
+    <div style="margin-top:10px;padding:8px 12px;border-radius:6px;background:rgba(248,113,113,.06);border:1px solid rgba(248,113,113,.2);font-size:11px;color:var(--muted);">
+      <strong style="color:var(--red);">Part 2 only starts after Part 1 is working.</strong> If your Compose stack is not running on EC2 by early afternoon, skip the Swarm demo and go straight to Q8 — the memory file matters more than running the commands.
+    </div>
+  </div>
+
+  <!-- CONCEPT -->
+  <div class="section-block" id="concept">
+    <div class="sec-label">Concept — the five problems orchestration solves</div>
+
+    <div style="font-size:13px;color:var(--muted);line-height:1.7;margin-bottom:16px;">
+      Docker Compose is enough for one machine. The moment you need more than one server — for traffic, for reliability, or for zero-downtime deploys — five specific problems appear. Every orchestrator (Swarm, Kubernetes, Nomad) exists to solve these same five problems. Read this before touching any commands.
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:20px;">
+
+      <div style="display:grid;grid-template-columns:180px 1fr;gap:0;border:1px solid var(--border);border-radius:10px;overflow:hidden;">
+        <div style="padding:14px 16px;background:rgba(108,142,247,.06);border-right:1px solid var(--border);display:flex;align-items:flex-start;gap:10px;">
+          <div style="font-size:18px;line-height:1;">&#128200;</div>
+          <div>
+            <div style="font-size:12px;font-weight:700;color:var(--accent);">1. Scheduling</div>
+            <div style="font-size:11px;color:var(--muted);margin-top:2px;line-height:1.5;">Which machine runs which container?</div>
+          </div>
+        </div>
+        <div style="padding:14px 16px;font-size:12px;color:var(--muted);line-height:1.6;">
+          With 3 servers and 9 containers, you must decide manually where each container runs — and track available CPU and memory across all servers. One wrong placement and a server goes OOM. An orchestrator tracks resource availability across every node and places containers automatically.
+        </div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:180px 1fr;gap:0;border:1px solid var(--border);border-radius:10px;overflow:hidden;">
+        <div style="padding:14px 16px;background:rgba(52,211,153,.06);border-right:1px solid var(--border);display:flex;align-items:flex-start;gap:10px;">
+          <div style="font-size:18px;line-height:1;">&#10084;</div>
+          <div>
+            <div style="font-size:12px;font-weight:700;color:var(--green);">2. Health monitoring</div>
+            <div style="font-size:11px;color:var(--muted);margin-top:2px;line-height:1.5;">What happens when a container crashes?</div>
+          </div>
+        </div>
+        <div style="padding:14px 16px;font-size:12px;color:var(--muted);line-height:1.6;">
+          A container crashes at 3am on server 2. No alert fires. It stays down until someone checks in the morning — 6 hours of partial outage. An orchestrator runs health checks continuously and restarts failed containers automatically, on the same node or a different one.
+        </div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:180px 1fr;gap:0;border:1px solid var(--border);border-radius:10px;overflow:hidden;">
+        <div style="padding:14px 16px;background:rgba(251,191,36,.06);border-right:1px solid var(--border);display:flex;align-items:flex-start;gap:10px;">
+          <div style="font-size:18px;line-height:1;">&#128268;</div>
+          <div>
+            <div style="font-size:12px;font-weight:700;color:var(--yellow);">3. Service discovery</div>
+            <div style="font-size:11px;color:var(--muted);margin-top:2px;line-height:1.5;">How do containers find each other?</div>
+          </div>
+        </div>
+        <div style="padding:14px 16px;font-size:12px;color:var(--muted);line-height:1.6;">
+          Container IPs change on every restart and every reschedule. Hardcoding IPs breaks immediately. An orchestrator gives each service a stable DNS name — your API always reaches the database via <code style="font-size:11px;color:var(--accent2);">db</code>, regardless of which node it is running on or what IP it has today.
+        </div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:180px 1fr;gap:0;border:1px solid var(--border);border-radius:10px;overflow:hidden;">
+        <div style="padding:14px 16px;background:rgba(251,146,60,.06);border-right:1px solid var(--border);display:flex;align-items:flex-start;gap:10px;">
+          <div style="font-size:18px;line-height:1;">&#128257;</div>
+          <div>
+            <div style="font-size:12px;font-weight:700;color:var(--orange);">4. Rolling deployments</div>
+            <div style="font-size:11px;color:var(--muted);margin-top:2px;line-height:1.5;">How do you deploy without downtime?</div>
+          </div>
+        </div>
+        <div style="padding:14px 16px;font-size:12px;color:var(--muted);line-height:1.6;">
+          Updating 10 servers manually means SSH-ing into each one, stopping the old container, starting the new one — while some servers serve old traffic and others serve new. An orchestrator replaces containers in controlled batches, keeps old ones running until new ones pass health checks, and stops automatically if something is wrong.
+        </div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:180px 1fr;gap:0;border:1px solid var(--border);border-radius:10px;overflow:hidden;">
+        <div style="padding:14px 16px;background:rgba(167,139,250,.06);border-right:1px solid var(--border);display:flex;align-items:flex-start;gap:10px;">
+          <div style="font-size:18px;line-height:1;">&#8645;</div>
+          <div>
+            <div style="font-size:12px;font-weight:700;color:var(--accent2);">5. Scaling</div>
+            <div style="font-size:11px;color:var(--muted);margin-top:2px;line-height:1.5;">How do you handle more traffic?</div>
+          </div>
+        </div>
+        <div style="padding:14px 16px;font-size:12px;color:var(--muted);line-height:1.6;">
+          Adding a second copy of your API on another server means updating load balancer config, tracking which instances exist, and cleaning up when traffic drops. An orchestrator does this with one command — or automatically based on CPU usage — and removes instances cleanly when they are no longer needed.
+        </div>
+      </div>
+
+    </div>
+
+    <div style="padding:12px 16px;background:var(--surface);border:1px solid var(--border);border-radius:10px;font-size:12px;color:var(--muted);line-height:1.7;">
+      <strong style="color:var(--text);">Today you will experience problem #2 directly.</strong> You will run 2 replicas of a service in Docker Swarm, kill one container manually, and watch the orchestrator restart it — automatically, in under 10 seconds. That one demo makes all five problems real. Keep this list in mind as you work through Q6–Q7.
+    </div>
+  </div>
+
+  <!-- DISCOVERY CHAIN -->
+  <div class="section-block" id="chain">
+    <div class="sec-label">Discovery chain — 8 questions</div>
+
+    <!-- Part 1 divider -->
+    <div class="part-divider">
+      <div class="part-line"></div>
+      <div class="part-label" style="background:rgba(108,142,247,.1);border:1px solid rgba(108,142,247,.25);color:var(--accent);">Part 1 — Deploy to EC2</div>
+      <div class="part-line"></div>
+    </div>
+
+    <div class="chain">
+
+      <div class="chain-item" onclick="toggleChain(this,0)">
+        <div class="chain-num">1</div>
+        <div class="chain-body">
+          <div class="chain-q">Provision a fresh t3.micro EC2 in the default VPC. SSH in, install Docker and Docker Compose. What is the minimum setup needed to get a clean server ready to run containers?</div>
+          <div class="chain-prompt">I need to provision a fresh EC2 instance and get it ready to run Docker containers. Walk me through: (1) the AWS Console steps to launch a t3.micro using Amazon Linux 2023 (or Ubuntu 22.04) in the default VPC and default subnet — no new VPC needed, (2) what Security Group rules to add at launch — SSH (port 22) from my IP only, plus the ports my services use, (3) once I SSH in, the exact commands to install Docker, add my user to the docker group, start and enable the Docker daemon, and install Docker Compose v2 as a plugin, (4) the two commands to verify Docker and Compose are working before I do anything else. Keep it minimal — I do not need anything beyond what is required to run docker compose up.</div>
+          <div class="chain-hint">Use Amazon Linux 2023 — it has the cleanest Docker install path with <code style="font-size:11px;color:var(--accent2);">dnf install docker</code>. After adding yourself to the docker group, run <code style="font-size:11px;color:var(--accent2);">newgrp docker</code> to apply without logging out. Open only the ports your services actually need in the Security Group — not a wide-open 0.0.0.0/0 range.</div>
+          <div class="chain-note">No Elastic IP, no NAT Gateway, no new VPC. Default VPC + default subnet + Security Group is everything you need for today.</div>
+        </div>
+      </div>
+
+      <div class="chain-item" onclick="toggleChain(this,1)">
+        <div class="chain-num">2</div>
+        <div class="chain-body">
+          <div class="chain-q">Your images are on Docker Hub (you pushed them on Day 9). Pull them onto the EC2. Before you can run the stack, you also need your <code>.env</code> file — but it is not in the repo. How do you get it onto the server securely?</div>
+          <div class="chain-prompt">I need to get two things onto my EC2 to run my stack: (1) my Docker images from Docker Hub, and (2) my .env file which contains database passwords and API keys — it is gitignored so it is not in the repo. Explain: (a) the docker pull command to pull a specific image and tag from Docker Hub, (b) two safe ways to get my .env file onto the EC2 without putting secrets in the repo or typing them into the terminal history — what is scp and what is the heredoc approach, (c) what permissions should the .env file have on the server and why.</div>
+          <div class="chain-hint">The simplest approach for a training environment: use <code style="font-size:11px;color:var(--accent2);">scp</code> to copy your local <code style="font-size:11px;color:var(--accent2);">.env</code> file directly to the EC2. Run: <code style="font-size:11px;color:var(--accent2);">scp -i your-key.pem .env ec2-user@[public-ip]:~/</code> from your local machine.</div>
+        </div>
+      </div>
+
+      <div class="chain-item" onclick="toggleChain(this,2)">
+        <div class="chain-num">3</div>
+        <div class="chain-body">
+          <div class="chain-q">You copy your <code>docker-compose.yml</code> to the EC2 and run <code>docker compose up</code>. Some containers start, some fail. What are the three most common reasons a Compose stack that works on your laptop fails on a fresh EC2?</div>
+          <div class="chain-prompt">I copied my docker-compose.yml to an EC2 and ran docker compose up. Some services started but others failed. Before I look at specific error messages, help me build a mental checklist: what are the 3 most common reasons a Compose stack that works perfectly on a developer laptop fails on a fresh Linux server? For each reason: (1) what the symptom looks like in docker compose logs, (2) the root cause, (3) the fix. Focus on: image availability, environment variables, and port/user permission issues.</div>
+          <div class="chain-hint">The three usual suspects: (1) image not pulled or wrong tag — <code style="font-size:11px;color:var(--accent2);">docker compose pull</code> first, (2) <code style="font-size:11px;color:var(--accent2);">.env</code> file missing or in the wrong directory, (3) a port below 1024 that needs root on Linux. Read <code style="font-size:11px;color:var(--accent2);">docker compose logs [service-name]</code> — the error is almost always in the first 10 lines.</div>
+        </div>
+      </div>
+
+      <div class="chain-item" onclick="toggleChain(this,3)">
+        <div class="chain-num">4</div>
+        <div class="chain-body">
+          <div class="chain-q">The stack is running. You try to reach your API from a browser using the EC2 public IP — connection refused. The container is up. What is the missing piece?</div>
+          <div class="chain-prompt">My docker compose up shows all services as running and healthy. I try to open http://[ec2-public-ip]:3000 in a browser — connection refused. The container is definitely running and listening on port 3000 inside the container. Walk me through: (1) what is an EC2 Security Group and why does it block my request even though the container is running, (2) what inbound rule do I need to add — what port, what protocol, what source CIDR — to allow HTTP access to my API, (3) after I add the rule, is there anything else that could still block the connection — what does docker compose ports mapping do and what does it mean if I see 127.0.0.1:3000 vs 0.0.0.0:3000 in docker ps output?</div>
+          <div class="chain-hint">Two separate systems control access: (1) AWS Security Group — controls traffic at the network level before it reaches the instance, (2) Docker port binding — controls what interface the container listens on inside the instance. Both must allow the traffic. Add the Security Group inbound rule in the AWS Console, then check <code style="font-size:11px;color:var(--accent2);">docker ps</code> to confirm the port binding shows <code style="font-size:11px;color:var(--accent2);">0.0.0.0:3000</code>.</div>
+          <div class="chain-note">Only open the ports your services actually use. Do not open port 0-65535 to 0.0.0.0/0 — that defeats the purpose of a security group.</div>
+        </div>
+      </div>
+
+      <div class="chain-item" onclick="toggleChain(this,4)">
+        <div class="chain-num">5</div>
+        <div class="chain-body">
+          <div class="chain-q">Your services are reachable. But if you close the SSH terminal, the stack stops. How do you keep it running after you disconnect — and how do you verify it is still up after reconnecting?</div>
+          <div class="chain-prompt">My docker compose stack is running and accessible on the EC2 public IP. But when I close my SSH terminal the stack stops. I need it to keep running after I disconnect. Explain: (1) why closing the terminal stops the processes — what is a foreground process vs a background process in Linux, (2) what does docker compose up -d do and how is it different from running without -d, (3) after I disconnect and reconnect, what commands do I run to verify the stack is still running and healthy, (4) if the EC2 reboots, will the containers restart automatically — and if not, what is the simplest way to make them start on boot?</div>
+          <div class="chain-hint"><code style="font-size:11px;color:var(--accent2);">docker compose up -d</code> is the answer to disconnecting safely. After reconnecting: <code style="font-size:11px;color:var(--accent2);">docker compose ps</code> to check status, <code style="font-size:11px;color:var(--accent2);">docker compose logs --tail=20</code> to check for errors. For auto-restart on reboot: <code style="font-size:11px;color:var(--accent2);">restart: unless-stopped</code> in each service definition in your compose file.</div>
+        </div>
+      </div>
+
+      <!-- Part 2 divider -->
+      <div class="part-divider" style="margin-top:10px;">
+        <div class="part-line"></div>
+        <div class="part-label" style="background:rgba(167,139,250,.1);border:1px solid rgba(167,139,250,.25);color:var(--accent2);">Part 2 — Swarm Intro</div>
+        <div class="part-line"></div>
+      </div>
+
+      <div class="chain-item" onclick="toggleChain(this,5)">
+        <div class="chain-num">6</div>
+        <div class="chain-body">
+          <div class="chain-q">Initialize Docker Swarm on your EC2 and create a service with 2 replicas. Then kill one container manually. Watch what happens.</div>
+          <div class="chain-prompt">I want to see Docker Swarm's automatic recovery in action on my EC2. Give me the exact commands to: (1) initialize a single-node Swarm with docker swarm init, (2) create a service called "web" using the nginx image with 2 replicas, (3) list the running tasks of the service to see both replicas, (4) get the container ID of one replica from docker ps, (5) kill that container with docker kill [container-id], (6) immediately run docker service ps web again to see what the Swarm manager does. Explain what I should see in the output after step 6 — specifically what the CURRENT STATE and DESIRED STATE columns will show.</div>
+          <div class="chain-hint">You will see one task show <code style="font-size:11px;color:var(--accent2);">Failed</code> and a new one appear as <code style="font-size:11px;color:var(--accent2);">Running</code> almost immediately. The DESIRED STATE column always says <code style="font-size:11px;color:var(--accent2);">Running</code> — the manager's job is to make reality match that. This is the reconciliation loop that Kubernetes also uses.</div>
+          <div class="chain-note">This takes about 5 minutes to run. Do it — watching it happen is the entire point of Part 2. Screenshots of the before/after output are good evidence for your daily report.</div>
+        </div>
+      </div>
+
+      <div class="chain-item" onclick="toggleChain(this,6)">
+        <div class="chain-num">7</div>
+        <div class="chain-body">
+          <div class="chain-q">You just saw automatic recovery. What are the four other problems orchestration solves beyond health monitoring — and where does Docker Compose fall short on each one?</div>
+          <div class="chain-prompt">I just watched Docker Swarm automatically restart a container I killed. That demonstrated one orchestration problem: health monitoring and recovery. Explain the four other problems that appear when you run containers across multiple servers — not just one EC2: (1) scheduling — who decides which server runs which container, (2) service discovery — how containers find each other when IPs change, (3) rolling deployments — how you update without downtime, (4) scaling — how you add more copies under load. For each one: what breaks if you try to do it manually with just Docker Compose, and what does an orchestrator do instead? Keep it concrete — one paragraph each.</div>
+          <div class="chain-hint">This is the conceptual anchor for everything in Days 12–15. After this question you should be able to explain WHY Kubernetes exists — not just WHAT it does. The answer feeds directly into your memory file in Q8.</div>
+        </div>
+      </div>
+
+      <div class="chain-item" onclick="toggleChain(this,7)">
+        <div class="chain-num">8</div>
+        <div class="chain-body">
+          <div class="chain-q">Write <code>memory/orchestration.md</code> — the five problems, what you saw Swarm do today, and what Kubernetes will solve differently starting tomorrow.</div>
+          <div class="chain-prompt">Help me write memory/orchestration.md. This file will be loaded into my agent's context every time I work on Kubernetes and CI/CD. It should contain:
+
+1. The five orchestration problems — one short paragraph each: what the problem is, what breaks without an orchestrator, what an orchestrator does. (scheduling, health monitoring, service discovery, rolling deployments, scaling)
+2. What I saw today — 2–3 sentences: what docker swarm init + service create + docker kill demonstrated, and what the output showed
+3. Docker Compose vs Swarm vs Kubernetes — a simple 3-column table: Problem | Compose | Swarm | Kubernetes. Show what each tool can and cannot do for each problem
+4. One sentence: why I am learning Kubernetes next — what Swarm cannot do that production requires
+
+Format: short, structured, easy for an AI agent to query. No long paragraphs.</div>
+          <div class="chain-hint">The Compose vs Swarm vs Kubernetes table is the most valuable part. When you open Day 12, your agent will already know the context — it will answer Kubernetes questions with this comparison in mind instead of explaining Kubernetes from scratch.</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ARTIFACT -->
+  <div class="section-block" id="artifact">
+    <div class="sec-label">Artifacts</div>
+
+    <div class="artifact-card">
+      <div class="artifact-head">
+        <div class="artifact-title">Stack running on EC2</div>
+        <div class="artifact-file">EC2 public IP reachable</div>
+      </div>
+      <div class="artifact-body">
+        <div class="artifact-row"><div class="ar-dot"></div><div class="ar-text"><strong>At least 2 services accessible</strong> via the EC2 public IP and correct ports — not just "containers are running" but actually reachable from a browser or curl.</div></div>
+        <div class="artifact-row"><div class="ar-dot"></div><div class="ar-text"><strong>Running detached</strong> — <code>docker compose up -d</code>, not in the foreground. Stays up after terminal disconnect.</div></div>
+        <div class="artifact-row"><div class="ar-dot"></div><div class="ar-text"><strong>EC2 stopped at end of day</strong> — not terminated. Instance ID noted in your daily report so you can start it again for Day 12.</div></div>
+        <div class="artifact-fail"><strong>Weak signals:</strong> "Containers are running" confirmed only via <code>docker compose ps</code> on the server but never actually tested via HTTP from outside. Or stack left running overnight — costs money for nothing.</div>
+      </div>
+    </div>
+
+    <div class="artifact-card">
+      <div class="artifact-head">
+        <div class="artifact-title">Orchestration Memory File</div>
+        <div class="artifact-file">memory/orchestration.md</div>
+      </div>
+      <div class="artifact-body">
+        <div class="artifact-row"><div class="ar-dot"></div><div class="ar-text"><strong>Five problems named and explained</strong> — each one states what breaks without an orchestrator, not just what the orchestrator does.</div></div>
+        <div class="artifact-row"><div class="ar-dot"></div><div class="ar-text"><strong>Compose vs Swarm vs Kubernetes table is present</strong> — the bridge to Day 12. Without this table the file is incomplete.</div></div>
+        <div class="artifact-row"><div class="ar-dot"></div><div class="ar-text"><strong>"What I saw today" section</strong> — describes the kill-and-recover demo in your own words. Makes it real, not abstract.</div></div>
+        <div class="artifact-fail"><strong>Weak signals:</strong> Orchestration defined as "tool to manage containers" with no specific problems listed. No Compose vs Swarm vs K8s comparison. Memory file written but not committed to the repo.</div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- INTERVIEW QUESTIONS -->
+  <div class="iq-section" id="interview">
+    <div class="iq-header">
+      <div class="iq-title">Interview Questions</div>
+      <div class="iq-subtitle">Click when you can answer without notes. These come up in both DevOps interviews and in daily work when you explain architecture decisions to teammates.</div>
+    </div>
+    <div class="iq-body">
+
+      <div class="iq-item" onclick="toggleIQ(this)">
+        <div class="iq-q">
+          <span class="iq-num">Q1</span>
+          <span class="iq-text">Your Docker Compose stack works on your laptop but fails on EC2. Walk me through the first three things you check — in order.</span>
+          <span class="iq-check">&#10003;</span>
+        </div>
+      </div>
+
+      <div class="iq-item" onclick="toggleIQ(this)">
+        <div class="iq-q">
+          <span class="iq-num">Q2</span>
+          <span class="iq-text">What is an EC2 Security Group and how is it different from a firewall rule inside the operating system? Why do both matter?</span>
+          <span class="iq-check">&#10003;</span>
+        </div>
+      </div>
+
+      <div class="iq-item" onclick="toggleIQ(this)">
+        <div class="iq-q">
+          <span class="iq-num">Q3</span>
+          <span class="iq-text">You have a <code>.env</code> file with database passwords. How do you get it onto a production server without putting it in the git repo or typing secrets into the terminal?</span>
+          <span class="iq-check">&#10003;</span>
+        </div>
+      </div>
+
+      <div class="iq-item" onclick="toggleIQ(this)">
+        <div class="iq-q">
+          <span class="iq-num">Q4</span>
+          <span class="iq-text">What is the difference between <code>docker compose up</code> and <code>docker compose up -d</code>? When would you use each?</span>
+          <span class="iq-check">&#10003;</span>
+        </div>
+      </div>
+
+      <div class="iq-item" onclick="toggleIQ(this)">
+        <div class="iq-q">
+          <span class="iq-num">Q5</span>
+          <span class="iq-text">Name the five problems orchestration solves. For each one, describe what happens on a 10-server setup if you have no orchestrator.</span>
+          <span class="iq-check">&#10003;</span>
+        </div>
+      </div>
+
+      <div class="iq-item" onclick="toggleIQ(this)">
+        <div class="iq-q">
+          <span class="iq-num">Q6</span>
+          <span class="iq-text">What is the difference between a Docker Swarm service and a Docker container? If you kill a container that belongs to a service, what happens and why?</span>
+          <span class="iq-check">&#10003;</span>
+        </div>
+      </div>
+
+      <div class="iq-item" onclick="toggleIQ(this)">
+        <div class="iq-q">
+          <span class="iq-num">Q7</span>
+          <span class="iq-text">Docker Compose can run multiple containers. Docker Swarm can also run multiple containers. What can Swarm do that Compose cannot — and what can Kubernetes do that Swarm cannot?</span>
+          <span class="iq-check">&#10003;</span>
+        </div>
+      </div>
+
+      <div class="iq-item" onclick="toggleIQ(this)">
+        <div class="iq-q">
+          <span class="iq-num">Q8</span>
+          <span class="iq-text">What is a reconciliation loop? Why does an orchestrator constantly compare desired state to actual state rather than just reacting to failures when they happen?</span>
+          <span class="iq-check">&#10003;</span>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- DONE CRITERIA -->
+  <div class="section-block" id="done">
+    <div class="sec-label">Done criteria</div>
+    <div class="criteria">
+      <div class="crit" onclick="toggleCrit(this)">
+        <div class="crit-box"><span class="crit-check">&#10003;</span></div>
+        <div class="crit-text">Docker and Docker Compose are installed on your EC2. <code style="font-size:11px;color:var(--accent2);">docker --version</code> and <code style="font-size:11px;color:var(--accent2);">docker compose version</code> return results.</div>
+      </div>
+      <div class="crit" onclick="toggleCrit(this)">
+        <div class="crit-box"><span class="crit-check">&#10003;</span></div>
+        <div class="crit-text">At least 2 services from your mock project stack are reachable via <code style="font-size:11px;color:var(--accent2);">http://[ec2-public-ip]:[port]</code> from your local browser or curl.</div>
+      </div>
+      <div class="crit" onclick="toggleCrit(this)">
+        <div class="crit-box"><span class="crit-check">&#10003;</span></div>
+        <div class="crit-text">Stack is running detached (<code style="font-size:11px;color:var(--accent2);">-d</code>) and stays up after closing the SSH terminal and reconnecting.</div>
+      </div>
+      <div class="crit" onclick="toggleCrit(this)">
+        <div class="crit-box"><span class="crit-check">&#10003;</span></div>
+        <div class="crit-text">Docker Swarm demo completed: <code style="font-size:11px;color:var(--accent2);">docker kill</code> on one replica, <code style="font-size:11px;color:var(--accent2);">docker service ps</code> shows the manager restarted it. (Skip if Part 1 took all day.)</div>
+      </div>
+      <div class="crit" onclick="toggleCrit(this)">
+        <div class="crit-box"><span class="crit-check">&#10003;</span></div>
+        <div class="crit-text"><code style="font-size:11px;color:var(--accent2);">memory/orchestration.md</code> written with the five problems + Compose vs Swarm vs K8s table + "what I saw today" section.</div>
+      </div>
+      <div class="crit" onclick="toggleCrit(this)">
+        <div class="crit-box"><span class="crit-check">&#10003;</span></div>
+        <div class="crit-text">EC2 instance <strong>terminated</strong> in the AWS Console. Confirm in the billing dashboard that no running instances remain.</div>
+      </div>
+      <div class="crit" onclick="toggleCrit(this)">
+        <div class="crit-box"><span class="crit-check">&#10003;</span></div>
+        <div class="crit-text">Git commit pushed: <code style="font-size:11px;color:var(--accent2);">Day 11 — deployed to EC2 + memory/orchestration.md</code></div>
+      </div>
+      <div class="crit" onclick="toggleCrit(this)">
+        <div class="crit-box"><span class="crit-check">&#10003;</span></div>
+        <div class="crit-text">Daily log filled — Tomorrow's Context Block states the one Kubernetes concept you most want to understand on Day 12.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- EXPLORE FURTHER -->
+  <div class="explore-section">
+    <div class="explore-header">
+      <span class="label">Explore further</span>
+      <span class="sublabel">Only after EC2 stopped and memory file committed &#10003;</span>
+    </div>
+    <div class="explore-body">
+      <div style="font-size:11px;color:var(--dim);margin-bottom:4px;">Optional. Only if all done criteria are checked.</div>
+      <div class="explore-item">
+        <strong>Systemd auto-start.</strong> Make your Compose stack start automatically when the EC2 reboots without using Docker's restart policy. Ask Claude: <em>"How do I create a systemd service file that runs docker compose up -d on boot for my stack — and how do I enable and test it?"</em>
+      </div>
+      <div class="explore-item">
+        <strong>Swarm rolling update.</strong> Ask Claude: <em>"I have a service running with 2 replicas. Show me the exact command to update the image to a new tag using docker service update — with --update-parallelism 1 and --update-delay 10s. What happens to live traffic during the update?"</em>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /main -->
+
+<!-- SIDEBAR -->
+<div class="sidebar">
+
+  <div class="widget">
+    <div class="widget-title">Progress</div>
+    <div class="progress-count" id="prog-count">0 / 8</div>
+    <div style="margin-bottom:8px;">
+      <div class="progress-bar"><div class="progress-fill" id="prog-fill" style="width:0%"></div></div>
+      <div class="progress-label" id="prog-label">Discovery chain</div>
+    </div>
+  </div>
+
+  <div class="widget">
+    <div class="widget-title">Today's Artifacts</div>
+    <div class="as-row"><div class="as-dot" id="dot-ec2"></div><div class="as-name">Stack live on EC2 public IP</div></div>
+    <div class="as-row"><div class="as-dot" id="dot-swarm"></div><div class="as-name">Swarm demo (kill + recover)</div></div>
+    <div class="as-row"><div class="as-dot" id="dot-mem"></div><div class="as-name">memory/orchestration.md</div></div>
+    <div class="as-row"><div class="as-dot" id="dot-stop"></div><div class="as-name">EC2 stopped (not terminated)</div></div>
+  </div>
+
+  <div class="widget" style="background:rgba(251,191,36,.04);border-color:rgba(251,191,36,.2);">
+    <div class="widget-title" style="color:var(--yellow);">AWS cost checklist</div>
+    <div style="font-size:11px;color:var(--muted);line-height:1.8;">
+      &#9744; t3.micro only — default VPC<br>
+      &#9744; No NAT Gateway created<br>
+      &#9744; No Load Balancer created<br>
+      &#9744; No Elastic IP allocated<br>
+      &#9744; Instance <strong style="color:var(--yellow);">terminated</strong> end of day<br>
+      &#9744; Billing dashboard: 0 running instances
+    </div>
+  </div>
+
+  <div class="widget">
+    <div class="widget-title">Connects To</div>
+    <div style="display:flex;flex-direction:column;gap:6px;">
+      <div class="conn-row"><span class="conn-dir">&larr; Day 6</span><span style="font-size:11px;color:var(--muted);">EC2 knowledge (fresh instance today)</span></div>
+      <div class="conn-row"><span class="conn-dir">&larr; Day 9</span><span style="font-size:11px;color:var(--muted);">docker-compose.yml + images on registry</span></div>
+      <div class="conn-row"><span class="conn-dir">&rarr; Day 12</span><span style="font-size:11px;color:var(--muted);">Kubernetes — same five problems, declarative model</span></div>
+      <div class="conn-row"><span class="conn-dir">&rarr; Day 15</span><span style="font-size:11px;color:var(--muted);">K8s lab deploys your actual mock project</span></div>
+    </div>
+  </div>
+
+  <div class="report-box">
+    <div class="report-title">End-of-day report</div>
+    <div class="report-step"><span class="report-step-num">1.</span> Fill daily log + context block</div>
+    <div class="report-step"><span class="report-step-num">2.</span> git commit + push to GitHub repo</div>
+    <div class="report-step"><span class="report-step-num">3.</span> Fill <code style="font-size:10px;color:var(--accent);">templates/daily-report-template.md</code> &rarr; paste to trainer chat</div>
+    <div style="margin-top:8px;padding:6px 8px;background:rgba(52,211,153,.06);border:1px solid rgba(52,211,153,.2);border-radius:5px;font-size:10px;color:var(--green);line-height:1.5;">
+      Include: EC2 public IP used + service URLs you tested + confirm instance is terminated
+    </div>
+  </div>
+
+</div><!-- /sidebar -->
+</div><!-- /layout -->
+
+<script>
+const chainDone = new Array(8).fill(false);
+function toggleChain(el, i) {
+  chainDone[i] = !chainDone[i];
+  el.classList.toggle('done', chainDone[i]);
+  const done = chainDone.filter(Boolean).length;
+  document.getElementById('prog-count').textContent = done + ' / 8';
+  document.getElementById('prog-fill').style.width = (done/8*100) + '%';
+  const labels = ['Keep going','Keep going','Halfway','Halfway','Almost there','Almost there','Almost there','Done!'];
+  document.getElementById('prog-label').textContent = done === 0 ? 'Discovery chain' : labels[done-1];
+  if (done >= 3) document.getElementById('dot-ec2').classList.add('done');
+  if (done >= 6) document.getElementById('dot-swarm').classList.add('done');
+  if (done >= 7) document.getElementById('dot-mem').classList.add('done');
+  if (done >= 8) document.getElementById('dot-stop').classList.add('done');
+}
+function toggleIQ(el) { el.classList.toggle('answered'); }
+function toggleCrit(el) { el.classList.toggle('done'); }
+</script>
+</body>
+</html>
