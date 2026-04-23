@@ -1,0 +1,651 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Day 12 — Kubernetes Basics: Pod, Deployment, Service · ProOps2026</title>
+<style>
+:root {
+  --bg:#0b0d14; --surface:#13161f; --surface2:#1c2030; --border:#252a3a;
+  --accent:#6c8ef7; --accent2:#a78bfa;
+  --green:#34d399; --yellow:#fbbf24; --orange:#fb923c;
+  --red:#f87171; --teal:#22d3ee; --blue:#60a5fa;
+  --text:#e8edf5; --muted:#7c87a0; --dim:#3a4258;
+}
+* { box-sizing:border-box; margin:0; padding:0; }
+body { background:var(--bg); color:var(--text); font-family:'Segoe UI',system-ui,sans-serif; font-size:15px; line-height:1.6; }
+
+nav { background:var(--surface);border-bottom:1px solid var(--border);padding:0 32px;height:50px;display:flex;align-items:center;gap:6px;position:sticky;top:0;z-index:200; }
+nav .brand { font-weight:800;font-size:14px;color:var(--accent);margin-right:12px; }
+nav a { color:var(--muted);text-decoration:none;font-size:12px;font-weight:600;padding:5px 12px;border-radius:6px;transition:all .15s;white-space:nowrap; }
+nav a:hover { color:var(--text);background:var(--surface2); }
+nav .spacer { flex:1; }
+nav .badge { background:rgba(52,211,153,.12);border:1px solid rgba(52,211,153,.25);color:var(--green);font-size:11px;font-weight:700;padding:3px 12px;border-radius:20px; }
+
+.layout { display:grid;grid-template-columns:1fr 260px;gap:32px;max-width:1100px;margin:0 auto;padding:40px 32px; }
+.main { min-width:0; }
+.sidebar { position:sticky;top:70px;height:fit-content;display:flex;flex-direction:column;gap:14px; }
+
+.day-header { margin-bottom:32px; }
+.day-meta { display:flex;align-items:center;gap:10px;margin-bottom:12px; }
+.day-pill { font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;padding:3px 12px;border-radius:20px;background:rgba(108,142,247,.12);border:1px solid rgba(108,142,247,.25);color:var(--accent); }
+.day-tag { font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;padding:3px 12px;border-radius:20px;background:rgba(52,211,153,.08);border:1px solid rgba(52,211,153,.2);color:var(--green); }
+.day-title { font-size:26px;font-weight:800;letter-spacing:-.3px;margin-bottom:8px; }
+.day-question { font-size:15px;color:var(--accent2);font-style:italic;border-left:3px solid var(--accent2);padding-left:14px;margin-bottom:16px;line-height:1.6; }
+.day-why { font-size:13px;color:var(--muted);line-height:1.7;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:14px 16px; }
+.day-why strong { color:var(--text); }
+
+.section-block { margin-bottom:32px; }
+.sec-label { font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:var(--dim);margin-bottom:14px;display:flex;align-items:center;gap:10px; }
+.sec-label::after { content:'';flex:1;height:1px;background:var(--border); }
+
+.chain { display:flex;flex-direction:column;gap:10px; }
+.chain-item { display:grid;grid-template-columns:32px 1fr;gap:14px;padding:14px 16px;background:var(--surface);border:1px solid var(--border);border-radius:10px;cursor:pointer;transition:border-color .15s; }
+.chain-item:hover { border-color:rgba(167,139,250,.4); }
+.chain-item.done { border-color:rgba(52,211,153,.3);background:rgba(52,211,153,.03); }
+.chain-num { width:32px;height:32px;border-radius:50%;background:var(--surface2);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;color:var(--muted);flex-shrink:0;transition:all .15s; }
+.chain-item.done .chain-num { background:rgba(52,211,153,.15);border-color:rgba(52,211,153,.4);color:var(--green); }
+.chain-q { font-size:13px;font-weight:600;margin-bottom:6px;line-height:1.5; }
+.chain-item.done .chain-q { color:var(--muted);text-decoration:line-through;text-decoration-color:var(--dim); }
+.chain-prompt { font-size:11px;font-family:'Cascadia Code','Fira Code',monospace;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:8px 12px;color:var(--accent2);line-height:1.6;margin-top:8px; }
+.chain-hint { font-size:11px;color:var(--dim);margin-top:6px;line-height:1.5; }
+.chain-note { font-size:11px;color:var(--yellow);margin-top:6px;line-height:1.5;padding:6px 10px;background:rgba(251,191,36,.06);border:1px solid rgba(251,191,36,.15);border-radius:5px; }
+
+.part-divider { display:flex;align-items:center;gap:14px;margin:20px 0 14px; }
+.part-label { font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:1px;padding:4px 14px;border-radius:20px;white-space:nowrap; }
+.part-line { flex:1;height:1px;background:var(--border); }
+
+.artifact-card { background:var(--surface);border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:14px; }
+.artifact-head { padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px; }
+.artifact-title { font-size:13px;font-weight:700;flex:1; }
+.artifact-file { font-family:'Cascadia Code','Fira Code',monospace;font-size:11px;color:var(--green);background:rgba(52,211,153,.08);border:1px solid rgba(52,211,153,.2);padding:2px 10px;border-radius:5px; }
+.artifact-body { padding:16px 18px; }
+.artifact-row { display:flex;gap:10px;margin-bottom:8px;font-size:12px;align-items:flex-start; }
+.artifact-row:last-child { margin-bottom:0; }
+.ar-dot { width:5px;height:5px;border-radius:50%;background:var(--green);flex-shrink:0;margin-top:6px; }
+.ar-text { color:var(--muted);line-height:1.5; }
+.ar-text strong { color:var(--text); }
+.artifact-fail { margin-top:14px;padding:10px 14px;background:rgba(248,113,113,.06);border:1px solid rgba(248,113,113,.2);border-radius:7px;font-size:11px;color:var(--muted);line-height:1.6; }
+.artifact-fail strong { color:var(--red); }
+
+.iq-section { margin-bottom:32px; }
+.iq-header { padding:14px 18px;background:rgba(167,139,250,.06);border:1px solid rgba(167,139,250,.25);border-radius:10px 10px 0 0;border-bottom:none; }
+.iq-title { font-size:12px;font-weight:700;color:var(--accent2);margin-bottom:4px; }
+.iq-subtitle { font-size:11px;color:var(--muted);line-height:1.6; }
+.iq-body { padding:14px 18px;background:rgba(167,139,250,.02);border:1px solid rgba(167,139,250,.25);border-radius:0 0 10px 10px;display:flex;flex-direction:column;gap:8px; }
+.iq-item { background:var(--surface);border:1px solid var(--border);border-radius:8px;overflow:hidden;cursor:pointer;transition:border-color .15s; }
+.iq-item:hover { border-color:rgba(167,139,250,.35); }
+.iq-item.answered { border-color:rgba(52,211,153,.3); }
+.iq-q { display:flex;align-items:flex-start;gap:12px;padding:10px 14px; }
+.iq-num { font-size:10px;font-weight:800;color:var(--accent2);background:rgba(167,139,250,.1);border:1px solid rgba(167,139,250,.2);padding:2px 7px;border-radius:4px;flex-shrink:0;margin-top:2px; }
+.iq-item.answered .iq-num { background:rgba(52,211,153,.12);border-color:rgba(52,211,153,.3);color:var(--green); }
+.iq-text { font-size:12px;color:var(--text);line-height:1.6;flex:1; }
+.iq-item.answered .iq-text { color:var(--muted); }
+.iq-check { font-size:11px;color:var(--dim);flex-shrink:0;margin-top:3px; }
+.iq-item.answered .iq-check { color:var(--green); }
+
+.criteria { display:flex;flex-direction:column;gap:8px; }
+.crit { display:flex;gap:10px;align-items:flex-start;padding:10px 14px;background:var(--surface);border:1px solid var(--border);border-radius:8px;font-size:12px;cursor:pointer;transition:border-color .15s; }
+.crit:hover { border-color:rgba(52,211,153,.3); }
+.crit.done { border-color:rgba(52,211,153,.35);background:rgba(52,211,153,.03); }
+.crit-box { width:16px;height:16px;border-radius:4px;border:1.5px solid var(--border);flex-shrink:0;margin-top:1px;display:flex;align-items:center;justify-content:center;transition:all .15s; }
+.crit.done .crit-box { background:var(--green);border-color:var(--green); }
+.crit-check { color:#0b0d14;font-size:10px;font-weight:900;display:none; }
+.crit.done .crit-check { display:block; }
+.crit-text { color:var(--muted);line-height:1.5; }
+.crit.done .crit-text { color:var(--dim); }
+
+.widget { background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px; }
+.widget-title { font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--dim);margin-bottom:12px; }
+.progress-bar { height:5px;background:var(--surface2);border-radius:10px;overflow:hidden;margin-bottom:6px; }
+.progress-fill { height:100%;background:linear-gradient(90deg,var(--accent),var(--green));border-radius:10px;transition:width .3s; }
+.progress-label { font-size:11px;color:var(--muted); }
+.progress-count { font-size:22px;font-weight:800;color:var(--text);margin-bottom:2px; }
+.as-row { display:flex;align-items:center;gap:8px;font-size:11px;margin-bottom:4px; }
+.as-dot { width:7px;height:7px;border-radius:50%;background:var(--dim);flex-shrink:0; }
+.as-dot.done { background:var(--green); }
+.as-name { color:var(--muted);flex:1; }
+.conn-row { font-size:11px;color:var(--muted);display:flex;gap:8px;align-items:flex-start; }
+.conn-dir { color:var(--dim);flex-shrink:0;width:48px; }
+.report-box { background:rgba(108,142,247,.06);border:1px solid rgba(108,142,247,.2);border-radius:10px;padding:14px 16px; }
+.report-title { font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--accent);margin-bottom:8px; }
+.report-step { font-size:11px;color:var(--muted);margin-bottom:6px;display:flex;gap:8px; }
+.report-step-num { color:var(--accent);font-weight:700;flex-shrink:0; }
+
+.explore-section { margin-bottom:32px; }
+.explore-header { display:flex;align-items:center;gap:12px;padding:12px 16px;background:rgba(251,191,36,.04);border:1px solid rgba(251,191,36,.2);border-radius:10px 10px 0 0;border-bottom:none; }
+.explore-header .label { font-size:12px;font-weight:700;color:var(--yellow); }
+.explore-header .sublabel { font-size:11px;color:var(--muted);margin-left:auto; }
+.explore-body { padding:14px 16px;background:rgba(251,191,36,.02);border:1px solid rgba(251,191,36,.2);border-radius:0 0 10px 10px;display:flex;flex-direction:column;gap:10px; }
+.explore-item { font-size:12px;color:var(--muted);line-height:1.6;padding-left:14px;position:relative; }
+.explore-item::before { content:'';position:absolute;left:0;top:7px;width:5px;height:5px;border-radius:50%;background:var(--yellow); }
+.explore-item strong { color:var(--text); }
+.explore-item code { font-size:10px;color:var(--accent2);background:var(--surface2);padding:1px 5px;border-radius:3px; }
+</style>
+</head>
+<body>
+
+<nav>
+  <span class="brand">ProOps2026</span>
+  <a href="#concept">Concept</a>
+  <a href="#chain">Discovery</a>
+  <a href="#artifact">Artifact</a>
+  <a href="#interview">Interview Qs</a>
+  <a href="#done">Done?</a>
+  <div class="spacer"></div>
+  <span class="badge">Week 3 · Day 12 · Hands-On</span>
+</nav>
+
+<div class="layout">
+<div class="main">
+
+  <!-- HEADER -->
+  <div class="day-header">
+    <div class="day-meta">
+      <span class="day-pill">Week 3 · Day 12</span>
+      <span class="day-tag">Hands-On</span>
+    </div>
+    <div class="day-title">Kubernetes Basics: Pod, Deployment, Service</div>
+    <div class="day-question">
+      What are the three foundational Kubernetes objects every workload uses — and how do they connect to produce a running, accessible, self-healing application?
+    </div>
+    <div class="day-why">
+      Kubernetes is the operating system of cloud-native infrastructure. <strong>Pod, Deployment, and Service are the three objects in virtually every K8s workload</strong> — everything else you will learn (Ingress, HPA, ConfigMap, Secret) is built on top of them. A DevOps engineer who cannot write a Deployment manifest by hand, read what <code>kubectl</code> shows, and debug a Pod that will not start is blocked on every modern infrastructure task. Yesterday Swarm showed you WHY orchestration exists. Today you learn the three nouns that express it.
+    </div>
+  </div>
+
+  <!-- VIDEO -->
+  <div class="section-block">
+    <div class="sec-label">Before you start — watch the training video</div>
+
+    <div style="padding:16px 18px;background:rgba(108,142,247,.04);border:1px solid rgba(108,142,247,.25);border-radius:10px;margin-bottom:14px;">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
+        <span style="font-size:10px;font-weight:800;color:var(--accent);background:rgba(108,142,247,.15);border:1px solid rgba(108,142,247,.3);padding:2px 10px;border-radius:20px;letter-spacing:1px;">VIDEO</span>
+        <span style="font-size:12px;font-weight:700;color:var(--text);">Theory — Kubernetes Basics Start</span>
+      </div>
+      <div style="font-size:12px;color:var(--muted);line-height:1.8;margin-bottom:10px;">
+        Introduction to Kubernetes: the cluster model, what a Pod / Deployment / Service are, and why they exist. <strong style="color:var(--text);">Watch this first — the discovery chain builds directly on the vocabulary and mental model from this segment.</strong>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:12px;">
+        <div style="padding:8px 14px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;font-size:12px;">
+          <strong style="color:var(--accent);">0:17 &ndash; 1:30</strong> <span style="color:var(--muted);">&mdash; K8s basics start: cluster, Pod, Deployment, Service, core vocabulary</span>
+        </div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">
+        <div style="padding:10px 12px;background:rgba(108,142,247,.05);border:1px solid rgba(108,142,247,.2);border-radius:6px;font-size:11px;color:var(--muted);line-height:1.6;">
+          <strong style="color:var(--accent);">What to look for #1</strong><br>
+          How a Deployment, a ReplicaSet, and Pods relate — the same chain that appears in Q2 of today's discovery.
+        </div>
+        <div style="padding:10px 12px;background:rgba(108,142,247,.05);border:1px solid rgba(108,142,247,.2);border-radius:6px;font-size:11px;color:var(--muted);line-height:1.6;">
+          <strong style="color:var(--accent);">What to look for #2</strong><br>
+          Why a Service needs a label selector — not "what it is" but what problem it solves that Pod IPs alone cannot.
+        </div>
+      </div>
+
+      <a href="https://drive.google.com/drive/u/0/folders/1ZdB3WszWY4u4XukylBkZPVA7uSDUJ738" target="_blank" style="display:inline-block;padding:8px 16px;border-radius:6px;background:rgba(108,142,247,.1);border:1px solid rgba(108,142,247,.3);font-size:12px;font-weight:600;color:var(--accent);text-decoration:none;transition:all .15s;">Watch Recording on Google Drive</a>
+    </div>
+  </div>
+
+  <!-- SETUP CALLOUT -->
+  <div style="padding:12px 16px;background:rgba(251,191,36,.06);border:1px solid rgba(251,191,36,.3);border-radius:10px;margin-bottom:24px;">
+    <div style="font-size:12px;font-weight:700;color:var(--yellow);margin-bottom:6px;">Setup — use minikube locally, AWS is blocked</div>
+    <div style="font-size:12px;color:var(--muted);line-height:1.7;">
+      <strong style="color:var(--yellow);">Do not try AWS EKS or run a K8s cluster on EC2 today — AWS access is blocked for this session.</strong> Use <code style="font-size:11px;color:var(--accent2);">minikube</code> on your local machine (or <code style="font-size:11px;color:var(--accent2);">kind</code> if minikube will not start). Install <code style="font-size:11px;color:var(--accent2);">kubectl</code> plus minikube, then run <code style="font-size:11px;color:var(--accent2);">minikube start</code> and verify with <code style="font-size:11px;color:var(--accent2);">kubectl get nodes</code> — you should see one node in <code>Ready</code> state.<br><br>
+      Local K8s is not a downgrade: every command, manifest, and failure mode you see in minikube is identical to a cloud cluster. You break things safely and iterate in seconds instead of minutes. The cloud cluster comes later in the week when AWS is available again.
+    </div>
+    <div style="margin-top:10px;padding:8px 12px;background:rgba(52,211,153,.06);border:1px solid rgba(52,211,153,.2);border-radius:6px;font-size:11px;color:var(--muted);line-height:1.6;">
+      <strong style="color:var(--green);">Install (copy-paste):</strong>
+      <div style="font-family:'Cascadia Code','Fira Code',monospace;margin-top:6px;color:var(--accent2);">
+        # macOS/Linux<br>
+        brew install minikube kubectl<br>
+        # Windows (winget)<br>
+        winget install Kubernetes.minikube Kubernetes.kubectl<br>
+        # start + verify<br>
+        minikube start &amp;&amp; kubectl get nodes
+      </div>
+    </div>
+  </div>
+
+  <!-- REQUIRED -->
+  <div style="padding:14px 18px;background:rgba(52,211,153,.04);border:1px solid rgba(52,211,153,.25);border-radius:10px;margin-bottom:28px;">
+    <div style="font-size:12px;font-weight:700;color:var(--green);margin-bottom:6px;">What you must complete today</div>
+    <div style="font-size:12px;color:var(--muted);line-height:1.7;">
+      <strong style="color:var(--text);">Discovery Q1–Q7:</strong> Walk through a broken Deployment end-to-end — from applying the manifest, to fixing env vars, to fixing the readiness probe, to exposing the Service, to watching a rolling update.<br>
+      <strong style="color:var(--text);">Q8:</strong> Write <code style="font-size:11px;color:var(--accent2);">memory/kubernetes-core.md</code> — the three objects, their relationship, probe types, kubectl diagnostic workflow, and a working manifest example for each.<br>
+      Push a commit with your manifests + memory file before end of day.
+    </div>
+    <div style="margin-top:10px;padding:8px 12px;border-radius:6px;background:rgba(248,113,113,.06);border:1px solid rgba(248,113,113,.2);font-size:11px;color:var(--muted);">
+      <strong style="color:var(--red);">Write manifests by hand at least once.</strong> <code style="font-size:11px;color:var(--accent2);">kubectl create --dry-run=client -o yaml</code> is a shortcut you earn after you can type the YAML fields from memory. The muscle memory matters.
+    </div>
+  </div>
+
+  <!-- CONCEPT -->
+  <div class="section-block" id="concept">
+    <div class="sec-label">Concept — the three objects and how they connect</div>
+
+    <div style="font-size:13px;color:var(--muted);line-height:1.7;margin-bottom:16px;">
+      Every workload you deploy to Kubernetes uses these three objects. Read this before you run a single <code>kubectl</code> command — the mental model is what makes the commands make sense.
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:20px;">
+
+      <div style="display:grid;grid-template-columns:180px 1fr;gap:0;border:1px solid var(--border);border-radius:10px;overflow:hidden;">
+        <div style="padding:14px 16px;background:rgba(108,142,247,.06);border-right:1px solid var(--border);display:flex;align-items:flex-start;gap:10px;">
+          <div style="font-size:18px;line-height:1;">&#128230;</div>
+          <div>
+            <div style="font-size:12px;font-weight:700;color:var(--accent);">1. Pod</div>
+            <div style="font-size:11px;color:var(--muted);margin-top:2px;line-height:1.5;">The runtime unit</div>
+          </div>
+        </div>
+        <div style="padding:14px 16px;font-size:12px;color:var(--muted);line-height:1.6;">
+          A Pod is one or more containers that share a network namespace and storage. It is the smallest thing K8s schedules onto a node. <strong style="color:var(--text);">You almost never create Pods directly</strong> — if a Pod dies, nothing replaces it. Pods are a building block that a Deployment manages on your behalf.
+        </div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:180px 1fr;gap:0;border:1px solid var(--border);border-radius:10px;overflow:hidden;">
+        <div style="padding:14px 16px;background:rgba(52,211,153,.06);border-right:1px solid var(--border);display:flex;align-items:flex-start;gap:10px;">
+          <div style="font-size:18px;line-height:1;">&#128260;</div>
+          <div>
+            <div style="font-size:12px;font-weight:700;color:var(--green);">2. Deployment</div>
+            <div style="font-size:11px;color:var(--muted);margin-top:2px;line-height:1.5;">The desired-state manager</div>
+          </div>
+        </div>
+        <div style="padding:14px 16px;font-size:12px;color:var(--muted);line-height:1.6;">
+          A Deployment says: "I want 3 replicas of this Pod template running, always." It creates a ReplicaSet that creates Pods. If a Pod dies, the ReplicaSet replaces it. If you change the image tag, the Deployment performs a rolling update — replacing Pods in controlled batches, keeping old ones alive until new ones pass health checks.
+        </div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:180px 1fr;gap:0;border:1px solid var(--border);border-radius:10px;overflow:hidden;">
+        <div style="padding:14px 16px;background:rgba(167,139,250,.06);border-right:1px solid var(--border);display:flex;align-items:flex-start;gap:10px;">
+          <div style="font-size:18px;line-height:1;">&#127760;</div>
+          <div>
+            <div style="font-size:12px;font-weight:700;color:var(--accent2);">3. Service</div>
+            <div style="font-size:11px;color:var(--muted);margin-top:2px;line-height:1.5;">The stable network endpoint</div>
+          </div>
+        </div>
+        <div style="padding:14px 16px;font-size:12px;color:var(--muted);line-height:1.6;">
+          Pod IPs change on every restart. A Service gives you a stable DNS name and virtual IP that always routes to the live Pods behind it. The connection between a Service and its Pods is a <strong style="color:var(--text);">label selector</strong> — the Service forwards traffic to every Pod carrying the matching labels. This is how Pods keep finding each other during a rolling update.
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Relationship diagram -->
+    <div style="padding:18px 20px;background:var(--surface);border:1px solid var(--border);border-radius:10px;margin-bottom:16px;">
+      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--dim);margin-bottom:14px;">How they connect</div>
+      <div style="font-family:'Cascadia Code','Fira Code',monospace;font-size:11px;color:var(--muted);line-height:1.9;white-space:pre;overflow-x:auto;">
+<span style="color:var(--green);">Deployment</span> (replicas: 3, selector: app=web)
+     &#8595; creates
+<span style="color:var(--blue);">ReplicaSet</span> (maintains 3 Pods matching the template)
+     &#8595; creates
+<span style="color:var(--accent);">Pod</span> app=web   <span style="color:var(--accent);">Pod</span> app=web   <span style="color:var(--accent);">Pod</span> app=web
+     &#8593;          &#8593;          &#8593;
+     &#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472; traffic routed by &#9472;&#9472;&#9472;&#9472;&#9472;&#9472;
+                       &#8593;
+                <span style="color:var(--accent2);">Service</span> (selector: app=web)
+                       &#8593;
+                  <span style="color:var(--yellow);">Client</span> hits stable DNS: <span style="color:var(--green);">http://web/</span>
+      </div>
+    </div>
+
+    <div style="padding:12px 16px;background:var(--surface);border:1px solid var(--border);border-radius:10px;font-size:12px;color:var(--muted);line-height:1.7;">
+      <strong style="color:var(--text);">The four commands you will run today.</strong> Any time a Pod is not healthy, run them in this order: <code style="font-size:11px;color:var(--accent2);">kubectl get pods</code> &rarr; <code style="font-size:11px;color:var(--accent2);">kubectl describe pod [name]</code> &rarr; <code style="font-size:11px;color:var(--accent2);">kubectl logs [name]</code> &rarr; <code style="font-size:11px;color:var(--accent2);">kubectl get events --sort-by='.lastTimestamp'</code>. Each one reveals something the others do not. This sequence is muscle memory for every K8s operator.
+    </div>
+  </div>
+
+  <!-- DISCOVERY CHAIN -->
+  <div class="section-block" id="chain">
+    <div class="sec-label">Discovery chain — 8 questions</div>
+
+    <div class="chain">
+
+      <div class="chain-item" onclick="toggleChain(this,0)">
+        <div class="chain-num">1</div>
+        <div class="chain-body">
+          <div class="chain-q">You apply a Deployment manifest and run <code>kubectl get pods</code>. Two Pods show <code>CrashLoopBackOff</code>. What does this status mean, and what is the first command you run to find out why the container is crashing — before you even look at the Deployment definition?</div>
+          <div class="chain-prompt">Explain CrashLoopBackOff in Kubernetes to me as if I have never seen it before. Cover: (1) what the status literally means — what loop is looping, what backoff is being applied, (2) the most common root causes in order of frequency (app exits on startup, missing env var, wrong image, OOMKilled), (3) the kubectl command I run FIRST to see why the container is crashing — not kubectl describe but the one that actually shows application output, (4) what the three flags for that command do: --previous, --tail, --follow, and when each one matters. Keep it short and specific — I want a diagnostic playbook, not a tutorial.</div>
+          <div class="chain-hint"><code style="font-size:11px;color:var(--accent2);">kubectl logs [pod-name]</code> is the first command. Use <code style="font-size:11px;color:var(--accent2);">--previous</code> if the container has already restarted — you want the logs from the crashed instance, not the new one that is about to crash.</div>
+        </div>
+      </div>
+
+      <div class="chain-item" onclick="toggleChain(this,1)">
+        <div class="chain-num">2</div>
+        <div class="chain-body">
+          <div class="chain-q">The logs show the app cannot find the environment variable <code>DATABASE_URL</code>. You look at the Deployment manifest — where do environment variables live, and what is the relationship between the Pod spec and the container spec inside it?</div>
+          <div class="chain-prompt">Show me a minimal Deployment YAML for a generic web app. Annotate where each piece lives: (1) the Deployment spec (replicas, selector, strategy), (2) the Pod template inside it — spec.template.spec, (3) the container array inside the Pod spec — spec.template.spec.containers, (4) where environment variables are defined — at the container level, not the Pod level. Show me two ways to define env vars: (a) inline value, (b) from a ConfigMap or Secret using valueFrom. Also explain why the selector.matchLabels in the Deployment MUST match template.metadata.labels — what breaks if they do not.</div>
+          <div class="chain-hint">Every container in the Pod has its own <code style="font-size:11px;color:var(--accent2);">env:</code> list. The Pod spec shares network namespace and volumes; the container spec owns image, env, ports, probes. Use <code style="font-size:11px;color:var(--accent2);">kubectl explain deployment.spec.template.spec.containers</code> to browse all the container fields from the command line — this is the single best learning tool for manifest syntax.</div>
+        </div>
+      </div>
+
+      <div class="chain-item" onclick="toggleChain(this,2)">
+        <div class="chain-num">3</div>
+        <div class="chain-body">
+          <div class="chain-q">You add the env var. The Pod starts. But <code>kubectl get pods</code> shows <code>0/1 READY</code>. The container is running but the readiness check is failing. What is the difference between a liveness probe and a readiness probe, what does "not ready" mean for traffic, and how do you read a failing probe?</div>
+          <div class="chain-prompt">Explain liveness vs readiness probes in Kubernetes using one concrete scenario: a web app that takes 20 seconds to warm up at startup, then connects to a database that can go down intermittently. For each probe type: (1) what question is the probe answering, (2) what does Kubernetes do when the probe fails — restart the container, or stop sending traffic, or both, (3) what should the probe endpoint check — the process, a simple HTTP 200, or the database connection, (4) what does 0/1 READY mean in kubectl get pods output, and how does it affect Service routing. Finally, show me the YAML for both probes on a container using httpGet, with sensible initialDelaySeconds and periodSeconds values for the scenario above.</div>
+          <div class="chain-hint">Liveness failing = container restarted. Readiness failing = Pod removed from Service endpoints (no traffic), but container keeps running. If your readiness probe checks the database, a DB blip causes ALL your Pods to go 0/1 at once — this is a classic production outage pattern.</div>
+          <div class="chain-note">Read the describe output carefully: <code style="font-size:11px;color:var(--accent2);">kubectl describe pod [name]</code> shows the last probe failure reason under the Events section. That is where "connection refused", "404", or "timeout" appears.</div>
+        </div>
+      </div>
+
+      <div class="chain-item" onclick="toggleChain(this,3)">
+        <div class="chain-num">4</div>
+        <div class="chain-body">
+          <div class="chain-q">The readiness probe passes. The Pod is <code>1/1 READY</code>. You try to reach the app from outside the cluster — not accessible. The Service is type <code>ClusterIP</code>. What do the four Service types give you access to, and which one do you need?</div>
+          <div class="chain-prompt">Give me a comparison of the four Kubernetes Service types: ClusterIP, NodePort, LoadBalancer, ExternalName. For each one: (1) what problem it solves, (2) who can reach the Service (inside the cluster only, from the node IP, from the internet), (3) what IP/port you use to connect, (4) when you would pick it over the others. Then show me a minimal Service YAML for a NodePort type that targets Pods with label app=web on container port 8080. Explain the three ports in the YAML — port, targetPort, nodePort — and what happens if I omit nodePort.</div>
+          <div class="chain-hint"><strong>ClusterIP</strong> = inside cluster only (default). <strong>NodePort</strong> = reach via any node IP on a high port 30000–32767. <strong>LoadBalancer</strong> = cloud provider provisions an external load balancer (minikube simulates this with <code style="font-size:11px;color:var(--accent2);">minikube tunnel</code>). <strong>ExternalName</strong> = DNS alias to an external service, no proxying.</div>
+        </div>
+      </div>
+
+      <div class="chain-item" onclick="toggleChain(this,4)">
+        <div class="chain-num">5</div>
+        <div class="chain-body">
+          <div class="chain-q">You change the Service to <code>NodePort</code>. You can reach the app. You notice traffic hits different Pods on different requests. How does the Service know which Pods belong to it — what is a label selector and how does it stay current during a rolling update?</div>
+          <div class="chain-prompt">Explain label selectors in Kubernetes. Walk me through: (1) what labels are — arbitrary key/value pairs attached to Pods and other objects, (2) how the Service's spec.selector field connects to Pods — via matchLabels, (3) what kubectl command shows the list of Endpoints currently backing a Service — what are Endpoints objects, and how are they different from the Service itself, (4) during a rolling update when new Pods appear with the same labels and old Pods are terminating, how does the Endpoints controller keep the list current, and what prevents a client from hitting a Pod that is mid-shutdown. Keep it concrete — use a Deployment named "web" with label app=web as the example.</div>
+          <div class="chain-hint">Run <code style="font-size:11px;color:var(--accent2);">kubectl get endpoints [service-name]</code> to see the actual list of Pod IPs behind a Service. During a rolling update this list updates in real time. The <code style="font-size:11px;color:var(--accent2);">terminationGracePeriodSeconds</code> field on a Pod (default 30s) is what gives the Endpoints controller time to remove a terminating Pod before it is killed.</div>
+        </div>
+      </div>
+
+      <div class="chain-item" onclick="toggleChain(this,5)">
+        <div class="chain-num">6</div>
+        <div class="chain-body">
+          <div class="chain-q">You need to update the image to a new tag. You apply the change. Kubernetes performs a rolling update. How does the <code>RollingUpdate</code> strategy work — what do <code>maxUnavailable</code> and <code>maxSurge</code> control — and how do you roll back if the new version is broken?</div>
+          <div class="chain-prompt">Walk me through a Kubernetes rolling update on a Deployment with replicas: 4. Assume strategy.type: RollingUpdate with default maxUnavailable and maxSurge. Answer: (1) what the defaults are for maxUnavailable and maxSurge (percentage or absolute), (2) with defaults, what is the maximum number of Pods alive at any point during the update, and the minimum number ready, (3) what happens if a new Pod fails its readiness probe mid-update — does the rollout stop, or keep trying, (4) the exact command to check rollout status in real time, (5) the exact command to roll back to the previous revision, (6) how Kubernetes tracks revisions — where are old ReplicaSets kept and how many by default. End with a one-paragraph explanation of why aggressive maxSurge (like 100%) might be bad on a resource-constrained cluster.</div>
+          <div class="chain-hint"><code style="font-size:11px;color:var(--accent2);">kubectl rollout status deployment/web</code> watches progress. <code style="font-size:11px;color:var(--accent2);">kubectl rollout undo deployment/web</code> reverts to the previous ReplicaSet. <code style="font-size:11px;color:var(--accent2);">kubectl rollout history deployment/web</code> shows revisions. Old ReplicaSets are kept so undo works — the <code style="font-size:11px;color:var(--accent2);">revisionHistoryLimit</code> field controls how many.</div>
+        </div>
+      </div>
+
+      <div class="chain-item" onclick="toggleChain(this,6)">
+        <div class="chain-num">7</div>
+        <div class="chain-body">
+          <div class="chain-q">After the rollout, <code>kubectl get pods</code> shows 3 running, but <code>kubectl get deployments</code> shows <code>2/3 READY</code>. One Pod is stuck. What do <code>describe</code>, <code>logs</code>, and <code>get events</code> each reveal that the others do not?</div>
+          <div class="chain-prompt">Build me a kubectl diagnostic workflow for a stuck Pod. Show me the exact command for each step and explain what information it gives you that the others miss:
+1. kubectl get pods — what columns matter (READY, STATUS, RESTARTS, AGE)
+2. kubectl describe pod [name] — what sections to read first (Events, Conditions, Containers with State + Last State)
+3. kubectl logs [name] — when to use --previous vs current
+4. kubectl get events --sort-by='.lastTimestamp' — why cluster-wide events sometimes reveal problems Pod events do not (scheduling failures, image pull errors from the kubelet)
+5. kubectl exec -it [name] -- sh — when you reach for this as a last resort
+
+For each command, give me one concrete failure signal that command reveals that nothing else does.</div>
+          <div class="chain-hint"><code style="font-size:11px;color:var(--accent2);">describe</code> shows the last probe error and scheduling decisions. <code style="font-size:11px;color:var(--accent2);">logs</code> shows what the app actually said before dying. <code style="font-size:11px;color:var(--accent2);">get events</code> shows cluster-wide things like "0/3 nodes are available: insufficient memory" that never appear in a Pod's own events.</div>
+          <div class="chain-note">Run this sequence against a Pod you deliberately broke today (wrong image tag, bad env var, probe pointing at the wrong port). Seeing each command's unique output in a real failure sticks far better than reading about it.</div>
+        </div>
+      </div>
+
+      <div class="chain-item" onclick="toggleChain(this,7)">
+        <div class="chain-num">8</div>
+        <div class="chain-body">
+          <div class="chain-q">Deployment is healthy. Write <code>memory/kubernetes-core.md</code> — the three object relationships, probe types, the kubectl diagnostic workflow, and one working manifest example per object, all in a form your agent can query fast.</div>
+          <div class="chain-prompt">Help me write memory/kubernetes-core.md. This file loads into my agent's context every time I work on Kubernetes. It must contain:
+
+1. The three objects — one short section each:
+   - Pod: what it is, what containers in a Pod share (network, volumes), why you do not create Pods directly
+   - Deployment: desired state, ReplicaSet relationship, rolling update strategy (maxUnavailable, maxSurge), rollback command
+   - Service: the four types (ClusterIP/NodePort/LoadBalancer/ExternalName), label selectors as the connection mechanism, what happens during a rolling update
+
+2. Liveness vs readiness probes — two sentences each plus the YAML fields (httpGet, initialDelaySeconds, periodSeconds)
+
+3. The kubectl diagnostic workflow — 4-step sequence with one line per step on what it uniquely reveals (get pods &rarr; describe &rarr; logs &rarr; get events)
+
+4. One minimal working manifest per object: Pod, Deployment, Service — each under 20 lines, all three labeled consistently so they connect
+
+5. A table: "If I see X, run Y" — common statuses (CrashLoopBackOff, ImagePullBackOff, 0/1 READY, Pending, Error) mapped to the first diagnostic command
+
+Format for an AI agent, not a human reader: tables and short bullets beat paragraphs.</div>
+          <div class="chain-hint">The three working manifests are the highest-value part — your agent can reference them directly when it writes new ones. Keep them labeled app=[something] consistently so a reader immediately sees how the Service selector, Deployment selector, and Pod labels all match.</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ARTIFACT -->
+  <div class="section-block" id="artifact">
+    <div class="sec-label">Artifacts</div>
+
+    <div class="artifact-card">
+      <div class="artifact-head">
+        <div class="artifact-title">Kubernetes Core Memory File</div>
+        <div class="artifact-file">memory/kubernetes-core.md</div>
+      </div>
+      <div class="artifact-body">
+        <div class="artifact-row"><div class="ar-dot"></div><div class="ar-text"><strong>Pod / Deployment / Service all defined AND connected</strong> — not three disconnected sections. The reader sees how a Deployment creates Pods and how a Service routes to them via labels.</div></div>
+        <div class="artifact-row"><div class="ar-dot"></div><div class="ar-text"><strong>Liveness vs readiness probe distinction</strong> — including what each failure does to the Pod and to Service traffic.</div></div>
+        <div class="artifact-row"><div class="ar-dot"></div><div class="ar-text"><strong>kubectl diagnostic workflow as an ordered sequence</strong> — <code>get pods</code> &rarr; <code>describe</code> &rarr; <code>logs</code> &rarr; <code>get events</code>, with one unique signal each command reveals.</div></div>
+        <div class="artifact-row"><div class="ar-dot"></div><div class="ar-text"><strong>One working YAML manifest per object</strong> — Pod, Deployment, Service — with consistent labels so the relationships are visible at a glance.</div></div>
+        <div class="artifact-row"><div class="ar-dot"></div><div class="ar-text"><strong>Status-to-command table</strong> — maps CrashLoopBackOff, ImagePullBackOff, 0/1 READY, Pending, Error to the first diagnostic command.</div></div>
+        <div class="artifact-fail"><strong>Weak signals:</strong> definitions of Pod/Deployment/Service with no explanation of how they connect. No mention of liveness vs readiness and why it matters for availability. <code>kubectl</code> section that lists commands without a diagnostic sequence. Manifests copied from the docs without labels tying them together.</div>
+      </div>
+    </div>
+
+    <div class="artifact-card">
+      <div class="artifact-head">
+        <div class="artifact-title">Working manifests in your repo</div>
+        <div class="artifact-file">k8s/*.yaml</div>
+      </div>
+      <div class="artifact-body">
+        <div class="artifact-row"><div class="ar-dot"></div><div class="ar-text"><strong>At least one Deployment + Service applied successfully</strong> to your local cluster. <code style="font-size:11px;color:var(--accent2);">kubectl get deploy,svc,pods</code> shows all green.</div></div>
+        <div class="artifact-row"><div class="ar-dot"></div><div class="ar-text"><strong>You performed a rolling update</strong> — changed the image tag, ran <code style="font-size:11px;color:var(--accent2);">kubectl rollout status</code>, watched Pods roll over.</div></div>
+        <div class="artifact-row"><div class="ar-dot"></div><div class="ar-text"><strong>You caused and recovered from one failure</strong> — broken env, wrong image, bad probe — and ran the 4-step diagnostic sequence on it.</div></div>
+        <div class="artifact-fail"><strong>Weak signals:</strong> manifests copied but never applied. Rolling update not performed. No failure debugged — zero muscle memory on the diagnostic commands.</div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- INTERVIEW QUESTIONS -->
+  <div class="iq-section" id="interview">
+    <div class="iq-header">
+      <div class="iq-title">Interview Questions</div>
+      <div class="iq-subtitle">Click when you can answer without notes. These test the mental model — not YAML syntax you can look up.</div>
+    </div>
+    <div class="iq-body">
+
+      <div class="iq-item" onclick="toggleIQ(this)">
+        <div class="iq-q">
+          <span class="iq-num">Q1</span>
+          <span class="iq-text">Why should you almost never create a Pod directly in production? What does a Deployment give you that a bare Pod does not?</span>
+          <span class="iq-check">&#10003;</span>
+        </div>
+      </div>
+
+      <div class="iq-item" onclick="toggleIQ(this)">
+        <div class="iq-q">
+          <span class="iq-num">Q2</span>
+          <span class="iq-text">A Pod shows <code>CrashLoopBackOff</code>. Walk me through the first three commands you run, in order, and what each one uniquely tells you.</span>
+          <span class="iq-check">&#10003;</span>
+        </div>
+      </div>
+
+      <div class="iq-item" onclick="toggleIQ(this)">
+        <div class="iq-q">
+          <span class="iq-num">Q3</span>
+          <span class="iq-text">Your app is running but <code>0/1 READY</code>. Which probe is failing, what is Kubernetes doing right now, and how is that different from a failing liveness probe?</span>
+          <span class="iq-check">&#10003;</span>
+        </div>
+      </div>
+
+      <div class="iq-item" onclick="toggleIQ(this)">
+        <div class="iq-q">
+          <span class="iq-num">Q4</span>
+          <span class="iq-text">Name the four Service types and describe the access each one gives you. Which one do you pick for: internal database, public API in AWS, exposing a dev service from minikube?</span>
+          <span class="iq-check">&#10003;</span>
+        </div>
+      </div>
+
+      <div class="iq-item" onclick="toggleIQ(this)">
+        <div class="iq-q">
+          <span class="iq-num">Q5</span>
+          <span class="iq-text">How does a Service know which Pods to send traffic to? Explain the role of labels, selectors, and the Endpoints object.</span>
+          <span class="iq-check">&#10003;</span>
+        </div>
+      </div>
+
+      <div class="iq-item" onclick="toggleIQ(this)">
+        <div class="iq-q">
+          <span class="iq-num">Q6</span>
+          <span class="iq-text">Your Deployment has replicas: 10. You push a new image. Explain what <code>maxUnavailable: 25%</code> and <code>maxSurge: 25%</code> will do to Pods during the rolling update.</span>
+          <span class="iq-check">&#10003;</span>
+        </div>
+      </div>
+
+      <div class="iq-item" onclick="toggleIQ(this)">
+        <div class="iq-q">
+          <span class="iq-num">Q7</span>
+          <span class="iq-text">A new version of your app is crashing. You notice 5 minutes after deploy. What are the exact commands you use to roll back, and how does Kubernetes know where to roll back to?</span>
+          <span class="iq-check">&#10003;</span>
+        </div>
+      </div>
+
+      <div class="iq-item" onclick="toggleIQ(this)">
+        <div class="iq-q">
+          <span class="iq-num">Q8</span>
+          <span class="iq-text">Why is <code>kubectl apply</code> idempotent but <code>kubectl create</code> is not? When would that difference matter to you in practice?</span>
+          <span class="iq-check">&#10003;</span>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- DONE CRITERIA -->
+  <div class="section-block" id="done">
+    <div class="sec-label">Done criteria</div>
+    <div class="criteria">
+      <div class="crit" onclick="toggleCrit(this)">
+        <div class="crit-box"><span class="crit-check">&#10003;</span></div>
+        <div class="crit-text">Local cluster running. <code style="font-size:11px;color:var(--accent2);">kubectl get nodes</code> shows one node in <code>Ready</code> state.</div>
+      </div>
+      <div class="crit" onclick="toggleCrit(this)">
+        <div class="crit-box"><span class="crit-check">&#10003;</span></div>
+        <div class="crit-text">A Deployment is running with at least 2 replicas. <code style="font-size:11px;color:var(--accent2);">kubectl get deploy</code> shows <code>2/2</code> or better READY.</div>
+      </div>
+      <div class="crit" onclick="toggleCrit(this)">
+        <div class="crit-box"><span class="crit-check">&#10003;</span></div>
+        <div class="crit-text">A Service of type <code>NodePort</code> (or <code>LoadBalancer</code> via <code style="font-size:11px;color:var(--accent2);">minikube tunnel</code>) exposes the Deployment — reachable with <code>curl</code> from your local machine.</div>
+      </div>
+      <div class="crit" onclick="toggleCrit(this)">
+        <div class="crit-box"><span class="crit-check">&#10003;</span></div>
+        <div class="crit-text">You caused a real failure (bad env, wrong image, broken probe) and ran the 4-step diagnostic sequence: <code style="font-size:11px;color:var(--accent2);">get pods</code> &rarr; <code style="font-size:11px;color:var(--accent2);">describe</code> &rarr; <code style="font-size:11px;color:var(--accent2);">logs</code> &rarr; <code style="font-size:11px;color:var(--accent2);">get events</code>.</div>
+      </div>
+      <div class="crit" onclick="toggleCrit(this)">
+        <div class="crit-box"><span class="crit-check">&#10003;</span></div>
+        <div class="crit-text">You performed a rolling update (image tag change) and watched it with <code style="font-size:11px;color:var(--accent2);">kubectl rollout status</code>. You ran <code style="font-size:11px;color:var(--accent2);">kubectl rollout undo</code> at least once.</div>
+      </div>
+      <div class="crit" onclick="toggleCrit(this)">
+        <div class="crit-box"><span class="crit-check">&#10003;</span></div>
+        <div class="crit-text">Liveness AND readiness probes defined on your Deployment's container — not identical, not omitted.</div>
+      </div>
+      <div class="crit" onclick="toggleCrit(this)">
+        <div class="crit-box"><span class="crit-check">&#10003;</span></div>
+        <div class="crit-text"><code style="font-size:11px;color:var(--accent2);">memory/kubernetes-core.md</code> written — three objects + probes + diagnostic workflow + 3 working manifests + status-to-command table.</div>
+      </div>
+      <div class="crit" onclick="toggleCrit(this)">
+        <div class="crit-box"><span class="crit-check">&#10003;</span></div>
+        <div class="crit-text">Git commit pushed: <code style="font-size:11px;color:var(--accent2);">Day 12 — K8s basics: Pod + Deployment + Service</code></div>
+      </div>
+      <div class="crit" onclick="toggleCrit(this)">
+        <div class="crit-box"><span class="crit-check">&#10003;</span></div>
+        <div class="crit-text">Daily log filled — Tomorrow's Context Block names the one K8s primitive (Ingress? ConfigMap? HPA?) you most want to understand on Day 13.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- EXPLORE FURTHER -->
+  <div class="explore-section">
+    <div class="explore-header">
+      <span class="label">Explore further</span>
+      <span class="sublabel">Only after memory file committed &#10003;</span>
+    </div>
+    <div class="explore-body">
+      <div style="font-size:11px;color:var(--dim);margin-bottom:4px;">Optional. Only if all done criteria are checked.</div>
+      <div class="explore-item">
+        <strong>Reconciliation loop internals.</strong> Ask Claude: <em>"Walk me through what happens from the moment I run kubectl apply -f deployment.yaml — which controllers wake up, what they write to etcd, and how the scheduler picks a node."</em> This is the conceptual core of how K8s thinks.
+      </div>
+      <div class="explore-item">
+        <strong>Pod anti-affinity for HA.</strong> Ask Claude: <em>"Show me how to add podAntiAffinity to a Deployment so Kubernetes never schedules two replicas of my app on the same node. Why does this matter for availability during a node failure?"</em>
+      </div>
+      <div class="explore-item">
+        <strong>Why <code>apply</code> is idempotent, <code>create</code> is not.</strong> Ask Claude: <em>"Explain server-side apply vs create in Kubernetes. Why does running kubectl apply twice produce the same result, but kubectl create twice errors? What is the three-way merge algorithm apply uses?"</em>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /main -->
+
+<!-- SIDEBAR -->
+<div class="sidebar">
+
+  <div class="widget">
+    <div class="widget-title">Progress</div>
+    <div class="progress-count" id="prog-count">0 / 8</div>
+    <div style="margin-bottom:8px;">
+      <div class="progress-bar"><div class="progress-fill" id="prog-fill" style="width:0%"></div></div>
+      <div class="progress-label" id="prog-label">Discovery chain</div>
+    </div>
+  </div>
+
+  <div class="widget">
+    <div class="widget-title">Today's Artifacts</div>
+    <div class="as-row"><div class="as-dot" id="dot-cluster"></div><div class="as-name">Local cluster + Deployment running</div></div>
+    <div class="as-row"><div class="as-dot" id="dot-svc"></div><div class="as-name">Service reachable from laptop</div></div>
+    <div class="as-row"><div class="as-dot" id="dot-debug"></div><div class="as-name">4-step diagnostic sequence run</div></div>
+    <div class="as-row"><div class="as-dot" id="dot-mem"></div><div class="as-name">memory/kubernetes-core.md</div></div>
+  </div>
+
+  <div class="widget" style="background:rgba(108,142,247,.04);border-color:rgba(108,142,247,.2);">
+    <div class="widget-title" style="color:var(--accent);">kubectl quick map</div>
+    <div style="font-size:11px;color:var(--muted);line-height:1.8;font-family:'Cascadia Code','Fira Code',monospace;">
+      get pods<br>
+      describe pod [n]<br>
+      logs [n] --previous<br>
+      get events<br>
+      rollout status<br>
+      rollout undo<br>
+      explain [resource]
+    </div>
+  </div>
+
+  <div class="widget">
+    <div class="widget-title">Connects To</div>
+    <div style="display:flex;flex-direction:column;gap:6px;">
+      <div class="conn-row"><span class="conn-dir">&larr; Day 11</span><span style="font-size:11px;color:var(--muted);">Swarm showed WHY orchestration exists</span></div>
+      <div class="conn-row"><span class="conn-dir">&larr; Day 9</span><span style="font-size:11px;color:var(--muted);">Images on registry — same images used today</span></div>
+      <div class="conn-row"><span class="conn-dir">&rarr; Day 13</span><span style="font-size:11px;color:var(--muted);">K8s intermediate: Ingress, ConfigMap, Secret, HPA</span></div>
+      <div class="conn-row"><span class="conn-dir">&rarr; Day 15</span><span style="font-size:11px;color:var(--muted);">Lab — deploy your mock project to K8s</span></div>
+    </div>
+  </div>
+
+  <div class="report-box">
+    <div class="report-title">End-of-day report</div>
+    <div class="report-step"><span class="report-step-num">1.</span> Fill daily log + context block</div>
+    <div class="report-step"><span class="report-step-num">2.</span> git commit + push k8s/*.yaml + memory file</div>
+    <div class="report-step"><span class="report-step-num">3.</span> Paste <code style="font-size:10px;color:var(--accent);">=== Day 12 |</code> report to trainer channel</div>
+    <div style="margin-top:8px;padding:6px 8px;background:rgba(52,211,153,.06);border:1px solid rgba(52,211,153,.2);border-radius:5px;font-size:10px;color:var(--green);line-height:1.5;">
+      Include: output of <code>kubectl get deploy,svc,pods</code> + one screenshot of the rollout happening
+    </div>
+  </div>
+
+</div><!-- /sidebar -->
+</div><!-- /layout -->
+
+<script>
+const chainDone = new Array(8).fill(false);
+function toggleChain(el, i) {
+  chainDone[i] = !chainDone[i];
+  el.classList.toggle('done', chainDone[i]);
+  const done = chainDone.filter(Boolean).length;
+  document.getElementById('prog-count').textContent = done + ' / 8';
+  document.getElementById('prog-fill').style.width = (done/8*100) + '%';
+  const labels = ['Keep going','Keep going','Halfway','Halfway','Almost there','Almost there','Almost there','Done!'];
+  document.getElementById('prog-label').textContent = done === 0 ? 'Discovery chain' : labels[done-1];
+  if (done >= 2) document.getElementById('dot-cluster').classList.add('done');
+  if (done >= 4) document.getElementById('dot-svc').classList.add('done');
+  if (done >= 7) document.getElementById('dot-debug').classList.add('done');
+  if (done >= 8) document.getElementById('dot-mem').classList.add('done');
+}
+function toggleIQ(el) { el.classList.toggle('answered'); }
+function toggleCrit(el) { el.classList.toggle('done'); }
+</script>
+</body>
+</html>

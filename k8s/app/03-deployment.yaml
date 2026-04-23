@@ -1,0 +1,90 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web
+  namespace: web-lab
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: web                        # phải khớp template.metadata.labels
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1               # tối đa 1 Pod down trong lúc rollout
+      maxSurge: 1                     # tối đa tạo thêm 1 Pod mới trước khi xóa Pod cũ
+
+  template:
+    metadata:
+      labels:
+        app: web                      # phải khớp selector.matchLabels
+        version: v1.0.0
+    spec:
+      containers:
+      - name: app
+        image: nginx:1.25.3           # luôn pin version cụ thể
+        ports:
+        - containerPort: 8080
+
+        # Env vars — cách (a): lấy từ ConfigMap
+        env:
+        - name: APP_ENV
+          valueFrom:
+            configMapKeyRef:
+              name: web-config
+              key: APP_ENV
+        - name: LOG_LEVEL
+          valueFrom:
+            configMapKeyRef:
+              name: web-config
+              key: LOG_LEVEL
+
+        # Env vars — cách (b): lấy từ Secret
+        - name: DB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: web-secrets
+              key: DB_PASSWORD
+        - name: DB_HOST
+          valueFrom:
+            secretKeyRef:
+              name: web-secrets
+              key: DB_HOST
+
+        # Resource limits — bắt buộc trong production
+        resources:
+          requests:
+            cpu: "100m"
+            memory: "128Mi"
+          limits:
+            cpu: "500m"
+            memory: "256Mi"
+
+        # Readiness probe — quyết định có nhận traffic không
+        # Fail → gỡ khỏi Service, KHÔNG restart
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 8080
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          failureThreshold: 3
+
+        # Liveness probe — quyết định container còn sống không
+        # Fail → RESTART container
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 8080
+          initialDelaySeconds: 15     # phải > thời gian app khởi động
+          periodSeconds: 10
+          failureThreshold: 3
+
+        # preStop hook — cho kube-proxy kịp cập nhật iptables trước khi Pod tắt
+        lifecycle:
+          preStop:
+            exec:
+              command: ["sh", "-c", "sleep 5"]
+
+      # Graceful shutdown — chờ tối đa 30s sau SIGTERM
+      terminationGracePeriodSeconds: 30

@@ -1,0 +1,38 @@
+# SCENARIO 3: OOMKilled — container vượt memory limit
+#
+# Triệu chứng: STATUS = OOMKilled hoặc CrashLoopBackOff, exit code = 137
+# Chẩn đoán 1: kubectl get pod crash-oom -n web-lab
+#              → cột STATUS hiện OOMKilled
+# Chẩn đoán 2: kubectl get pod crash-oom -n web-lab \
+#                -o jsonpath='{.status.containerStatuses[0].lastState.terminated.reason}'
+#              → output: OOMKilled
+# Chẩn đoán 3: kubectl get pod crash-oom -n web-lab \
+#                -o jsonpath='{.status.containerStatuses[0].lastState.terminated.exitCode}'
+#              → output: 137
+# Fix:         Tăng resources.limits.memory (ít nhất 64Mi cho scenario này)
+#
+apiVersion: v1
+kind: Pod
+metadata:
+  name: crash-oom
+  namespace: web-lab
+  labels:
+    scenario: "03-oom-kill"
+spec:
+  restartPolicy: Always
+  containers:
+  - name: app
+    image: busybox:1.36
+    command: ["sh", "-c"]
+    args:
+    - |
+      echo "Allocating memory beyond limit..."
+      # Tạo file 50MB trong /dev/shm (RAM) — vượt limit 20Mi → kernel kill
+      dd if=/dev/zero of=/dev/shm/bigfile bs=1M count=50
+      echo "Done (won't reach here)"
+      sleep 3600
+    resources:
+      requests: { cpu: "50m", memory: "10Mi" }
+      limits:
+        cpu: "100m"
+        memory: "20Mi"               # limit thấp cố ý để trigger OOMKill

@@ -1,0 +1,27 @@
+# SCENARIO 4: Sai image tag — ImagePullBackOff
+#
+# Triệu chứng: STATUS = ImagePullBackOff hoặc ErrImagePull (KHÔNG phải CrashLoopBackOff)
+#              Vì container chưa kịp chạy → không có log app để đọc
+# Chẩn đoán:   kubectl describe pod crash-badimage -n web-lab
+#              → xem phần Events ở cuối
+#              → tìm: "Failed to pull image" + lý do (tag không tồn tại, no auth)
+# Lệnh logs sẽ KHÔNG có output — đây là điểm khác biệt với CrashLoopBackOff
+# Fix:         Sửa image tag thành nginx:1.25.3
+#
+apiVersion: v1
+kind: Pod
+metadata:
+  name: crash-badimage
+  namespace: web-lab
+  labels:
+    scenario: "04-bad-image"
+spec:
+  restartPolicy: Always
+  containers:
+  - name: app
+    image: nginx:this-tag-does-not-exist-999   # tag sai cố ý
+    ports:
+    - containerPort: 8080
+    resources:
+      requests: { cpu: "50m", memory: "32Mi" }
+      limits:   { cpu: "100m", memory: "64Mi" }

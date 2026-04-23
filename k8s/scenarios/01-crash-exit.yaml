@@ -1,0 +1,30 @@
+# SCENARIO 1: App thoát ngay khi khởi động (exit code 1)
+#
+# Triệu chứng: STATUS = CrashLoopBackOff, RESTARTS tăng dần
+# Chẩn đoán:   kubectl logs crash-exit -n web-lab --previous
+# Tìm gì:      "ERROR: config not found" → app thoát ngay
+# Fix:         Sửa lệnh command hoặc cung cấp config đúng
+#
+apiVersion: v1
+kind: Pod
+metadata:
+  name: crash-exit
+  namespace: web-lab
+  labels:
+    scenario: "01-crash-exit"
+spec:
+  restartPolicy: Always
+  containers:
+  - name: app
+    image: busybox:1.36
+    command: ["sh", "-c"]
+    args:
+    - |
+      echo "Starting app..."
+      echo "Loading config from /etc/app/config.yaml..."
+      sleep 2
+      echo "ERROR: config file not found at /etc/app/config.yaml"
+      exit 1
+    resources:
+      requests: { cpu: "50m", memory: "32Mi" }
+      limits:   { cpu: "100m", memory: "64Mi" }
