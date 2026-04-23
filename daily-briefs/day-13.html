@@ -1,0 +1,664 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Day 13 — Kubernetes Intermediate: Ingress, ConfigMap, Secret, HPA · ProOps2026</title>
+<style>
+:root {
+  --bg:#0b0d14; --surface:#13161f; --surface2:#1c2030; --border:#252a3a;
+  --accent:#6c8ef7; --accent2:#a78bfa;
+  --green:#34d399; --yellow:#fbbf24; --orange:#fb923c;
+  --red:#f87171; --teal:#22d3ee; --blue:#60a5fa;
+  --text:#e8edf5; --muted:#7c87a0; --dim:#3a4258;
+}
+* { box-sizing:border-box; margin:0; padding:0; }
+body { background:var(--bg); color:var(--text); font-family:'Segoe UI',system-ui,sans-serif; font-size:15px; line-height:1.6; }
+
+nav { background:var(--surface);border-bottom:1px solid var(--border);padding:0 32px;height:50px;display:flex;align-items:center;gap:6px;position:sticky;top:0;z-index:200; }
+nav .brand { font-weight:800;font-size:14px;color:var(--accent);margin-right:12px; }
+nav a { color:var(--muted);text-decoration:none;font-size:12px;font-weight:600;padding:5px 12px;border-radius:6px;transition:all .15s;white-space:nowrap; }
+nav a:hover { color:var(--text);background:var(--surface2); }
+nav .spacer { flex:1; }
+nav .badge { background:rgba(52,211,153,.12);border:1px solid rgba(52,211,153,.25);color:var(--green);font-size:11px;font-weight:700;padding:3px 12px;border-radius:20px; }
+
+.layout { display:grid;grid-template-columns:1fr 260px;gap:32px;max-width:1100px;margin:0 auto;padding:40px 32px; }
+.main { min-width:0; }
+.sidebar { position:sticky;top:70px;height:fit-content;display:flex;flex-direction:column;gap:14px; }
+
+.day-header { margin-bottom:32px; }
+.day-meta { display:flex;align-items:center;gap:10px;margin-bottom:12px; }
+.day-pill { font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;padding:3px 12px;border-radius:20px;background:rgba(108,142,247,.12);border:1px solid rgba(108,142,247,.25);color:var(--accent); }
+.day-tag { font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;padding:3px 12px;border-radius:20px;background:rgba(52,211,153,.08);border:1px solid rgba(52,211,153,.2);color:var(--green); }
+.day-title { font-size:26px;font-weight:800;letter-spacing:-.3px;margin-bottom:8px; }
+.day-question { font-size:15px;color:var(--accent2);font-style:italic;border-left:3px solid var(--accent2);padding-left:14px;margin-bottom:16px;line-height:1.6; }
+.day-why { font-size:13px;color:var(--muted);line-height:1.7;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:14px 16px; }
+.day-why strong { color:var(--text); }
+
+.section-block { margin-bottom:32px; }
+.sec-label { font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:var(--dim);margin-bottom:14px;display:flex;align-items:center;gap:10px; }
+.sec-label::after { content:'';flex:1;height:1px;background:var(--border); }
+
+.chain { display:flex;flex-direction:column;gap:10px; }
+.chain-item { display:grid;grid-template-columns:32px 1fr;gap:14px;padding:14px 16px;background:var(--surface);border:1px solid var(--border);border-radius:10px;cursor:pointer;transition:border-color .15s; }
+.chain-item:hover { border-color:rgba(167,139,250,.4); }
+.chain-item.done { border-color:rgba(52,211,153,.3);background:rgba(52,211,153,.03); }
+.chain-num { width:32px;height:32px;border-radius:50%;background:var(--surface2);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;color:var(--muted);flex-shrink:0;transition:all .15s; }
+.chain-item.done .chain-num { background:rgba(52,211,153,.15);border-color:rgba(52,211,153,.4);color:var(--green); }
+.chain-q { font-size:13px;font-weight:600;margin-bottom:6px;line-height:1.5; }
+.chain-item.done .chain-q { color:var(--muted);text-decoration:line-through;text-decoration-color:var(--dim); }
+.chain-prompt { font-size:11px;font-family:'Cascadia Code','Fira Code',monospace;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:8px 12px;color:var(--accent2);line-height:1.6;margin-top:8px; }
+.chain-hint { font-size:11px;color:var(--dim);margin-top:6px;line-height:1.5; }
+.chain-note { font-size:11px;color:var(--yellow);margin-top:6px;line-height:1.5;padding:6px 10px;background:rgba(251,191,36,.06);border:1px solid rgba(251,191,36,.15);border-radius:5px; }
+
+.part-divider { display:flex;align-items:center;gap:14px;margin:20px 0 14px; }
+.part-label { font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:1px;padding:4px 14px;border-radius:20px;white-space:nowrap; }
+.part-line { flex:1;height:1px;background:var(--border); }
+
+.artifact-card { background:var(--surface);border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:14px; }
+.artifact-head { padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px; }
+.artifact-title { font-size:13px;font-weight:700;flex:1; }
+.artifact-file { font-family:'Cascadia Code','Fira Code',monospace;font-size:11px;color:var(--green);background:rgba(52,211,153,.08);border:1px solid rgba(52,211,153,.2);padding:2px 10px;border-radius:5px; }
+.artifact-body { padding:16px 18px; }
+.artifact-row { display:flex;gap:10px;margin-bottom:8px;font-size:12px;align-items:flex-start; }
+.artifact-row:last-child { margin-bottom:0; }
+.ar-dot { width:5px;height:5px;border-radius:50%;background:var(--green);flex-shrink:0;margin-top:6px; }
+.ar-text { color:var(--muted);line-height:1.5; }
+.ar-text strong { color:var(--text); }
+.artifact-fail { margin-top:14px;padding:10px 14px;background:rgba(248,113,113,.06);border:1px solid rgba(248,113,113,.2);border-radius:7px;font-size:11px;color:var(--muted);line-height:1.6; }
+.artifact-fail strong { color:var(--red); }
+
+.iq-section { margin-bottom:32px; }
+.iq-header { padding:14px 18px;background:rgba(167,139,250,.06);border:1px solid rgba(167,139,250,.25);border-radius:10px 10px 0 0;border-bottom:none; }
+.iq-title { font-size:12px;font-weight:700;color:var(--accent2);margin-bottom:4px; }
+.iq-subtitle { font-size:11px;color:var(--muted);line-height:1.6; }
+.iq-body { padding:14px 18px;background:rgba(167,139,250,.02);border:1px solid rgba(167,139,250,.25);border-radius:0 0 10px 10px;display:flex;flex-direction:column;gap:8px; }
+.iq-item { background:var(--surface);border:1px solid var(--border);border-radius:8px;overflow:hidden;cursor:pointer;transition:border-color .15s; }
+.iq-item:hover { border-color:rgba(167,139,250,.35); }
+.iq-item.answered { border-color:rgba(52,211,153,.3); }
+.iq-q { display:flex;align-items:flex-start;gap:12px;padding:10px 14px; }
+.iq-num { font-size:10px;font-weight:800;color:var(--accent2);background:rgba(167,139,250,.1);border:1px solid rgba(167,139,250,.2);padding:2px 7px;border-radius:4px;flex-shrink:0;margin-top:2px; }
+.iq-item.answered .iq-num { background:rgba(52,211,153,.12);border-color:rgba(52,211,153,.3);color:var(--green); }
+.iq-text { font-size:12px;color:var(--text);line-height:1.6;flex:1; }
+.iq-item.answered .iq-text { color:var(--muted); }
+.iq-check { font-size:11px;color:var(--dim);flex-shrink:0;margin-top:3px; }
+.iq-item.answered .iq-check { color:var(--green); }
+
+.criteria { display:flex;flex-direction:column;gap:8px; }
+.crit { display:flex;gap:10px;align-items:flex-start;padding:10px 14px;background:var(--surface);border:1px solid var(--border);border-radius:8px;font-size:12px;cursor:pointer;transition:border-color .15s; }
+.crit:hover { border-color:rgba(52,211,153,.3); }
+.crit.done { border-color:rgba(52,211,153,.35);background:rgba(52,211,153,.03); }
+.crit-box { width:16px;height:16px;border-radius:4px;border:1.5px solid var(--border);flex-shrink:0;margin-top:1px;display:flex;align-items:center;justify-content:center;transition:all .15s; }
+.crit.done .crit-box { background:var(--green);border-color:var(--green); }
+.crit-check { color:#0b0d14;font-size:10px;font-weight:900;display:none; }
+.crit.done .crit-check { display:block; }
+.crit-text { color:var(--muted);line-height:1.5; }
+.crit.done .crit-text { color:var(--dim); }
+
+.widget { background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px; }
+.widget-title { font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--dim);margin-bottom:12px; }
+.progress-bar { height:5px;background:var(--surface2);border-radius:10px;overflow:hidden;margin-bottom:6px; }
+.progress-fill { height:100%;background:linear-gradient(90deg,var(--accent),var(--green));border-radius:10px;transition:width .3s; }
+.progress-label { font-size:11px;color:var(--muted); }
+.progress-count { font-size:22px;font-weight:800;color:var(--text);margin-bottom:2px; }
+.as-row { display:flex;align-items:center;gap:8px;font-size:11px;margin-bottom:4px; }
+.as-dot { width:7px;height:7px;border-radius:50%;background:var(--dim);flex-shrink:0; }
+.as-dot.done { background:var(--green); }
+.as-name { color:var(--muted);flex:1; }
+.conn-row { font-size:11px;color:var(--muted);display:flex;gap:8px;align-items:flex-start; }
+.conn-dir { color:var(--dim);flex-shrink:0;width:48px; }
+.report-box { background:rgba(108,142,247,.06);border:1px solid rgba(108,142,247,.2);border-radius:10px;padding:14px 16px; }
+.report-title { font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--accent);margin-bottom:8px; }
+.report-step { font-size:11px;color:var(--muted);margin-bottom:6px;display:flex;gap:8px; }
+.report-step-num { color:var(--accent);font-weight:700;flex-shrink:0; }
+
+.explore-section { margin-bottom:32px; }
+.explore-header { display:flex;align-items:center;gap:12px;padding:12px 16px;background:rgba(251,191,36,.04);border:1px solid rgba(251,191,36,.2);border-radius:10px 10px 0 0;border-bottom:none; }
+.explore-header .label { font-size:12px;font-weight:700;color:var(--yellow); }
+.explore-header .sublabel { font-size:11px;color:var(--muted);margin-left:auto; }
+.explore-body { padding:14px 16px;background:rgba(251,191,36,.02);border:1px solid rgba(251,191,36,.2);border-radius:0 0 10px 10px;display:flex;flex-direction:column;gap:10px; }
+.explore-item { font-size:12px;color:var(--muted);line-height:1.6;padding-left:14px;position:relative; }
+.explore-item::before { content:'';position:absolute;left:0;top:7px;width:5px;height:5px;border-radius:50%;background:var(--yellow); }
+.explore-item strong { color:var(--text); }
+.explore-item code { font-size:10px;color:var(--accent2);background:var(--surface2);padding:1px 5px;border-radius:3px; }
+</style>
+</head>
+<body>
+
+<nav>
+  <span class="brand">ProOps2026</span>
+  <a href="#concept">Concept</a>
+  <a href="#chain">Discovery</a>
+  <a href="#artifact">Artifact</a>
+  <a href="#interview">Interview Qs</a>
+  <a href="#done">Done?</a>
+  <div class="spacer"></div>
+  <span class="badge">Week 3 · Day 13 · Hands-On</span>
+</nav>
+
+<div class="layout">
+<div class="main">
+
+  <!-- HEADER -->
+  <div class="day-header">
+    <div class="day-meta">
+      <span class="day-pill">Week 3 · Day 13</span>
+      <span class="day-tag">Hands-On</span>
+    </div>
+    <div class="day-title">Kubernetes Intermediate: Ingress, ConfigMap, Secret, HPA</div>
+    <div class="day-question">
+      How do you manage external access, configuration, sensitive data, and automatic scaling — the four operational concerns that appear in every production cluster?
+    </div>
+    <div class="day-why">
+      Yesterday's Deployment and Service got your app running. That is a toy cluster. <strong>Production adds four concerns that a bare Deployment + Service cannot solve</strong>: external traffic needs a single entry point with hostname and path routing (Ingress), configuration must change per environment without rebuilding the image (ConfigMap), credentials must not sit in plain text in manifests (Secret), and replica count must react to load automatically (HPA). These four objects are the gap between a cluster that runs an app and a cluster that serves production.
+    </div>
+  </div>
+
+  <!-- SETUP CALLOUT -->
+  <div style="padding:12px 16px;background:rgba(251,191,36,.06);border:1px solid rgba(251,191,36,.3);border-radius:10px;margin-bottom:24px;">
+    <div style="font-size:12px;font-weight:700;color:var(--yellow);margin-bottom:6px;">Setup — keep using minikube, AWS still blocked</div>
+    <div style="font-size:12px;color:var(--muted);line-height:1.7;">
+      <strong style="color:var(--yellow);">AWS is still blocked.</strong> Continue on the same <code style="font-size:11px;color:var(--accent2);">minikube</code> cluster you used on Day 12. You do need two addons enabled today — <strong style="color:var(--text);">ingress</strong> (for the Nginx Ingress controller) and <strong style="color:var(--text);">metrics-server</strong> (required for HPA to see CPU). Enable both before starting the discovery chain, or Q2 and Q6 will silently do nothing.
+    </div>
+    <div style="margin-top:10px;padding:8px 12px;background:rgba(52,211,153,.06);border:1px solid rgba(52,211,153,.2);border-radius:6px;font-size:11px;color:var(--muted);line-height:1.6;">
+      <strong style="color:var(--green);">Enable (copy-paste):</strong>
+      <div style="font-family:'Cascadia Code','Fira Code',monospace;margin-top:6px;color:var(--accent2);">
+        minikube addons enable ingress<br>
+        minikube addons enable metrics-server<br>
+        # verify<br>
+        kubectl get pods -n ingress-nginx<br>
+        kubectl top nodes
+      </div>
+    </div>
+  </div>
+
+  <!-- REQUIRED -->
+  <div style="padding:14px 18px;background:rgba(52,211,153,.04);border:1px solid rgba(52,211,153,.25);border-radius:10px;margin-bottom:28px;">
+    <div style="font-size:12px;font-weight:700;color:var(--green);margin-bottom:6px;">What you must complete today</div>
+    <div style="font-size:12px;color:var(--muted);line-height:1.7;">
+      <strong style="color:var(--text);">Discovery Q1–Q7:</strong> Expose two services behind one Ingress with path routing, replace hardcoded config with a ConfigMap, replace a plain-text password with a Secret, and configure an HPA that scales your Deployment under CPU load.<br>
+      <strong style="color:var(--text);">Q8:</strong> Write <code style="font-size:11px;color:var(--accent2);">memory/kubernetes-advanced.md</code> — the four production objects, what gap each one fills, and one working manifest example per object.<br>
+      Push a commit with the manifests + memory file before end of day.
+    </div>
+    <div style="margin-top:10px;padding:8px 12px;border-radius:6px;background:rgba(248,113,113,.06);border:1px solid rgba(248,113,113,.2);font-size:11px;color:var(--muted);">
+      <strong style="color:var(--red);">Trigger a real HPA scale event.</strong> Running <code style="font-size:11px;color:var(--accent2);">kubectl get hpa</code> and seeing the object exist is not learning HPA. Run a load generator — <code style="font-size:11px;color:var(--accent2);">kubectl run -it load --image=busybox -- /bin/sh -c "while true; do wget -q -O- http://web; done"</code> — and watch the replica count climb with <code style="font-size:11px;color:var(--accent2);">kubectl get hpa -w</code>. The autoscale event is the point.
+    </div>
+  </div>
+
+  <!-- CONCEPT -->
+  <div class="section-block" id="concept">
+    <div class="sec-label">Concept — the four production objects</div>
+
+    <div style="font-size:13px;color:var(--muted);line-height:1.7;margin-bottom:16px;">
+      Each object fills a specific gap that a bare Deployment + Service leaves open. Read this before touching a manifest — the question is not "what does this object do," it is "what problem does it solve that I would otherwise solve badly by hand."
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:20px;">
+
+      <div style="display:grid;grid-template-columns:180px 1fr;gap:0;border:1px solid var(--border);border-radius:10px;overflow:hidden;">
+        <div style="padding:14px 16px;background:rgba(108,142,247,.06);border-right:1px solid var(--border);display:flex;align-items:flex-start;gap:10px;">
+          <div style="font-size:18px;line-height:1;">&#128737;</div>
+          <div>
+            <div style="font-size:12px;font-weight:700;color:var(--accent);">1. Ingress</div>
+            <div style="font-size:11px;color:var(--muted);margin-top:2px;line-height:1.5;">Single entry for many services</div>
+          </div>
+        </div>
+        <div style="padding:14px 16px;font-size:12px;color:var(--muted);line-height:1.6;">
+          NodePort gives every service a different high port. With 20 services you have 20 firewall rules, 20 DNS entries, and no hostname-based routing. An Ingress is a set of rules ("host api.example.com goes to api-svc, path /admin goes to admin-svc") enforced by an <strong style="color:var(--text);">Ingress controller</strong> — a real Pod running nginx or traefik. The Ingress object is the config; the controller is the process that reads it.
+        </div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:180px 1fr;gap:0;border:1px solid var(--border);border-radius:10px;overflow:hidden;">
+        <div style="padding:14px 16px;background:rgba(52,211,153,.06);border-right:1px solid var(--border);display:flex;align-items:flex-start;gap:10px;">
+          <div style="font-size:18px;line-height:1;">&#128196;</div>
+          <div>
+            <div style="font-size:12px;font-weight:700;color:var(--green);">2. ConfigMap</div>
+            <div style="font-size:11px;color:var(--muted);margin-top:2px;line-height:1.5;">Non-sensitive config, decoupled</div>
+          </div>
+        </div>
+        <div style="padding:14px 16px;font-size:12px;color:var(--muted);line-height:1.6;">
+          Feature flags, database hostnames, log levels, base URLs — values that differ between dev/staging/prod. Hardcoding them in the Deployment means a different manifest per environment. A ConfigMap lives separately and is mounted into the container two ways: <strong style="color:var(--text);">envFrom</strong> (every key becomes an env var) or <strong style="color:var(--text);">volumeMount</strong> (every key becomes a file). Same image, different config, nothing rebuilt.
+        </div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:180px 1fr;gap:0;border:1px solid var(--border);border-radius:10px;overflow:hidden;">
+        <div style="padding:14px 16px;background:rgba(251,146,60,.06);border-right:1px solid var(--border);display:flex;align-items:flex-start;gap:10px;">
+          <div style="font-size:18px;line-height:1;">&#128274;</div>
+          <div>
+            <div style="font-size:12px;font-weight:700;color:var(--orange);">3. Secret</div>
+            <div style="font-size:11px;color:var(--muted);margin-top:2px;line-height:1.5;">Sensitive values, access-controlled</div>
+          </div>
+        </div>
+        <div style="padding:14px 16px;font-size:12px;color:var(--muted);line-height:1.6;">
+          Shape-wise identical to a ConfigMap. The difference is <strong style="color:var(--red);">governance, not cryptography</strong>. Secret values are stored base64-encoded in etcd — that is encoding, not encryption. What makes a Secret "secret" is RBAC: only principals with <code style="font-size:11px;color:var(--accent2);">get secret</code> permission can read it. For real encryption at rest, enable encryption providers on the API server; for real production secrets, use a dedicated secret manager (Vault, AWS Secrets Manager) with the Secrets Store CSI driver.
+        </div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:180px 1fr;gap:0;border:1px solid var(--border);border-radius:10px;overflow:hidden;">
+        <div style="padding:14px 16px;background:rgba(167,139,250,.06);border-right:1px solid var(--border);display:flex;align-items:flex-start;gap:10px;">
+          <div style="font-size:18px;line-height:1;">&#128200;</div>
+          <div>
+            <div style="font-size:12px;font-weight:700;color:var(--accent2);">4. HPA</div>
+            <div style="font-size:11px;color:var(--muted);margin-top:2px;line-height:1.5;">Replica count reacts to load</div>
+          </div>
+        </div>
+        <div style="padding:14px 16px;font-size:12px;color:var(--muted);line-height:1.6;">
+          A Horizontal Pod Autoscaler watches CPU (or custom metrics) and adjusts a Deployment's replica count between <code style="font-size:11px;color:var(--accent2);">minReplicas</code> and <code style="font-size:11px;color:var(--accent2);">maxReplicas</code>. It <strong style="color:var(--text);">requires metrics-server</strong> — without it, HPA reports <code>unknown</code> for utilization and does nothing. HPA scales Pods, not nodes. When Pods go <code>Pending</code> because no node has room, that is the <strong style="color:var(--text);">cluster autoscaler's</strong> job — a separate system that adds nodes.
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ConfigMap vs Secret contrast -->
+    <div style="padding:14px 18px;background:var(--surface);border:1px solid var(--border);border-radius:10px;margin-bottom:16px;">
+      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--dim);margin-bottom:10px;">ConfigMap vs Secret — the single rule that matters</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+        <div style="padding:12px 14px;background:rgba(52,211,153,.04);border:1px solid rgba(52,211,153,.25);border-radius:7px;">
+          <div style="font-size:11px;font-weight:700;color:var(--green);margin-bottom:4px;">ConfigMap</div>
+          <div style="font-size:12px;color:var(--muted);line-height:1.6;">Feature flags, hostnames, log levels, base URLs, file paths. Safe to appear in logs, safe in a PR diff.</div>
+        </div>
+        <div style="padding:12px 14px;background:rgba(248,113,113,.04);border:1px solid rgba(248,113,113,.25);border-radius:7px;">
+          <div style="font-size:11px;font-weight:700;color:var(--red);margin-bottom:4px;">Secret</div>
+          <div style="font-size:12px;color:var(--muted);line-height:1.6;">Database passwords, API keys, TLS private keys, OAuth tokens. Would cause an incident if leaked to a log, PR, or screenshot.</div>
+        </div>
+      </div>
+      <div style="margin-top:10px;padding:8px 12px;background:rgba(248,113,113,.05);border:1px solid rgba(248,113,113,.2);border-radius:6px;font-size:11px;color:var(--muted);line-height:1.6;">
+        <strong style="color:var(--red);">Rule:</strong> if leaking the value to CI logs would require an incident review, it goes in a Secret. If it would not, a ConfigMap is enough. Do not mix the two in the same object.
+      </div>
+    </div>
+
+    <div style="padding:12px 16px;background:var(--surface);border:1px solid var(--border);border-radius:10px;font-size:12px;color:var(--muted);line-height:1.7;">
+      <strong style="color:var(--text);">The production gap.</strong> A Deployment + Service runs an app. Adding Ingress + ConfigMap + Secret + HPA is what makes the cluster <em>operable</em>: one hostname for users, one config knob per environment, credentials handled under access control, and capacity that reacts to real load. Every production K8s deployment you will encounter uses these four.
+    </div>
+  </div>
+
+  <!-- DISCOVERY CHAIN -->
+  <div class="section-block" id="chain">
+    <div class="sec-label">Discovery chain — 8 questions</div>
+
+    <div class="chain">
+
+      <div class="chain-item" onclick="toggleChain(this,0)">
+        <div class="chain-num">1</div>
+        <div class="chain-body">
+          <div class="chain-q">You have three microservices behind three <code>NodePort</code> Services. A load balancer forwards traffic to three high ports. A fourth service means another port, rule, and DNS entry. What is the operational problem — and what does an Ingress controller give you instead?</div>
+          <div class="chain-prompt">I have 3 microservices exposed as NodePort Services on ports 30081, 30082, 30083. I am about to add a 4th and a 5th. Explain the scaling problem with NodePort-per-service: (1) what breaks operationally at 10+ services — ports, firewall rules, DNS, TLS certs, (2) what an Ingress controller is — make it explicit that it is a REAL Pod running nginx or traefik, not an abstract concept, (3) what an Ingress resource is vs the Ingress controller — the config rule vs the process that enforces it, (4) the two forms of routing an Ingress supports: host-based (api.example.com vs admin.example.com) and path-based (/api vs /admin), with a concrete example of each. Keep it under 300 words.</div>
+          <div class="chain-hint">The Ingress resource is just YAML. The Ingress controller is a running Pod (you installed it via <code style="font-size:11px;color:var(--accent2);">minikube addons enable ingress</code>). Confusing these two is the single most common Day-13 mistake.</div>
+        </div>
+      </div>
+
+      <div class="chain-item" onclick="toggleChain(this,1)">
+        <div class="chain-num">2</div>
+        <div class="chain-body">
+          <div class="chain-q">Write an Ingress with path-based routing: <code>/api</code> &rarr; api-service, <code>/</code> &rarr; frontend-service. After applying, frontend works but <code>/api</code> returns 404. What three things do you check — in order?</div>
+          <div class="chain-prompt">I applied this Ingress with two path rules (/api to api-svc:8080, / to frontend-svc:3000). Frontend loads correctly but /api returns 404 from the nginx Ingress controller. Give me a 3-step debugging checklist in the right order — cheapest to most expensive check first: (1) what to look at in the Ingress resource itself (pathType, backend service name, port name vs port number), (2) what to verify on the Service (does the Service exist, does it have Endpoints — run kubectl get endpoints [svc-name]), (3) what to verify on the Pods (labels match the Service selector, container listening on the right port). For each step, give me the kubectl command and what a good vs bad result looks like.</div>
+          <div class="chain-hint"><code style="font-size:11px;color:var(--accent2);">pathType: Prefix</code> is the one most people get wrong — <code>Exact</code> means "/api" only, not "/api/users". And check <code style="font-size:11px;color:var(--accent2);">kubectl get endpoints api-svc</code> — if it shows <code>&lt;none&gt;</code>, the Service selector does not match any Pods and no amount of Ingress debugging will help.</div>
+          <div class="chain-note">When your Ingress debugging goes past 15 minutes, run <code style="font-size:11px;color:var(--accent2);">kubectl logs -n ingress-nginx -l app.kubernetes.io/name=ingress-nginx --tail=50</code> — the controller logs show the actual request routing decision.</div>
+        </div>
+      </div>
+
+      <div class="chain-item" onclick="toggleChain(this,2)">
+        <div class="chain-num">3</div>
+        <div class="chain-body">
+          <div class="chain-q">Your Deployment has <code>DATABASE_HOST</code> and <code>LOG_LEVEL</code> hardcoded. Values differ in dev, staging, prod. What is the problem with this at scale, and how does a ConfigMap decouple configuration from the Deployment?</div>
+          <div class="chain-prompt">Show me the transformation from "config hardcoded in Deployment" to "config in a ConfigMap":
+(1) First, write a minimal Deployment YAML with env vars DATABASE_HOST=db.internal and LOG_LEVEL=info hardcoded inline
+(2) Explain the scaling problem when you need 3 environments (dev, staging, prod) with different values — how many manifests do you end up maintaining and what goes wrong at PR-review time
+(3) Now write a ConfigMap YAML holding DATABASE_HOST and LOG_LEVEL
+(4) Rewrite the Deployment to pull env vars from the ConfigMap TWO ways: (a) envFrom.configMapRef (whole ConfigMap becomes env vars), (b) env.valueFrom.configMapKeyRef (one specific key). Show both.
+(5) One sentence on when to pick envFrom vs valueFrom
+
+Keep each YAML under 25 lines. I want to read them side by side.</div>
+          <div class="chain-hint"><code style="font-size:11px;color:var(--accent2);">envFrom</code> is the one-line shortcut when you want the whole ConfigMap injected. <code style="font-size:11px;color:var(--accent2);">env.valueFrom.configMapKeyRef</code> is when you only need one specific key or need to rename the variable. Both are valid; they are not redundant.</div>
+        </div>
+      </div>
+
+      <div class="chain-item" onclick="toggleChain(this,3)">
+        <div class="chain-num">4</div>
+        <div class="chain-body">
+          <div class="chain-q">You move non-sensitive config to a ConfigMap. The database password is still in plain text in the Deployment. You create a Secret. What IS a Secret — and why is base64 NOT encryption?</div>
+          <div class="chain-prompt">Be explicit and blunt on this one — this is the single most misunderstood K8s concept. Answer:
+(1) What a Secret is — how it differs from a ConfigMap (shape is similar, governance is different)
+(2) How values are stored — base64-encoded in etcd. Show me with: echo -n "supersecret" | base64 and the reverse with base64 -d. Make it concrete that anyone with kubectl get secret and base64 -d sees the value.
+(3) Why base64 is encoding, not encryption — one sentence on what each word means and why people confuse them
+(4) What actually protects a Secret in practice: RBAC (who can kubectl get secret), etcd encryption-at-rest (cluster setting, off by default), and external secret stores for production (Vault, AWS Secrets Manager, Azure Key Vault via CSI driver)
+(5) The two mount methods — env var vs file (volumeMount) — and one tradeoff each. Hint: env vars appear in process listings and crash dumps; files do not.
+
+End with: if someone says "Secrets are encrypted in Kubernetes," what do you correct them on?</div>
+          <div class="chain-hint">Mounting a Secret as a <strong>file</strong> (volumeMount) is generally safer than as an env var — env vars show up in <code style="font-size:11px;color:var(--accent2);">/proc</code>, crash dumps, and accidental <code style="font-size:11px;color:var(--accent2);">env</code> prints. Files stay on disk inside the container only.</div>
+        </div>
+      </div>
+
+      <div class="chain-item" onclick="toggleChain(this,4)">
+        <div class="chain-num">5</div>
+        <div class="chain-body">
+          <div class="chain-q">A security audit flags that any developer with <code>kubectl get secret</code> can read database passwords. What Kubernetes mechanism restricts this — and how is it different from using AWS Secrets Manager or Vault?</div>
+          <div class="chain-prompt">Explain the two layers of secret access control in Kubernetes and why production teams usually run both:
+(1) RBAC inside the cluster — what Role, ClusterRole, RoleBinding, ClusterRoleBinding are, and how a Role that excludes "secrets" from its rules prevents a developer from reading them. Show me a minimal Role YAML that grants get/list on pods and deployments but NOT secrets, in a namespace.
+(2) External secret management — AWS Secrets Manager, HashiCorp Vault, Azure Key Vault. What the Secrets Store CSI Driver is and how it pulls a secret from an external store and mounts it into the Pod at runtime — so the value never lives in etcd at all.
+(3) When each approach is enough: RBAC alone is enough for a small team with homogeneous trust. An external store is needed when: auditors require rotation, multiple clusters share credentials, or the secret is managed by a separate team (DBA, security).
+
+Keep this practical — I need to know which approach to reach for when.</div>
+          <div class="chain-hint">The CSI driver is the modern default for cloud deployments. It means Secrets become a cache of an external source of truth, not the source itself. Rotating a secret in AWS Secrets Manager causes every Pod using it to pick up the new value on restart — no kubectl needed.</div>
+        </div>
+      </div>
+
+      <div class="chain-item" onclick="toggleChain(this,5)">
+        <div class="chain-num">6</div>
+        <div class="chain-body">
+          <div class="chain-q">Your app is pegging 90% CPU. You could run <code>kubectl scale deployment --replicas=10</code>, but you are going on holiday. What does an HPA do, what does it need, and what are its three main knobs?</div>
+          <div class="chain-prompt">Walk me through configuring a Horizontal Pod Autoscaler end-to-end for a Deployment named "web":
+(1) Prerequisite: the metrics-server must be running. Command to verify: kubectl top pods. Explain what happens if metrics-server is NOT installed (HPA reports utilization as unknown and does nothing — the most common HPA failure mode)
+(2) Resource requests matter — HPA targets a percentage of spec.containers.resources.requests.cpu. If the container has no CPU request, HPA cannot compute utilization. Show me a Deployment snippet with a cpu request of 100m.
+(3) Write the HPA YAML (autoscaling/v2) for Deployment web: minReplicas: 2, maxReplicas: 10, target CPU 70% averageUtilization.
+(4) Explain the three parameters in one sentence each: minReplicas, maxReplicas, targetAverageUtilization.
+(5) What is the scale-down cooldown and why does it exist? (Pods are killed slower than they are added — prevents flapping between sizes under bursty traffic.)
+(6) The command to watch scaling happen live: kubectl get hpa -w</div>
+          <div class="chain-hint">Metrics-server is disabled by default on most clusters. On minikube: <code style="font-size:11px;color:var(--accent2);">minikube addons enable metrics-server</code>. Then wait ~60 seconds and verify with <code style="font-size:11px;color:var(--accent2);">kubectl top pods</code> — if you see values, HPA can work. If you see an error, HPA will report <code>unknown</code> forever.</div>
+          <div class="chain-note">Actually trigger a scale event today. Run a load generator, watch <code style="font-size:11px;color:var(--accent2);">kubectl get hpa -w</code>, see replica count climb, stop the load, see it shrink. That observation is the entire point of this question.</div>
+        </div>
+      </div>
+
+      <div class="chain-item" onclick="toggleChain(this,6)">
+        <div class="chain-num">7</div>
+        <div class="chain-body">
+          <div class="chain-q">HPA scales to 10 replicas. 3 Pods are <code>Pending</code> — no node has enough CPU. HPA has hit the limit of what it can do. What is cluster-level autoscaling, and how is it different from HPA?</div>
+          <div class="chain-prompt">Explain the second layer of autoscaling that HPA alone cannot provide:
+(1) The problem: HPA changed replica count from 2 to 10, but the cluster has 2 nodes with 4 CPU each — not enough to schedule all 10 Pods. 3 Pods show Pending. kubectl describe on a Pending Pod shows "0/2 nodes available: insufficient cpu."
+(2) What the Cluster Autoscaler does — watches for Pending Pods and adds nodes to the cluster (by talking to the cloud provider: EC2 Auto Scaling Group, Azure VMSS, GCP instance group). Explain the feedback loop: new node joins -> kubelet reports ready -> scheduler places the Pending Pod.
+(3) How HPA and Cluster Autoscaler compose: HPA scales the Deployment (more Pods needed) -> scheduler tries to place them -> if no room, Pods go Pending -> Cluster Autoscaler adds a node -> Pods get placed. It is two independent loops.
+(4) Managed-cluster names for this: EKS = Managed Node Groups + Cluster Autoscaler (or Karpenter), AKS = Cluster Autoscaler, GKE = Node Auto-Provisioning.
+(5) What minikube does for this question — nothing, because it is single-node. Note that this is a concept you will see in real clusters in Week 5.</div>
+          <div class="chain-hint">One-sentence summary to memorize: <strong>HPA scales Pods. Cluster Autoscaler scales Nodes. They are different controllers solving different problems, and production clusters run both.</strong></div>
+        </div>
+      </div>
+
+      <div class="chain-item" onclick="toggleChain(this,7)">
+        <div class="chain-num">8</div>
+        <div class="chain-body">
+          <div class="chain-q">Write <code>memory/kubernetes-advanced.md</code>. Four production objects — Ingress, ConfigMap, Secret, HPA — each one covering the gap it fills, the prerequisites it needs, and a working manifest.</div>
+          <div class="chain-prompt">Help me write memory/kubernetes-advanced.md. This file joins memory/kubernetes-core.md in my agent's context every time I work on K8s. It must contain:
+
+1. For each of the four objects (Ingress, ConfigMap, Secret, HPA) — one short section with:
+   - The gap it fills (what breaks without it)
+   - The prerequisite it needs (Ingress controller installed, metrics-server installed, RBAC enabled, etc.)
+   - A working minimal YAML manifest (under 20 lines, labeled consistently with memory/kubernetes-core.md manifests so they all compose into one stack)
+
+2. A ConfigMap vs Secret table — one line each on shape, storage, access control, leak-risk category
+
+3. An explicit correction note: "Secrets are NOT encrypted by default — base64 is encoding, not encryption. Access control is enforced by RBAC and (optionally) etcd encryption-at-rest." This must be verbatim, because the wrong mental model here is how real clusters get owned.
+
+4. A sentence distinguishing HPA (scales Pods) from Cluster Autoscaler (scales Nodes) with one failure mode each
+
+5. A table: "If I see X, check Y" — Ingress 404, HPA stuck at unknown, Secret mounted but empty, Pods pending after HPA scale-up
+
+Format for an AI agent: tables and short bullets, minimal prose.</div>
+          <div class="chain-hint">The four manifests should use the same labels (<code style="font-size:11px;color:var(--accent2);">app=web</code>) as the Pod/Deployment/Service manifests from Day 12's memory file — that way a reader sees how all seven objects compose into one working stack. Your agent can then read both memory files and write a full production manifest set from memory.</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ARTIFACT -->
+  <div class="section-block" id="artifact">
+    <div class="sec-label">Artifacts</div>
+
+    <div class="artifact-card">
+      <div class="artifact-head">
+        <div class="artifact-title">Kubernetes Advanced Memory File</div>
+        <div class="artifact-file">memory/kubernetes-advanced.md</div>
+      </div>
+      <div class="artifact-body">
+        <div class="artifact-row"><div class="ar-dot"></div><div class="ar-text"><strong>Ingress section distinguishes resource from controller</strong> — makes explicit that the controller is a real running Pod, not an abstract concept. Includes host-based and path-based routing examples.</div></div>
+        <div class="artifact-row"><div class="ar-dot"></div><div class="ar-text"><strong>ConfigMap section covers both mount methods</strong> — <code>envFrom</code> (whole CM as env vars) and <code>volumeMount</code> (keys as files). Includes when to pick each.</div></div>
+        <div class="artifact-row"><div class="ar-dot"></div><div class="ar-text"><strong>Secret section states explicitly: base64 is encoding, not encryption.</strong> RBAC as the access-control mechanism. Named: Opaque, docker-registry, tls.</div></div>
+        <div class="artifact-row"><div class="ar-dot"></div><div class="ar-text"><strong>HPA section names metrics-server as a prerequisite</strong> — the most common reason HPA appears to do nothing. Scale-down cooldown explained.</div></div>
+        <div class="artifact-row"><div class="ar-dot"></div><div class="ar-text"><strong>HPA vs Cluster Autoscaler distinction</strong> — one scales Pods, the other scales Nodes. One sentence each.</div></div>
+        <div class="artifact-row"><div class="ar-dot"></div><div class="ar-text"><strong>Four working manifests + status-to-command table</strong> — consistently labeled with Day 12's manifests so the whole set composes into one working stack.</div></div>
+        <div class="artifact-fail"><strong>Weak signals:</strong> Secret section calls it "encrypted storage" — it is not. HPA section with no metrics-server mention. Ingress section with routing rules but no mention that the controller is a Pod. Memory file written but not committed.</div>
+      </div>
+    </div>
+
+    <div class="artifact-card">
+      <div class="artifact-head">
+        <div class="artifact-title">Working manifests in your repo</div>
+        <div class="artifact-file">k8s/*.yaml</div>
+      </div>
+      <div class="artifact-body">
+        <div class="artifact-row"><div class="ar-dot"></div><div class="ar-text"><strong>Ingress routes 2+ services on one host</strong> — reachable via minikube IP or <code style="font-size:11px;color:var(--accent2);">minikube tunnel</code>. Both paths return the expected service.</div></div>
+        <div class="artifact-row"><div class="ar-dot"></div><div class="ar-text"><strong>ConfigMap used</strong> — non-sensitive values removed from the Deployment, pulled via <code>envFrom</code> or <code>valueFrom</code>.</div></div>
+        <div class="artifact-row"><div class="ar-dot"></div><div class="ar-text"><strong>Secret used</strong> — at least one credential moved out of the Deployment manifest. Mounted as env var OR file.</div></div>
+        <div class="artifact-row"><div class="ar-dot"></div><div class="ar-text"><strong>HPA observed scaling</strong> — you ran a load generator, saw replica count climb in <code style="font-size:11px;color:var(--accent2);">kubectl get hpa -w</code>, stopped the load, saw it shrink.</div></div>
+        <div class="artifact-fail"><strong>Weak signals:</strong> Ingress created but never tested with curl. ConfigMap and Secret objects exist but are not referenced by any Deployment. HPA created but no scale event observed — you looked at the object, did not watch it work.</div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- INTERVIEW QUESTIONS -->
+  <div class="iq-section" id="interview">
+    <div class="iq-header">
+      <div class="iq-title">Interview Questions</div>
+      <div class="iq-subtitle">Click when you can answer without notes. These test the mental model — not YAML syntax you can look up.</div>
+    </div>
+    <div class="iq-body">
+
+      <div class="iq-item" onclick="toggleIQ(this)">
+        <div class="iq-q">
+          <span class="iq-num">Q1</span>
+          <span class="iq-text">What is the difference between an Ingress resource and an Ingress controller? Can you have one without the other?</span>
+          <span class="iq-check">&#10003;</span>
+        </div>
+      </div>
+
+      <div class="iq-item" onclick="toggleIQ(this)">
+        <div class="iq-q">
+          <span class="iq-num">Q2</span>
+          <span class="iq-text">A request hits your Ingress at <code>/api</code> and returns 404. What are the three checks you run — in order from cheapest to most expensive?</span>
+          <span class="iq-check">&#10003;</span>
+        </div>
+      </div>
+
+      <div class="iq-item" onclick="toggleIQ(this)">
+        <div class="iq-q">
+          <span class="iq-num">Q3</span>
+          <span class="iq-text">When do you pick a ConfigMap over putting the value directly in the Deployment manifest? When do you pick a Secret over a ConfigMap?</span>
+          <span class="iq-check">&#10003;</span>
+        </div>
+      </div>
+
+      <div class="iq-item" onclick="toggleIQ(this)">
+        <div class="iq-q">
+          <span class="iq-num">Q4</span>
+          <span class="iq-text">Someone on your team says "Kubernetes Secrets are encrypted." What do you correct them on, and what is actually protecting the value?</span>
+          <span class="iq-check">&#10003;</span>
+        </div>
+      </div>
+
+      <div class="iq-item" onclick="toggleIQ(this)">
+        <div class="iq-q">
+          <span class="iq-num">Q5</span>
+          <span class="iq-text">You deploy an HPA. <code>kubectl get hpa</code> shows <code>TARGETS: unknown/70%</code>. What is the most likely cause, and how do you fix it?</span>
+          <span class="iq-check">&#10003;</span>
+        </div>
+      </div>
+
+      <div class="iq-item" onclick="toggleIQ(this)">
+        <div class="iq-q">
+          <span class="iq-num">Q6</span>
+          <span class="iq-text">Explain the difference between HPA and Cluster Autoscaler. Give one failure mode that each one solves and the other one cannot.</span>
+          <span class="iq-check">&#10003;</span>
+        </div>
+      </div>
+
+      <div class="iq-item" onclick="toggleIQ(this)">
+        <div class="iq-q">
+          <span class="iq-num">Q7</span>
+          <span class="iq-text">What is the Secrets Store CSI Driver? Why would a team prefer it over storing secrets directly in Kubernetes?</span>
+          <span class="iq-check">&#10003;</span>
+        </div>
+      </div>
+
+      <div class="iq-item" onclick="toggleIQ(this)">
+        <div class="iq-q">
+          <span class="iq-num">Q8</span>
+          <span class="iq-text">You mount a Secret as both an env var AND a volume. Which one is generally safer, and why?</span>
+          <span class="iq-check">&#10003;</span>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- DONE CRITERIA -->
+  <div class="section-block" id="done">
+    <div class="sec-label">Done criteria</div>
+    <div class="criteria">
+      <div class="crit" onclick="toggleCrit(this)">
+        <div class="crit-box"><span class="crit-check">&#10003;</span></div>
+        <div class="crit-text">Minikube addons enabled: <code style="font-size:11px;color:var(--accent2);">minikube addons list</code> shows <strong>ingress</strong> and <strong>metrics-server</strong> as enabled.</div>
+      </div>
+      <div class="crit" onclick="toggleCrit(this)">
+        <div class="crit-box"><span class="crit-check">&#10003;</span></div>
+        <div class="crit-text">At least 2 Services reachable through a single Ingress — both paths return the correct service via <code>curl</code>.</div>
+      </div>
+      <div class="crit" onclick="toggleCrit(this)">
+        <div class="crit-box"><span class="crit-check">&#10003;</span></div>
+        <div class="crit-text">ConfigMap created and referenced by a Deployment — values pulled from the ConfigMap, not hardcoded in the manifest.</div>
+      </div>
+      <div class="crit" onclick="toggleCrit(this)">
+        <div class="crit-box"><span class="crit-check">&#10003;</span></div>
+        <div class="crit-text">Secret created and mounted into a Deployment — at least one credential out of plain text in the manifest.</div>
+      </div>
+      <div class="crit" onclick="toggleCrit(this)">
+        <div class="crit-box"><span class="crit-check">&#10003;</span></div>
+        <div class="crit-text">HPA configured and observed scaling under a load generator — replicas climbed, then shrank. <code style="font-size:11px;color:var(--accent2);">kubectl get hpa -w</code> watched live.</div>
+      </div>
+      <div class="crit" onclick="toggleCrit(this)">
+        <div class="crit-box"><span class="crit-check">&#10003;</span></div>
+        <div class="crit-text">CPU <code>resources.requests</code> set on the Deployment's container — without this HPA cannot compute utilization.</div>
+      </div>
+      <div class="crit" onclick="toggleCrit(this)">
+        <div class="crit-box"><span class="crit-check">&#10003;</span></div>
+        <div class="crit-text"><code style="font-size:11px;color:var(--accent2);">memory/kubernetes-advanced.md</code> written — four objects, gap + prerequisite each, working manifests, ConfigMap-vs-Secret table, explicit "base64 is not encryption" note.</div>
+      </div>
+      <div class="crit" onclick="toggleCrit(this)">
+        <div class="crit-box"><span class="crit-check">&#10003;</span></div>
+        <div class="crit-text">Git commit pushed: <code style="font-size:11px;color:var(--accent2);">Day 13 — K8s intermediate: Ingress + ConfigMap + Secret + HPA</code></div>
+      </div>
+      <div class="crit" onclick="toggleCrit(this)">
+        <div class="crit-box"><span class="crit-check">&#10003;</span></div>
+        <div class="crit-text">Daily log filled — Tomorrow's Context Block names the one Week 3 tool (Helm? K9s? Dashboard?) you most want to understand on Day 14.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- EXPLORE FURTHER -->
+  <div class="explore-section">
+    <div class="explore-header">
+      <span class="label">Explore further</span>
+      <span class="sublabel">Only after memory file committed &#10003;</span>
+    </div>
+    <div class="explore-body">
+      <div style="font-size:11px;color:var(--dim);margin-bottom:4px;">Optional. Only if all done criteria are checked.</div>
+      <div class="explore-item">
+        <strong>Ingress TLS with cert-manager.</strong> Ask Claude: <em>"Walk me through installing cert-manager on minikube and configuring an Ingress with automatic Let's Encrypt certificates. What does cert-manager actually do — the controller, the Issuer, and the Certificate resource?"</em>
+      </div>
+      <div class="explore-item">
+        <strong>Sealed Secrets for GitOps.</strong> Ask Claude: <em>"How do I commit encrypted secrets to Git safely using Sealed Secrets? Show me the workflow: kubeseal CLI, the controller, and what the SealedSecret resource looks like in a PR diff."</em>
+      </div>
+      <div class="explore-item">
+        <strong>Custom metrics HPA.</strong> Ask Claude: <em>"CPU-based HPA is a proxy for real load. Show me how to scale on request queue depth instead — what is the custom metrics API, and how does KEDA simplify this for event-driven workloads?"</em>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /main -->
+
+<!-- SIDEBAR -->
+<div class="sidebar">
+
+  <div class="widget">
+    <div class="widget-title">Progress</div>
+    <div class="progress-count" id="prog-count">0 / 8</div>
+    <div style="margin-bottom:8px;">
+      <div class="progress-bar"><div class="progress-fill" id="prog-fill" style="width:0%"></div></div>
+      <div class="progress-label" id="prog-label">Discovery chain</div>
+    </div>
+  </div>
+
+  <div class="widget">
+    <div class="widget-title">Today's Artifacts</div>
+    <div class="as-row"><div class="as-dot" id="dot-ingress"></div><div class="as-name">Ingress routes 2+ services</div></div>
+    <div class="as-row"><div class="as-dot" id="dot-cm"></div><div class="as-name">ConfigMap wired into Deployment</div></div>
+    <div class="as-row"><div class="as-dot" id="dot-secret"></div><div class="as-name">Secret replaces plain-text cred</div></div>
+    <div class="as-row"><div class="as-dot" id="dot-hpa"></div><div class="as-name">HPA observed scaling under load</div></div>
+    <div class="as-row"><div class="as-dot" id="dot-mem"></div><div class="as-name">memory/kubernetes-advanced.md</div></div>
+  </div>
+
+  <div class="widget" style="background:rgba(248,113,113,.04);border-color:rgba(248,113,113,.2);">
+    <div class="widget-title" style="color:var(--red);">Correct this myth</div>
+    <div style="font-size:11px;color:var(--muted);line-height:1.6;">
+      &ldquo;Kubernetes Secrets are encrypted.&rdquo;<br><br>
+      <strong style="color:var(--red);">No.</strong> Base64 is encoding. What actually protects a Secret is RBAC plus (optionally) etcd encryption-at-rest — and for real production, an external secret store.
+    </div>
+  </div>
+
+  <div class="widget" style="background:rgba(108,142,247,.04);border-color:rgba(108,142,247,.2);">
+    <div class="widget-title" style="color:var(--accent);">kubectl quick map</div>
+    <div style="font-size:11px;color:var(--muted);line-height:1.8;font-family:'Cascadia Code','Fira Code',monospace;">
+      get ingress<br>
+      get configmap<br>
+      get secret<br>
+      get hpa -w<br>
+      top pods<br>
+      get endpoints [svc]<br>
+      logs -n ingress-nginx
+    </div>
+  </div>
+
+  <div class="widget">
+    <div class="widget-title">Connects To</div>
+    <div style="display:flex;flex-direction:column;gap:6px;">
+      <div class="conn-row"><span class="conn-dir">&larr; Day 12</span><span style="font-size:11px;color:var(--muted);">Pod + Deployment + Service — the foundation today builds on</span></div>
+      <div class="conn-row"><span class="conn-dir">&rarr; Day 14</span><span style="font-size:11px;color:var(--muted);">Helm + K9s + Dashboard — packaging + tooling on top of today's objects</span></div>
+      <div class="conn-row"><span class="conn-dir">&rarr; Day 15</span><span style="font-size:11px;color:var(--muted);">Lab — deploy your mock project to K8s</span></div>
+      <div class="conn-row"><span class="conn-dir">&rarr; Day 28</span><span style="font-size:11px;color:var(--muted);">ConfigMap/Secret patterns drive multi-env pipelines</span></div>
+    </div>
+  </div>
+
+  <div class="report-box">
+    <div class="report-title">End-of-day report</div>
+    <div class="report-step"><span class="report-step-num">1.</span> Fill daily log + context block</div>
+    <div class="report-step"><span class="report-step-num">2.</span> git commit + push k8s/*.yaml + memory file</div>
+    <div class="report-step"><span class="report-step-num">3.</span> Paste <code style="font-size:10px;color:var(--accent);">=== Day 13 |</code> report to trainer channel</div>
+    <div style="margin-top:8px;padding:6px 8px;background:rgba(52,211,153,.06);border:1px solid rgba(52,211,153,.2);border-radius:5px;font-size:10px;color:var(--green);line-height:1.5;">
+      Include: output of <code>kubectl get ing,cm,secret,hpa</code> + one screenshot of HPA replica count climbing
+    </div>
+  </div>
+
+</div><!-- /sidebar -->
+</div><!-- /layout -->
+
+<script>
+const chainDone = new Array(8).fill(false);
+function toggleChain(el, i) {
+  chainDone[i] = !chainDone[i];
+  el.classList.toggle('done', chainDone[i]);
+  const done = chainDone.filter(Boolean).length;
+  document.getElementById('prog-count').textContent = done + ' / 8';
+  document.getElementById('prog-fill').style.width = (done/8*100) + '%';
+  const labels = ['Keep going','Keep going','Halfway','Halfway','Almost there','Almost there','Almost there','Done!'];
+  document.getElementById('prog-label').textContent = done === 0 ? 'Discovery chain' : labels[done-1];
+  if (done >= 2) document.getElementById('dot-ingress').classList.add('done');
+  if (done >= 3) document.getElementById('dot-cm').classList.add('done');
+  if (done >= 5) document.getElementById('dot-secret').classList.add('done');
+  if (done >= 7) document.getElementById('dot-hpa').classList.add('done');
+  if (done >= 8) document.getElementById('dot-mem').classList.add('done');
+}
+function toggleIQ(el) { el.classList.toggle('answered'); }
+function toggleCrit(el) { el.classList.toggle('done'); }
+</script>
+</body>
+</html>
