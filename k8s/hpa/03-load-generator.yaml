@@ -1,0 +1,38 @@
+# LOAD GENERATOR
+#
+# Dùng để giả lập traffic và trigger HPA scale-up.
+# Pod này chạy vòng lặp vô hạn gửi request đến web-svc.
+#
+# Cách dùng:
+#   kubectl apply -f 03-load-generator.yaml    ← bật load
+#   kubectl delete -f 03-load-generator.yaml   ← tắt load → trigger scale-down
+#
+# Xem log để confirm đang gửi request:
+#   kubectl logs -n hpa-lab load-generator -f
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: load-generator
+  namespace: hpa-lab
+spec:
+  containers:
+  - name: loader
+    image: busybox:1.36
+    command:
+    - /bin/sh
+    - -c
+    - |
+      echo "Load generator started — sending requests to web-svc"
+      while true; do
+        wget -q -O /dev/null http://web-svc.hpa-lab.svc.cluster.local/
+        sleep 0.01
+      done
+    resources:
+      requests:
+        cpu: 50m
+        memory: 32Mi
+      limits:
+        cpu: 100m
+        memory: 64Mi
+  restartPolicy: Never

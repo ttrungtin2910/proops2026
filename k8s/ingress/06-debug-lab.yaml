@@ -1,0 +1,107 @@
+# DEBUG LAB — 3 Ingress lỗi phổ biến
+#
+# Apply tất cả, sau đó chẩn đoán từng cái theo hướng dẫn bên dưới.
+# Mỗi Ingress bị broken theo một cách khác nhau.
+#
+# Apply:
+#   kubectl apply -f 06-debug-lab.yaml
+#
+# Xem tất cả Ingress:
+#   kubectl get ingress -n ingress-lab
+#
+# ─────────────────────────────────────────────────────────────────────────────
+# SCENARIO A: Tên Service bị sai (typo)
+# ─────────────────────────────────────────────────────────────────────────────
+# Triệu chứng: 503 Service Temporarily Unavailable
+# Chẩn đoán:
+#   kubectl describe ingress broken-typo -n ingress-lab
+#   → Tìm dòng Backends: "api-service:8080 (<error: endpoints not found>)"
+# Fix:
+#   Sửa service.name từ "api-service" → "api-svc"
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: broken-typo
+  namespace: ingress-lab
+spec:
+  ingressClassName: nginx
+  rules:
+  - host: app.local
+    http:
+      paths:
+      - path: /api
+        pathType: Prefix
+        backend:
+          service:
+            name: api-service   # BUG: tên sai, đúng phải là "api-svc"
+            port:
+              number: 8080
+---
+# ─────────────────────────────────────────────────────────────────────────────
+# SCENARIO B: pathType sai — Exact thay vì Prefix
+# ─────────────────────────────────────────────────────────────────────────────
+# Triệu chứng: curl /api trả về FRONTEND (không match /api, fallthrough xuống /)
+#              curl /api/users → 404 vì Exact chỉ match /api không match /api/users
+# Chẩn đoán:
+#   kubectl get ingress broken-pathtype -n ingress-lab -o yaml | grep pathType
+#   → thấy "Exact" thay vì "Prefix"
+# Fix:
+#   Đổi pathType: Exact → pathType: Prefix
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: broken-pathtype
+  namespace: ingress-lab
+spec:
+  ingressClassName: nginx
+  rules:
+  - host: app.local
+    http:
+      paths:
+      - path: /api
+        pathType: Exact         # BUG: Exact chỉ match "/api", không match "/api/users"
+        backend:
+          service:
+            name: api-svc
+            port:
+              number: 8080
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: frontend-svc
+            port:
+              number: 80
+---
+# ─────────────────────────────────────────────────────────────────────────────
+# SCENARIO C: Port sai — dùng port của container thay vì port của Service
+# ─────────────────────────────────────────────────────────────────────────────
+# Triệu chứng: 503 hoặc connection refused
+# Context:     api-svc expose port 8080 → targetPort 80
+#              Ingress phải trỏ vào port SERVICE (8080), không phải port container (80)
+# Chẩn đoán:
+#   kubectl describe ingress broken-port -n ingress-lab
+#   → Backends: api-svc:80 (<error: ...>) hoặc không có IP
+#   kubectl get svc api-svc -n ingress-lab
+#   → PORT(S): 8080/TCP ← đây là port đúng cần điền vào Ingress
+# Fix:
+#   Đổi port.number từ 80 → 8080
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: broken-port
+  namespace: ingress-lab
+spec:
+  ingressClassName: nginx
+  rules:
+  - host: app.local
+    http:
+      paths:
+      - path: /api
+        pathType: Prefix
+        backend:
+          service:
+            name: api-svc
+            port:
+              number: 80        # BUG: port container (80), đúng phải là port Service (8080)

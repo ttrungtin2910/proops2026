@@ -1,0 +1,40 @@
+# HORIZONTAL POD AUTOSCALER
+#
+# autoscaling/v2: hỗ trợ nhiều metrics (CPU + memory + custom)
+# autoscaling/v1: chỉ hỗ trợ CPU — deprecated
+#
+# Cơ chế scale-up:
+#   desiredReplicas = ceil(currentReplicas * (currentCPU / targetCPU))
+#   Ví dụ: 1 Pod, CPU 90%, target 50%
+#   → ceil(1 * 90/50) = ceil(1.8) = 2 Pods
+#
+# Cooldown mặc định:
+#   scale-up:   0s   (scale ngay)
+#   scale-down: 300s (chờ 5 phút để tránh flap)
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: web-hpa
+  namespace: hpa-lab
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: web
+  minReplicas: 1
+  maxReplicas: 5
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 50   # scale-up khi CPU trung bình > 50% của requests
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 60   # rút xuống 60s cho lab (mặc định 300s)
+      policies:
+      - type: Pods
+        value: 1
+        periodSeconds: 30              # giảm tối đa 1 Pod mỗi 30 giây

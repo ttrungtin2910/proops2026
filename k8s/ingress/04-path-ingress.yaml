@@ -1,0 +1,56 @@
+# INGRESS — PATH-BASED ROUTING
+#
+# Luồng traffic:
+#   browser → minikube IP:80 → nginx Ingress controller Pod
+#     → /api/*  → api-svc:8080  → api Pod
+#     → /*      → frontend-svc:80 → frontend Pod
+#
+# Prerequisite:
+#   minikube addons enable ingress
+#   kubectl get pods -n ingress-nginx   ← phải thấy controller Running
+#
+# Apply:
+#   kubectl apply -f 04-path-ingress.yaml
+#
+# Kiểm tra:
+#   kubectl describe ingress path-ingress -n ingress-lab
+#   → Tìm dòng Backends: phải có IP trong ngoặc, không phải <error>
+#
+# Test trên minikube:
+#   MINIKUBE_IP=$(minikube ip)
+#   curl -H "Host: app.local" http://$MINIKUBE_IP/          → trả về FRONTEND
+#   curl -H "Host: app.local" http://$MINIKUBE_IP/api       → trả về JSON api
+#   curl -H "Host: app.local" http://$MINIKUBE_IP/api/users → trả về JSON api (Prefix match)
+#
+# Nếu thấy 404: xem mục 06-debug-lab.yaml để chẩn đoán
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: path-ingress
+  namespace: ingress-lab
+  annotations:
+    # rewrite-target: / → strip prefix trước khi forward đến backend
+    # Không có annotation này: /api/users đến backend thành /api/users
+    # Có annotation này:       /api/users đến backend thành /
+    nginx.ingress.kubernetes.io/rewrite-target: /
+spec:
+  ingressClassName: nginx
+  rules:
+  - host: app.local
+    http:
+      paths:
+      - path: /api
+        pathType: Prefix        # Prefix: /api, /api/users, /api/v2/... đều match
+        backend:
+          service:
+            name: api-svc
+            port:
+              number: 8080
+      - path: /
+        pathType: Prefix        # catch-all — phải đứng SAU /api
+        backend:
+          service:
+            name: frontend-svc
+            port:
+              number: 80
