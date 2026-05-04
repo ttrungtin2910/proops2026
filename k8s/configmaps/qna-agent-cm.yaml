@@ -29,8 +29,8 @@ data:
   MILVUS_PORT:                "19530"
   MILVUS_COLLECTION_NAME:     "public_service_docs"
 
-  # ── Redis (K8s DNS: redis.default.svc.cluster.local:6379) ─────────────────
-  REDIS_URL:                  "redis://redis:6379/0"
+  # ── Redis (Helm release: my-redis-master.default.svc.cluster.local:6379) ──
+  REDIS_URL:                  "redis://my-redis-master:6379/0"
 
   # ── MongoDB (K8s DNS: mongodb.default.svc.cluster.local:27017) ────────────
   MONGODB_URI:                "mongodb://mongodb:27017"

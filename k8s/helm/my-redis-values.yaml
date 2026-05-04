@@ -1,0 +1,35 @@
+# my-redis-values.yaml
+# Helm values override cho bitnami/redis — môi trường dev
+# Dùng: helm install my-redis bitnami/redis -f my-redis-values.yaml -n default
+# ─────────────────────────────────────────────────────────────────────────────
+# Chỉ override những gì khác với chart default.
+# Mọi thứ còn lại dùng bitnami/redis default.
+
+auth:
+  enabled: true
+  existingSecret: "redis-auth-secret"
+  existingSecretPasswordKey: "redis-password"
+
+master:
+  persistence:
+    size: 1Gi                         # dev: nhỏ hơn default 8Gi
+
+  resources:
+    limits:
+      cpu: 200m
+      memory: 256Mi
+    requests:
+      cpu: 100m
+      memory: 128Mi
+
+  extraFlags:
+    - "--maxmemory 200mb"             # phòng OOMKilled
+    - "--maxmemory-policy allkeys-lru"  # phù hợp LangGraph checkpoint use case
+
+  # Label thêm vào để demo helm upgrade → revision 2
+  podLabels:
+    environment: dev
+    project: aiops-day14
+
+replica:
+  replicaCount: 0                     # dev không cần replica

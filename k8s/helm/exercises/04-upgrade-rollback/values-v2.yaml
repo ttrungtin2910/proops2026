@@ -1,0 +1,33 @@
+# values-v2.yaml — Upgrade có ý nghĩa: tăng memory request
+# So sánh với my-redis-values.yaml:
+#   resources.requests.memory: 128Mi → 256Mi   ← thay đổi duy nhất
+# ─────────────────────────────────────────────────────────────
+
+auth:
+  enabled: true
+  existingSecret: "redis-auth-secret"
+  existingSecretPasswordKey: "redis-password"
+
+master:
+  persistence:
+    size: 1Gi
+
+  resources:
+    limits:
+      cpu: 200m
+      memory: 256Mi
+    requests:
+      cpu: 100m
+      memory: 256Mi            # ← THAY ĐỔI: 128Mi → 256Mi
+
+  extraFlags:
+    - "--maxmemory 200mb"
+    - "--maxmemory-policy allkeys-lru"
+
+  podLabels:
+    environment: dev
+    project: aiops-day14
+    revision: "v2"             # ← label mới để phân biệt
+
+replica:
+  replicaCount: 0

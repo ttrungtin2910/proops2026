@@ -1,0 +1,34 @@
+# values-bad.yaml — Giả lập upgrade THẤT BẠI
+# Image tag không tồn tại → ImagePullBackOff → Helm STATUS: failed
+# ─────────────────────────────────────────────────────────────
+# CẢNH BÁO: File này được thiết kế để FAIL có chủ đích.
+# Dùng trong bài tập "giả lập upgrade xấu" → rollback.
+# KHÔNG dùng file này trong môi trường production.
+# ─────────────────────────────────────────────────────────────
+
+auth:
+  enabled: true
+  existingSecret: "redis-auth-secret"
+  existingSecretPasswordKey: "redis-password"
+
+image:
+  tag: "99.99.99-this-tag-does-not-exist"   # ← tag sai có chủ đích
+
+master:
+  persistence:
+    size: 1Gi
+
+  resources:
+    limits:
+      cpu: 200m
+      memory: 256Mi
+    requests:
+      cpu: 100m
+      memory: 256Mi
+
+  extraFlags:
+    - "--maxmemory 200mb"
+    - "--maxmemory-policy allkeys-lru"
+
+replica:
+  replicaCount: 0
