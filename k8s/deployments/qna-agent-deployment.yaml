@@ -27,6 +27,13 @@ spec:
       labels:
         app: qna-agent
     spec:
+      initContainers:
+        - name: wait-for-milvus
+          image: busybox:1.28
+          command: ['sh', '-c', 'until nc -z milvus 19530; do echo waiting for milvus:19530; sleep 5; done']
+        - name: wait-for-kafka
+          image: busybox:1.28
+          command: ['sh', '-c', 'until nc -z kafka 9092; do echo waiting for kafka:9092; sleep 5; done']
       containers:
         - name: qna-agent
           image: ttrungtin2910/qna-agent:day10
