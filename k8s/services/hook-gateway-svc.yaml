@@ -1,0 +1,32 @@
+# ╔══════════════════════════════════════════════════════════════════════════╗
+# ║  Service — hook-gateway (ClusterIP)                                    ║
+# ║  kubectl apply  -f hook-gateway-svc.yaml                               ║
+# ║  kubectl get svc hook-gateway                                          ║
+# ╚══════════════════════════════════════════════════════════════════════════╝
+#
+# ClusterIP — reachable only inside the cluster.
+# External traffic enters via Ingress → this Service → Pod.
+#
+# CRITICAL — targetPort must equal containerPort in the Deployment exactly.
+#   Deployment containerPort: 8080
+#   Service    targetPort:    8080   ← must match
+#   If they differ, traffic reaches the Service but the Pod returns Connection refused.
+# ──────────────────────────────────────────────────────────────────────────
+apiVersion: v1
+kind: Service
+metadata:
+  name: hook-gateway             # ← Ingress backend.service.name must match this
+  namespace: default
+  labels:
+    app: hook-gateway
+    tier: backend
+spec:
+  type: ClusterIP
+  selector:
+    app: hook-gateway            # ← must match Deployment template.metadata.labels
+  ports:
+    - name:       http
+      protocol:   TCP
+      port:       8080           # port exposed inside the cluster
+      targetPort: 8080           # port the container actually listens on
+# ──────────────────────────────────────────────────────────────────────────

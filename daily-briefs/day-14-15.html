@@ -1,0 +1,785 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Days 14–15 — K8s Practice + Helm Intro · ProOps2026</title>
+<style>
+:root {
+  --bg:#0b0d14; --surface:#13161f; --surface2:#1c2030; --border:#252a3a;
+  --accent:#6c8ef7; --accent2:#a78bfa;
+  --green:#34d399; --yellow:#fbbf24; --orange:#fb923c;
+  --red:#f87171; --teal:#22d3ee; --blue:#60a5fa;
+  --text:#e8edf5; --muted:#7c87a0; --dim:#3a4258;
+}
+* { box-sizing:border-box; margin:0; padding:0; }
+body { background:var(--bg); color:var(--text); font-family:'Segoe UI',system-ui,sans-serif; font-size:15px; line-height:1.6; }
+
+nav { background:var(--surface);border-bottom:1px solid var(--border);padding:0 32px;height:50px;display:flex;align-items:center;gap:8px;position:sticky;top:0;z-index:200; }
+nav .brand { font-weight:800;font-size:14px;color:var(--accent);margin-right:12px; }
+.day-tab { background:transparent;border:1px solid var(--border);color:var(--muted);font-size:12px;font-weight:700;padding:5px 16px;border-radius:7px;cursor:pointer;transition:all .15s;white-space:nowrap; }
+.day-tab.active { background:rgba(108,142,247,.12);border-color:rgba(108,142,247,.4);color:var(--accent); }
+.day-tab:hover:not(.active) { color:var(--text);background:var(--surface2); }
+nav .spacer { flex:1; }
+nav .badge { background:rgba(52,211,153,.12);border:1px solid rgba(52,211,153,.25);color:var(--green);font-size:11px;font-weight:700;padding:3px 12px;border-radius:20px; }
+
+.layout { display:grid;grid-template-columns:1fr 260px;gap:32px;max-width:1100px;margin:0 auto;padding:40px 32px; }
+.main { min-width:0; }
+.sidebar { position:sticky;top:70px;height:fit-content;display:flex;flex-direction:column;gap:14px; }
+
+.day-header { margin-bottom:32px; }
+.day-meta { display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap; }
+.day-pill { font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;padding:3px 12px;border-radius:20px;background:rgba(108,142,247,.12);border:1px solid rgba(108,142,247,.25);color:var(--accent); }
+.day-tag { font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;padding:3px 12px;border-radius:20px;background:rgba(52,211,153,.08);border:1px solid rgba(52,211,153,.2);color:var(--green); }
+.day-group { font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;padding:3px 12px;border-radius:20px;background:rgba(251,191,36,.08);border:1px solid rgba(251,191,36,.25);color:var(--yellow); }
+.day-title { font-size:26px;font-weight:800;letter-spacing:-.3px;margin-bottom:8px; }
+.day-question { font-size:15px;color:var(--accent2);font-style:italic;border-left:3px solid var(--accent2);padding-left:14px;margin-bottom:16px;line-height:1.6; }
+.day-why { font-size:13px;color:var(--muted);line-height:1.7;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:14px 16px; }
+.day-why strong { color:var(--text); }
+
+.section-block { margin-bottom:32px; }
+.sec-label { font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:var(--dim);margin-bottom:14px;display:flex;align-items:center;gap:10px; }
+.sec-label::after { content:'';flex:1;height:1px;background:var(--border); }
+
+.chain { display:flex;flex-direction:column;gap:10px; }
+.chain-item { display:grid;grid-template-columns:32px 1fr;gap:14px;padding:14px 16px;background:var(--surface);border:1px solid var(--border);border-radius:10px;cursor:pointer;transition:border-color .15s; }
+.chain-item:hover { border-color:rgba(167,139,250,.4); }
+.chain-item.done { border-color:rgba(52,211,153,.3);background:rgba(52,211,153,.03); }
+.chain-num { width:32px;height:32px;border-radius:50%;background:var(--surface2);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;color:var(--muted);flex-shrink:0;transition:all .15s; }
+.chain-item.done .chain-num { background:rgba(52,211,153,.15);border-color:rgba(52,211,153,.4);color:var(--green); }
+.chain-q { font-size:13px;font-weight:600;margin-bottom:6px;line-height:1.5; }
+.chain-item.done .chain-q { color:var(--muted);text-decoration:line-through;text-decoration-color:var(--dim); }
+.chain-prompt { font-size:11px;font-family:'Cascadia Code','Fira Code',monospace;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:8px 12px;color:var(--accent2);line-height:1.6;margin-top:8px; }
+.chain-hint { font-size:11px;color:var(--dim);margin-top:6px;line-height:1.5; }
+.chain-note { font-size:11px;color:var(--yellow);margin-top:6px;line-height:1.5;padding:6px 10px;background:rgba(251,191,36,.06);border:1px solid rgba(251,191,36,.15);border-radius:5px; }
+
+.artifact-card { background:var(--surface);border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:14px; }
+.artifact-head { padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px; }
+.artifact-title { font-size:13px;font-weight:700;flex:1; }
+.artifact-file { font-family:'Cascadia Code','Fira Code',monospace;font-size:11px;color:var(--green);background:rgba(52,211,153,.08);border:1px solid rgba(52,211,153,.2);padding:2px 10px;border-radius:5px; }
+.artifact-body { padding:16px 18px; }
+.artifact-row { display:flex;gap:10px;margin-bottom:8px;font-size:12px;align-items:flex-start; }
+.artifact-row:last-child { margin-bottom:0; }
+.ar-dot { width:5px;height:5px;border-radius:50%;background:var(--green);flex-shrink:0;margin-top:6px; }
+.ar-text { color:var(--muted);line-height:1.5; }
+.ar-text strong { color:var(--text); }
+.artifact-fail { margin-top:14px;padding:10px 14px;background:rgba(248,113,113,.06);border:1px solid rgba(248,113,113,.2);border-radius:7px;font-size:11px;color:var(--muted);line-height:1.6; }
+.artifact-fail strong { color:var(--red); }
+
+.iq-section { margin-bottom:32px; }
+.iq-header { padding:14px 18px;background:rgba(167,139,250,.06);border:1px solid rgba(167,139,250,.25);border-radius:10px 10px 0 0;border-bottom:none; }
+.iq-title { font-size:12px;font-weight:700;color:var(--accent2);margin-bottom:4px; }
+.iq-subtitle { font-size:11px;color:var(--muted);line-height:1.6; }
+.iq-body { padding:14px 18px;background:rgba(167,139,250,.02);border:1px solid rgba(167,139,250,.25);border-radius:0 0 10px 10px;display:flex;flex-direction:column;gap:8px; }
+.iq-item { background:var(--surface);border:1px solid var(--border);border-radius:8px;overflow:hidden;cursor:pointer;transition:border-color .15s; }
+.iq-item:hover { border-color:rgba(167,139,250,.35); }
+.iq-item.answered { border-color:rgba(52,211,153,.3); }
+.iq-q { display:flex;align-items:flex-start;gap:12px;padding:10px 14px; }
+.iq-num { font-size:10px;font-weight:800;color:var(--accent2);background:rgba(167,139,250,.1);border:1px solid rgba(167,139,250,.2);padding:2px 7px;border-radius:4px;flex-shrink:0;margin-top:2px; }
+.iq-item.answered .iq-num { background:rgba(52,211,153,.12);border-color:rgba(52,211,153,.3);color:var(--green); }
+.iq-text { font-size:12px;color:var(--text);line-height:1.6;flex:1; }
+.iq-item.answered .iq-text { color:var(--muted); }
+.iq-check { font-size:11px;color:var(--dim);flex-shrink:0;margin-top:3px; }
+.iq-item.answered .iq-check { color:var(--green); }
+
+.criteria { display:flex;flex-direction:column;gap:8px; }
+.crit { display:flex;gap:10px;align-items:flex-start;padding:10px 14px;background:var(--surface);border:1px solid var(--border);border-radius:8px;font-size:12px;cursor:pointer;transition:border-color .15s; }
+.crit:hover { border-color:rgba(52,211,153,.3); }
+.crit.done { border-color:rgba(52,211,153,.35);background:rgba(52,211,153,.03); }
+.crit-box { width:16px;height:16px;border-radius:4px;border:1.5px solid var(--border);flex-shrink:0;margin-top:1px;display:flex;align-items:center;justify-content:center;transition:all .15s; }
+.crit.done .crit-box { background:var(--green);border-color:var(--green); }
+.crit-check { color:#0b0d14;font-size:10px;font-weight:900;display:none; }
+.crit.done .crit-check { display:block; }
+.crit-text { color:var(--muted);line-height:1.5; }
+.crit.done .crit-text { color:var(--dim); }
+.crit-group-label { font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;margin-top:12px; }
+
+.widget { background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px; }
+.widget-title { font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--dim);margin-bottom:12px; }
+.progress-bar { height:5px;background:var(--surface2);border-radius:10px;overflow:hidden;margin-bottom:6px; }
+.progress-fill { height:100%;background:linear-gradient(90deg,var(--accent),var(--green));border-radius:10px;transition:width .3s; }
+.progress-label { font-size:11px;color:var(--muted); }
+.progress-count { font-size:22px;font-weight:800;color:var(--text);margin-bottom:2px; }
+.as-row { display:flex;align-items:center;gap:8px;font-size:11px;margin-bottom:4px; }
+.as-dot { width:7px;height:7px;border-radius:50%;background:var(--dim);flex-shrink:0; }
+.as-dot.done { background:var(--green); }
+.as-name { color:var(--muted);flex:1; }
+.conn-row { font-size:11px;color:var(--muted);display:flex;gap:8px;align-items:flex-start; }
+.conn-dir { color:var(--dim);flex-shrink:0;width:48px; }
+.report-box { background:rgba(108,142,247,.06);border:1px solid rgba(108,142,247,.2);border-radius:10px;padding:14px 16px; }
+.report-title { font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--accent);margin-bottom:8px; }
+.report-step { font-size:11px;color:var(--muted);margin-bottom:6px;display:flex;gap:8px; }
+.report-step-num { color:var(--accent);font-weight:700;flex-shrink:0; }
+.explore-section { margin-bottom:32px; }
+.explore-header { display:flex;align-items:center;gap:12px;padding:12px 16px;background:rgba(251,191,36,.04);border:1px solid rgba(251,191,36,.2);border-radius:10px 10px 0 0;border-bottom:none; }
+.explore-header .label { font-size:12px;font-weight:700;color:var(--yellow); }
+.explore-header .sublabel { font-size:11px;color:var(--muted);margin-left:auto; }
+.explore-body { padding:14px 16px;background:rgba(251,191,36,.02);border:1px solid rgba(251,191,36,.2);border-radius:0 0 10px 10px;display:flex;flex-direction:column;gap:10px; }
+.explore-item { font-size:12px;color:var(--muted);line-height:1.6;padding-left:14px;position:relative; }
+.explore-item::before { content:'';position:absolute;left:0;top:7px;width:5px;height:5px;border-radius:50%;background:var(--yellow); }
+.explore-item strong { color:var(--text); }
+</style>
+</head>
+<body>
+
+<nav>
+  <span class="brand">ProOps2026</span>
+  <button class="day-tab active" id="tab-14" onclick="switchDay(14)">Day 14 — K8s Practice</button>
+  <button class="day-tab" id="tab-15" onclick="switchDay(15)">Day 15 — Helm Intro</button>
+  <div class="spacer"></div>
+  <span class="badge" id="nav-badge">Week 3 · Day 14 · Group Lab</span>
+</nav>
+
+<!-- ═══════════════════════════════════════════════ DAY 14 ═══ -->
+<div id="layout-14" class="layout">
+<div class="main">
+
+  <div class="day-header">
+    <div class="day-meta">
+      <span class="day-pill">Week 3 · Day 14</span>
+      <span class="day-tag">Hands-On</span>
+      <span class="day-group">Group</span>
+    </div>
+    <div class="day-title">K8s Practice: Deploy Your Project to Minikube</div>
+    <div class="day-question">Can you take every service your group designed and run it correctly in Kubernetes — with config separated from code and credentials never in plain text?</div>
+    <div class="day-why">
+      Days 12–13 taught K8s objects on toy apps. Today those objects meet the real project your group has been designing since Day 8. <strong>The non-negotiable rule for today: every environment variable lives in a ConfigMap or a Secret — nothing hardcoded in the Deployment YAML.</strong> In production, hardcoded values mean environment-specific image builds, credentials in version control, and no way to rotate a secret without redeploying. Getting this right now means your agent and your pipeline both work correctly from Day 15 onward.
+    </div>
+  </div>
+
+  <div style="padding:12px 16px;background:rgba(251,191,36,.06);border:1px solid rgba(251,191,36,.3);border-radius:10px;margin-bottom:18px;">
+    <div style="font-size:12px;font-weight:700;color:var(--yellow);margin-bottom:4px;">Group day — work with your project partner</div>
+    <div style="font-size:12px;color:var(--muted);line-height:1.7;">Both partners deploy today using the shared <code style="font-size:11px;color:var(--accent2);">docs</code> repo as the spec. Read your DOP and infrastructure doc before writing any YAML. Both of you should end Day 14 with every project service Running in your own minikube cluster.</div>
+  </div>
+
+  <div style="padding:10px 16px;background:rgba(108,142,247,.06);border:1px solid rgba(108,142,247,.25);border-radius:10px;margin-bottom:24px;">
+    <div style="font-size:12px;font-weight:700;color:var(--accent);margin-bottom:4px;">Setup — same minikube cluster, ingress addon still enabled</div>
+    <div style="font-family:'Cascadia Code','Fira Code',monospace;font-size:11px;color:var(--accent2);line-height:1.9;">minikube status &nbsp;·&nbsp; kubectl get nodes &nbsp;·&nbsp; minikube addons list | grep ingress</div>
+  </div>
+
+  <div class="section-block" id="d14-chain">
+    <div class="sec-label">Discovery chain — 8 questions</div>
+    <div class="chain">
+
+      <div class="chain-item" onclick="toggleChain14(this,0)">
+        <div class="chain-num">1</div>
+        <div class="chain-body">
+          <div class="chain-q">Before writing any YAML: list every service from your DOP and build a deployment checklist — one row per service, classifying every env var as ConfigMap or Secret.</div>
+          <div class="chain-prompt">My project has these services: [list from your DOP]. For each service, give me a checklist table with: (1) image format, (2) container port, (3) all env vars the service reads at startup, (4) classify each env var — ConfigMap or Secret using this rule: "Would this value cause a security incident if it appeared in a CI log or a PR diff?" No → ConfigMap. Yes → Secret. Examples: DATABASE_HOST → ConfigMap, LOG_LEVEL → ConfigMap, DATABASE_PASSWORD → Secret, JWT_SECRET → Secret, (5) Service type: ClusterIP or needs Ingress route, (6) needs PVC?
+After the table: total number of K8s objects I need to create. Give me that count before I write a single line of YAML.</div>
+          <div class="chain-hint">The env var key names matter — your ConfigMap keys must match exactly what the application code reads from the environment. A typo here causes <code style="font-size:11px;color:var(--accent2);">CrashLoopBackOff</code> with a confusing error.</div>
+          <div class="chain-note">Create a <code style="font-size:11px;color:var(--accent2);">k8s/</code> directory in your repo now. Naming: <code style="font-size:11px;color:var(--accent2);">api-cm.yaml</code>, <code style="font-size:11px;color:var(--accent2);">api-secret.yaml</code>, <code style="font-size:11px;color:var(--accent2);">api-deployment.yaml</code>, <code style="font-size:11px;color:var(--accent2);">api-svc.yaml</code> — one file per object.</div>
+        </div>
+      </div>
+
+      <div class="chain-item" onclick="toggleChain14(this,1)">
+        <div class="chain-num">2</div>
+        <div class="chain-body">
+          <div class="chain-q">Write the ConfigMaps for your project's services. Choose between <code>envFrom</code> (whole ConfigMap as env vars) and <code>env.valueFrom.configMapKeyRef</code> (one specific key). Apply all of them.</div>
+          <div class="chain-prompt">Based on the checklist, help me write ConfigMap YAML for my project services.
+(1) Show both Deployment reference methods side by side:
+   Method A: envFrom.configMapRef — injects every key as an env var. One line in the Deployment. Use when you want all values and naming is consistent.
+   Method B: env.valueFrom.configMapKeyRef — pulls one key, lets you rename it. Use when you need to pull from multiple ConfigMaps selectively.
+(2) Use stringData (not data) — human-readable, no manual base64 needed.
+(3) Write the ConfigMap for [my first service]. Apply: kubectl apply -f api-cm.yaml. Verify: kubectl get configmap api-cm -o yaml.
+(4) Critical: the ConfigMap metadata.name must match exactly what envFrom.configMapRef.name references. Show the error message when the name is wrong — kubectl describe pod [pod] shows "configmap not found" in Events.
+(5) Write and apply ConfigMaps for ALL remaining services. kubectl get configmaps should list all of them.</div>
+          <div class="chain-hint">Use <code style="font-size:11px;color:var(--accent2);">stringData</code> in your ConfigMap, not <code style="font-size:11px;color:var(--accent2);">data</code>. Both store the same way internally — <code style="font-size:11px;color:var(--accent2);">stringData</code> is just easier to write and review in a PR without base64 decoding everything.</div>
+        </div>
+      </div>
+
+      <div class="chain-item" onclick="toggleChain14(this,2)">
+        <div class="chain-num">3</div>
+        <div class="chain-body">
+          <div class="chain-q">Write the Secrets for your services. The rule is strict: real credential values must not appear in any YAML file committed to Git. Use <code>kubectl create secret</code> instead.</div>
+          <div class="chain-prompt">Handle the sensitive values from the checklist.
+(1) Why you cannot commit real Secret values to Git: git history is permanent — even deleting the file doesn't remove the value from history. A private repo today can become a public leak tomorrow.
+(2) Safe creation — use kubectl create secret, not YAML:
+   kubectl create secret generic api-secret \
+     --from-literal=DATABASE_PASSWORD=dev-password-123 \
+     --from-literal=JWT_SECRET=dev-jwt-secret
+   The real value never touches a file on disk.
+(3) Quick reinforcement: base64 in Secret YAML is encoding, not encryption. kubectl get secret api-secret -o yaml, then base64 -d reveals the value instantly. What actually protects a Secret is RBAC.
+(4) Two mount methods in a Deployment:
+   env.valueFrom.secretKeyRef — value becomes env var. Simple. Shows up in `kubectl exec [pod] -- env`.
+   volumeMount with secret volume — value mounted as file in tmpfs. Doesn't appear in env output. Preferred for TLS certs and long tokens.
+   For today: use env.valueFrom.secretKeyRef for passwords and API keys.
+(5) Create Secrets for ALL services via kubectl create secret. Verify: kubectl get secrets.</div>
+          <div class="chain-hint">For this training, use realistic dummy credentials like <code style="font-size:11px;color:var(--accent2);">dev-password-123</code>. The habit that matters is knowing WHERE the value comes from — never a YAML file in Git.</div>
+          <div class="chain-note">In a real project, credentials come from a secrets manager (AWS Secrets Manager, HashiCorp Vault). The kubectl create secret workflow is the dev approximation — the source of truth is external, not in the repo.</div>
+        </div>
+      </div>
+
+      <div class="chain-item" onclick="toggleChain14(this,3)">
+        <div class="chain-num">4</div>
+        <div class="chain-body">
+          <div class="chain-q">Deploy your first service: write the Deployment (referencing ConfigMap + Secret) and Service. Apply both, then prove the wiring works by reading the injected values from inside the running Pod.</div>
+          <div class="chain-prompt">I have the ConfigMap and Secret for [first service]. Write and apply the Deployment and Service:
+(1) Deployment spec — include:
+   envFrom.configMapRef: pointing to the ConfigMap name
+   env.valueFrom.secretKeyRef: for each Secret key
+   resources.requests: cpu 100m, memory 128Mi
+   A livenessProbe if the service has a /health endpoint.
+   Apply order: ConfigMap and Secret must exist before the Deployment. If not, Pod enters CreateContainerConfigError.
+(2) ClusterIP Service — targetPort must match the container's listen port exactly.
+(3) Three verification commands in sequence:
+   kubectl get pods -w  (watch state transitions — Running 1/1 is success)
+   kubectl logs [pod] --tail=30  (look for startup message, no error stack trace)
+   kubectl exec -it [pod] -- env | grep DATABASE  (confirm ConfigMap values injected)
+(4) CrashLoopBackOff: kubectl logs [pod] --previous shows the crashed container's output. The error is almost always in the last 10 lines.
+(5) If env vars are present but wrong value: kubectl apply -f api-cm.yaml to update, then kubectl rollout restart deployment [name] to force Pods to pick up new values.</div>
+          <div class="chain-hint">The <code style="font-size:11px;color:var(--accent2);">kubectl exec [pod] -- env | grep DATABASE</code> command is the definitive proof of wiring. Do not skip this — seeing the value injected confirms the entire ConfigMap → Deployment → Pod chain is working.</div>
+        </div>
+      </div>
+
+      <div class="chain-item" onclick="toggleChain14(this,4)">
+        <div class="chain-num">5</div>
+        <div class="chain-body">
+          <div class="chain-q">In Docker Compose your services found each other by service name (e.g. <code>http://database:5432</code>). In Kubernetes, what is the correct hostname — and how do you update your ConfigMaps to use it?</div>
+          <div class="chain-prompt">Explain Kubernetes in-cluster DNS and help me update all ConfigMaps:
+(1) Format: [service-name].[namespace].svc.cluster.local. Within the same namespace, just [service-name] works. The service-name is the metadata.name in your Service YAML.
+(2) For each service that depends on another: map the old Docker Compose hostname to the new K8s Service name. Give me that mapping as a table.
+(3) Test DNS from inside a running Pod: kubectl exec -it [pod] -- nslookup [service-name]. Successful response shows the ClusterIP. NXDOMAIN means the Service doesn't exist or has a different name.
+(4) After updating ConfigMaps: kubectl apply -f [svc]-cm.yaml, then kubectl rollout restart deployment [name].
+(5) Race condition: Pod A starts before Pod B's Service is ready. Simplest dev workaround: configure retry/reconnect in the app code, or use an init container that loops nslookup until the dependency resolves.</div>
+          <div class="chain-hint">The Service name is what other Pods use as hostname — name your Services clearly: <code style="font-size:11px;color:var(--accent2);">api-svc</code>, <code style="font-size:11px;color:var(--accent2);">postgres-svc</code>. Avoid generic names like <code style="font-size:11px;color:var(--accent2);">service</code> when you have six of them.</div>
+        </div>
+      </div>
+
+      <div class="chain-item" onclick="toggleChain14(this,5)">
+        <div class="chain-num">6</div>
+        <div class="chain-body">
+          <div class="chain-q">Deploy all remaining services. For each one: ConfigMap → Secret → Deployment → Service, in that order. Troubleshoot any startup failures. All Pods must reach <code>Running 1/1</code>.</div>
+          <div class="chain-prompt">Walk me through a repeatable deploy-and-verify loop for my remaining services:
+(1) Apply order per service: kubectl apply -f [svc]-cm.yaml → kubectl create secret generic [svc]-secret ... → kubectl apply -f [svc]-deployment.yaml → kubectl apply -f [svc]-svc.yaml.
+(2) After each Deployment apply, watch for 30 seconds: kubectl get pods -w. The four bad states and causes:
+   Pending: insufficient resources — lower resources.requests
+   ImagePullBackOff: wrong image name/tag — fix image field
+   CrashLoopBackOff: app crashes on start — kubectl logs [pod] --previous
+   CreateContainerConfigError: ConfigMap or Secret name mismatch — kubectl get cm,secret and compare names
+(3) After each service is Running: kubectl exec -it [pod] -- env | grep [a key from its ConfigMap].
+(4) Deploy in dependency order: databases and caches first, then backend services, then gateway/frontend. Your architecture diagram shows this order.</div>
+          <div class="chain-hint">Work one service at a time. Deploying everything at once and debugging multiple CrashLoopBackOffs simultaneously is far harder than fixing them one by one.</div>
+        </div>
+      </div>
+
+      <div class="chain-item" onclick="toggleChain14(this,6)">
+        <div class="chain-num">7</div>
+        <div class="chain-body">
+          <div class="chain-q">All services are Running. Write the Ingress to route external traffic to the right backends. Test every path with <code>curl</code>.</div>
+          <div class="chain-prompt">Write and apply the Ingress for my project:
+(1) My routes: [fill from DOP — e.g. /api → api-svc:3000, / → frontend-svc:80]. Write full Ingress YAML with pathType: Prefix.
+(2) Access from outside minikube:
+   Option A: minikube tunnel (run in separate terminal) → curl -H "Host: myproject.local" http://127.0.0.1/api/health
+   Option B: curl -H "Host: myproject.local" http://$(minikube ip)/api/health
+(3) Test every path. Diagnose errors:
+   502 Bad Gateway: backend Service has no healthy Endpoints → kubectl get endpoints [svc-name] shows <none> → Service selector doesn't match Pod labels.
+   404 from nginx: path rule didn't match → check pathType and exact path string.
+(4) Verify Ingress routes to Service name not Deployment name. backend.service.name in Ingress must match metadata.name in the Service YAML exactly.</div>
+          <div class="chain-hint"><code style="font-size:11px;color:var(--accent2);">kubectl get endpoints</code> is the fastest debug tool for 502 errors. If a Service shows <code>&lt;none&gt;</code> Endpoints, compare the Service selector with <code style="font-size:11px;color:var(--accent2);">kubectl get pods --show-labels</code> — the labels must match exactly.</div>
+        </div>
+      </div>
+
+      <div class="chain-item" onclick="toggleChain14(this,7)">
+        <div class="chain-num">8</div>
+        <div class="chain-body">
+          <div class="chain-q">The full stack is Running. Make one real end-to-end API call. Then write <code>memory/kubernetes-project.md</code> — your agent's reference for every future K8s task on this project.</div>
+          <div class="chain-prompt">Two tasks to close Day 14:
+
+Task 1 — End-to-end verification:
+Make an API call that exercises real application logic — create a resource, read it back, confirm the response. This proves the full chain: Ingress → Service → Pod → application code → database. Then: kubectl get all — what does a fully healthy stack look like for each resource type?
+
+Task 2 — Write memory/kubernetes-project.md:
+1. Table: all services, their K8s Service name, namespace, port
+2. ConfigMap vs Secret rule — one sentence, your version from today
+3. In-cluster DNS pattern for this project (e.g. api-svc.default.svc.cluster.local)
+4. Apply order: which service must be Running before others can start
+5. Failures hit today + what fixed them — most valuable for future sessions
+
+Format: tables and short bullets. No prose. This file is loaded into agent context, not read by a human.</div>
+          <div class="chain-hint">The apply-order entry is the most likely thing you will re-debug. Write it now: "postgres-svc must be Running before api-svc, api-svc before gateway." Your agent follows this on every future deploy without rediscovering it.</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- D14 ARTIFACTS -->
+  <div class="section-block" id="d14-artifact">
+    <div class="sec-label">Artifacts</div>
+    <div class="artifact-card">
+      <div class="artifact-head"><div class="artifact-title">Project K8s Manifests</div><div class="artifact-file">k8s/*.yaml</div></div>
+      <div class="artifact-body">
+        <div class="artifact-row"><div class="ar-dot"></div><div class="ar-text"><strong>Every service has a ConfigMap</strong> — no env var hardcoded in any Deployment spec.</div></div>
+        <div class="artifact-row"><div class="ar-dot"></div><div class="ar-text"><strong>Every service has a Secret</strong> — created via <code>kubectl create secret</code>, no real credentials in any committed YAML file.</div></div>
+        <div class="artifact-row"><div class="ar-dot"></div><div class="ar-text"><strong>Wiring verified</strong> — <code>kubectl exec [pod] -- env | grep [KEY]</code> confirms ConfigMap values injected into at least one running Pod.</div></div>
+        <div class="artifact-row"><div class="ar-dot"></div><div class="ar-text"><strong>All Pods Running, Ingress tested</strong> — every path returns the correct service's response via <code>curl</code>.</div></div>
+        <div class="artifact-fail"><strong>Weak signals:</strong> ConfigMaps created but Deployments still have hardcoded env vars. Secret YAML with real credentials committed to Git. Pods Running but end-to-end call never made.</div>
+      </div>
+    </div>
+    <div class="artifact-card">
+      <div class="artifact-head"><div class="artifact-title">Project K8s Memory File</div><div class="artifact-file">memory/kubernetes-project.md</div></div>
+      <div class="artifact-body">
+        <div class="artifact-row"><div class="ar-dot"></div><div class="ar-text"><strong>Service table + DNS pattern + apply order</strong> — agent uses this to orient on every future K8s task without running kubectl to rediscover state.</div></div>
+        <div class="artifact-row"><div class="ar-dot"></div><div class="ar-text"><strong>Failures + fixes captured</strong> — what went wrong today and how it was resolved. Most valuable part for future sessions.</div></div>
+        <div class="artifact-fail"><strong>Weak signals:</strong> Written as a narrative log of today instead of a reference table. Missing apply-order section.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- D14 IQ -->
+  <div class="iq-section" id="d14-interview">
+    <div class="iq-header"><div class="iq-title">Interview Questions</div><div class="iq-subtitle">Click when you can answer without notes.</div></div>
+    <div class="iq-body">
+      <div class="iq-item" onclick="toggleIQ(this)"><div class="iq-q"><span class="iq-num">Q1</span><span class="iq-text">What is the rule for deciding whether an env var goes in a ConfigMap vs a Secret? Give two examples of each.</span><span class="iq-check">&#10003;</span></div></div>
+      <div class="iq-item" onclick="toggleIQ(this)"><div class="iq-q"><span class="iq-num">Q2</span><span class="iq-text">What is the difference between <code>envFrom.configMapRef</code> and <code>env.valueFrom.configMapKeyRef</code>? When do you prefer one over the other?</span><span class="iq-check">&#10003;</span></div></div>
+      <div class="iq-item" onclick="toggleIQ(this)"><div class="iq-q"><span class="iq-num">Q3</span><span class="iq-text">You update a ConfigMap with <code>kubectl apply</code>. The running Pod still has the old value. What do you run to fix it?</span><span class="iq-check">&#10003;</span></div></div>
+      <div class="iq-item" onclick="toggleIQ(this)"><div class="iq-q"><span class="iq-num">Q4</span><span class="iq-text">A Pod is in <code>CreateContainerConfigError</code>. What is the most likely cause, and what is the first command you run to confirm?</span><span class="iq-check">&#10003;</span></div></div>
+      <div class="iq-item" onclick="toggleIQ(this)"><div class="iq-q"><span class="iq-num">Q5</span><span class="iq-text">In Docker Compose, service A connects to service B using hostname "b". What hostname should service A use in Kubernetes? What changes if they are in different namespaces?</span><span class="iq-check">&#10003;</span></div></div>
+      <div class="iq-item" onclick="toggleIQ(this)"><div class="iq-q"><span class="iq-num">Q6</span><span class="iq-text">Your Ingress returns 502 for one path and 200 for another. What is the most likely cause, and which command confirms it?</span><span class="iq-check">&#10003;</span></div></div>
+      <div class="iq-item" onclick="toggleIQ(this)"><div class="iq-q"><span class="iq-num">Q7</span><span class="iq-text">Why should you never commit a Secret YAML with real credentials to Git — even in a private repository?</span><span class="iq-check">&#10003;</span></div></div>
+      <div class="iq-item" onclick="toggleIQ(this)"><div class="iq-q"><span class="iq-num">Q8</span><span class="iq-text">Mounting a Secret as a file vs as an env var — when does the file mount matter from a security standpoint?</span><span class="iq-check">&#10003;</span></div></div>
+    </div>
+  </div>
+
+  <!-- D14 DONE -->
+  <div class="section-block" id="d14-done">
+    <div class="sec-label">Done criteria</div>
+    <div class="criteria">
+      <div class="crit" onclick="toggleCrit(this)"><div class="crit-box"><span class="crit-check">&#10003;</span></div><div class="crit-text">Deployment checklist complete from DOP — all services mapped, all env vars classified.</div></div>
+      <div class="crit" onclick="toggleCrit(this)"><div class="crit-box"><span class="crit-check">&#10003;</span></div><div class="crit-text">ConfigMap written and applied for every service — <code style="font-size:11px;color:var(--accent2);">kubectl get configmaps</code> lists all of them.</div></div>
+      <div class="crit" onclick="toggleCrit(this)"><div class="crit-box"><span class="crit-check">&#10003;</span></div><div class="crit-text">No Deployment YAML contains hardcoded env var values — every value comes from <code>envFrom</code> or <code>valueFrom</code>.</div></div>
+      <div class="crit" onclick="toggleCrit(this)"><div class="crit-box"><span class="crit-check">&#10003;</span></div><div class="crit-text">Secrets created via <code style="font-size:11px;color:var(--accent2);">kubectl create secret</code> — no real credentials in any committed YAML file.</div></div>
+      <div class="crit" onclick="toggleCrit(this)"><div class="crit-box"><span class="crit-check">&#10003;</span></div><div class="crit-text">ConfigMap wiring verified: <code style="font-size:11px;color:var(--accent2);">kubectl exec [pod] -- env | grep [KEY]</code> shows values injected into at least one Pod.</div></div>
+      <div class="crit" onclick="toggleCrit(this)"><div class="crit-box"><span class="crit-check">&#10003;</span></div><div class="crit-text">All project services Running — <code style="font-size:11px;color:var(--accent2);">kubectl get pods</code> shows every Pod as <code>Running 1/1</code>.</div></div>
+      <div class="crit" onclick="toggleCrit(this)"><div class="crit-box"><span class="crit-check">&#10003;</span></div><div class="crit-text">Inter-service connection strings updated to K8s DNS names — no Docker Compose hostnames in any ConfigMap.</div></div>
+      <div class="crit" onclick="toggleCrit(this)"><div class="crit-box"><span class="crit-check">&#10003;</span></div><div class="crit-text">Ingress applied and tested — every path returns the correct response via <code>curl</code>.</div></div>
+      <div class="crit" onclick="toggleCrit(this)"><div class="crit-box"><span class="crit-check">&#10003;</span></div><div class="crit-text">End-to-end API call made from outside the cluster — real application logic executed, not just a health ping.</div></div>
+      <div class="crit" onclick="toggleCrit(this)"><div class="crit-box"><span class="crit-check">&#10003;</span></div><div class="crit-text"><code style="font-size:11px;color:var(--accent2);">memory/kubernetes-project.md</code> written — service table, DNS pattern, apply order, failures + fixes.</div></div>
+      <div class="crit" onclick="toggleCrit(this)"><div class="crit-box"><span class="crit-check">&#10003;</span></div><div class="crit-text">Git commit pushed: <code style="font-size:11px;color:var(--accent2);">Day 14 — K8s deploy: all services + ConfigMap + Secret + Ingress</code></div></div>
+      <div class="crit" onclick="toggleCrit(this)"><div class="crit-box"><span class="crit-check">&#10003;</span></div><div class="crit-text">Daily log filled — Tomorrow's Context Block names the 3rd-party service (Redis/RabbitMQ/etc.) your project needs for full functionality.</div></div>
+    </div>
+  </div>
+
+  <div class="explore-section">
+    <div class="explore-header"><span class="label">Explore further</span><span class="sublabel">Only after all done criteria checked &#10003;</span></div>
+    <div class="explore-body">
+      <div style="font-size:11px;color:var(--dim);margin-bottom:4px;">Optional. Only if everything above is done.</div>
+      <div class="explore-item"><strong>Namespace isolation.</strong> Ask Claude: <em>"Move my entire project stack into a dedicated namespace. What changes in the Service DNS names, and how do I re-create Secrets and ConfigMaps there?"</em></div>
+      <div class="explore-item"><strong>Resource limits.</strong> Ask Claude: <em>"I set requests but not limits. What happens if my api Pod's memory spikes — OOMKilled or memory stolen from other Pods? Show me how to set limits and the tradeoff."</em></div>
+      <div class="explore-item"><strong>Sealed Secrets for GitOps.</strong> Ask Claude: <em>"I want to commit encrypted Secrets to Git safely. What is the Sealed Secrets controller and how does kubeseal work?"</em></div>
+    </div>
+  </div>
+
+</div><!-- /main D14 -->
+
+<!-- D14 SIDEBAR -->
+<div class="sidebar">
+  <div class="widget">
+    <div class="widget-title">Progress — Day 14</div>
+    <div class="progress-count" id="d14-count">0 / 8</div>
+    <div style="margin-bottom:8px;"><div class="progress-bar"><div class="progress-fill" id="d14-fill" style="width:0%"></div></div><div class="progress-label" id="d14-label">Discovery chain</div></div>
+  </div>
+  <div class="widget">
+    <div class="widget-title">Today's Artifacts</div>
+    <div class="as-row"><div class="as-dot" id="d14-cm"></div><div class="as-name">ConfigMaps for all services</div></div>
+    <div class="as-row"><div class="as-dot" id="d14-sec"></div><div class="as-name">Secrets for all services</div></div>
+    <div class="as-row"><div class="as-dot" id="d14-first"></div><div class="as-name">First service Running + verified</div></div>
+    <div class="as-row"><div class="as-dot" id="d14-stack"></div><div class="as-name">Full project stack Running</div></div>
+    <div class="as-row"><div class="as-dot" id="d14-ing"></div><div class="as-name">Ingress verified end-to-end</div></div>
+    <div class="as-row"><div class="as-dot" id="d14-mem"></div><div class="as-name">memory/kubernetes-project.md</div></div>
+  </div>
+  <div class="widget" style="background:rgba(248,113,113,.04);border-color:rgba(248,113,113,.2);">
+    <div class="widget-title" style="color:var(--red);">The non-negotiable rule</div>
+    <div style="font-size:11px;color:var(--muted);line-height:1.6;">Zero hardcoded env vars in Deployment YAML. Every value from ConfigMap or Secret. Every credential from <code style="font-size:10px;color:var(--accent2);">kubectl create secret</code> — never from a file in Git.</div>
+  </div>
+  <div class="widget" style="background:rgba(108,142,247,.04);border-color:rgba(108,142,247,.2);">
+    <div class="widget-title" style="color:var(--accent);">Quick debug map</div>
+    <div style="font-size:11px;color:var(--muted);line-height:1.9;font-family:'Cascadia Code','Fira Code',monospace;">kubectl get pods -w<br>kubectl logs [pod] --previous<br>kubectl describe pod [pod]<br>kubectl exec [pod] -- env<br>kubectl get endpoints [svc]<br>kubectl rollout restart deploy [n]</div>
+  </div>
+  <div class="widget">
+    <div class="widget-title">Connects To</div>
+    <div style="display:flex;flex-direction:column;gap:6px;">
+      <div class="conn-row"><span class="conn-dir">&larr; Day 13</span><span style="font-size:11px;color:var(--muted);">ConfigMap, Secret, Ingress — applied to real project today</span></div>
+      <div class="conn-row"><span class="conn-dir">&larr; Day 8</span><span style="font-size:11px;color:var(--muted);">DOP + IRD — the spec you deployed from</span></div>
+      <div class="conn-row"><span class="conn-dir">&rarr; Day 15</span><span style="font-size:11px;color:var(--muted);">Helm intro — install Redis/RabbitMQ without writing manifests by hand</span></div>
+    </div>
+  </div>
+  <div class="report-box">
+    <div class="report-title">End-of-day report</div>
+    <div class="report-step"><span class="report-step-num">1.</span> Fill daily log + context block</div>
+    <div class="report-step"><span class="report-step-num">2.</span> git commit + push k8s/ + memory file</div>
+    <div class="report-step"><span class="report-step-num">3.</span> Paste <code style="font-size:10px;color:var(--accent);">=== Day 14 |</code> to trainer channel</div>
+    <div style="margin-top:8px;padding:6px 8px;background:rgba(52,211,153,.06);border:1px solid rgba(52,211,153,.2);border-radius:5px;font-size:10px;color:var(--green);line-height:1.5;">Include: <code>kubectl get all</code> + <code>kubectl get cm,secret</code> output</div>
+  </div>
+</div>
+</div><!-- /layout-14 -->
+
+
+<!-- ═══════════════════════════════════════════════ DAY 15 ═══ -->
+<div id="layout-15" class="layout" style="display:none">
+<div class="main">
+
+  <div class="day-header">
+    <div class="day-meta">
+      <span class="day-pill">Week 3 · Day 15</span>
+      <span class="day-tag">Hands-On</span>
+    </div>
+    <div class="day-title">Helm Intro: Install Your Project's Dependencies</div>
+    <div class="day-question">Your project needs Redis or RabbitMQ. Writing those manifests by hand is 70+ lines you now own forever — and the operator's knowledge that goes into configuring them correctly is not in any YAML tutorial. What does Helm give you instead?</div>
+    <div class="day-why">
+      Day 14 got your own services running. But your project design already calls for Redis, RabbitMQ, or PostgreSQL — infrastructure services with complex production requirements that have nothing to do with your application code. <strong>Helm is the package manager for Kubernetes.</strong> A chart is a package. A release is an installed instance. One install command gives you a StatefulSet, PVC, Service, and ConfigMap — battle-tested defaults, the operator's production experience baked in. Today you watch the intro video, understand the chart model, and use Helm to install the 3rd-party dependencies your project needs.
+    </div>
+  </div>
+
+  <!-- SETUP -->
+  <div style="padding:12px 16px;background:rgba(251,191,36,.06);border:1px solid rgba(251,191,36,.3);border-radius:10px;margin-bottom:18px;">
+    <div style="font-size:12px;font-weight:700;color:var(--yellow);margin-bottom:6px;">Setup — install Helm before starting</div>
+    <div style="padding:8px 12px;background:rgba(52,211,153,.06);border:1px solid rgba(52,211,153,.2);border-radius:6px;font-size:11px;color:var(--muted);line-height:1.6;">
+      <div style="font-family:'Cascadia Code','Fira Code',monospace;color:var(--accent2);line-height:1.9;">
+        # macOS<br>brew install helm<br># Linux<br>curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash<br>helm version
+      </div>
+    </div>
+  </div>
+
+  <!-- VIDEO BLOCK -->
+  <div id="d15-video" style="margin-bottom:28px;">
+    <div style="border:1px solid rgba(96,165,250,.35);border-radius:10px;overflow:hidden;">
+      <div style="padding:12px 18px;background:rgba(96,165,250,.06);border-bottom:1px solid rgba(96,165,250,.2);display:flex;align-items:center;gap:12px;">
+        <div style="width:8px;height:8px;border-radius:50%;background:var(--blue);flex-shrink:0;"></div>
+        <div style="font-size:12px;font-weight:700;color:var(--blue);">Theory Video — Helm Basics</div>
+        <div style="margin-left:auto;font-size:11px;color:var(--muted);font-family:'Cascadia Code','Fira Code',monospace;">00:32:00 → 2:03:00</div>
+      </div>
+      <div style="padding:16px 18px;">
+        <div style="font-size:12px;color:var(--muted);line-height:1.7;margin-bottom:14px;">Watch this before the discovery chain. Covers Helm from zero: what a chart is, what a release is, install/upgrade/rollback lifecycle, and the values override system. The discovery chain applies what you watched.</div>
+        <a href="https://drive.google.com/file/d/1BAhRZ0snvlLhXumBy4huOCPlw3U2U2C1/view?usp=sharing" target="_blank" style="display:inline-flex;align-items:center;gap:8px;padding:8px 16px;background:rgba(96,165,250,.1);border:1px solid rgba(96,165,250,.3);border-radius:7px;text-decoration:none;color:var(--blue);font-size:12px;font-weight:600;margin-bottom:16px;">&#9654; Open video — start at 00:32:00</a>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+          <div style="padding:10px 14px;background:rgba(96,165,250,.04);border:1px solid rgba(96,165,250,.2);border-radius:7px;">
+            <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--blue);margin-bottom:5px;">What to look for #1</div>
+            <div style="font-size:11px;color:var(--muted);line-height:1.6;">How <code style="color:var(--accent2);">helm install</code> creates a <strong style="color:var(--text);">named release</strong> stored in the cluster as a Secret — this is what enables history and rollback. Helm is tracking the deployment as a unit, not just applying YAML.</div>
+          </div>
+          <div style="padding:10px 14px;background:rgba(96,165,250,.04);border:1px solid rgba(96,165,250,.2);border-radius:7px;">
+            <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--blue);margin-bottom:5px;">What to look for #2</div>
+            <div style="font-size:11px;color:var(--muted);line-height:1.6;">How <code style="color:var(--accent2);">values.yaml</code> and <code style="color:var(--accent2);">--values</code> override files work together. The precedence: rightmost file wins, then <code style="color:var(--accent2);">--set</code> wins over all files. This is the pattern you'll use to customize 3rd-party charts.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- D15 CHAIN -->
+  <div class="section-block" id="d15-chain">
+    <div class="sec-label">Discovery chain — 8 questions</div>
+    <div class="chain">
+
+      <div class="chain-item" onclick="toggleChain15(this,0)">
+        <div class="chain-num">1</div>
+        <div class="chain-body">
+          <div class="chain-q">Your project needs Redis (or RabbitMQ, or PostgreSQL). What would deploying it to Kubernetes by hand actually require — and why does that become unsustainable?</div>
+          <div class="chain-prompt">My project needs [Redis / RabbitMQ / PostgreSQL]. What would deploying it manually look like?
+(1) List every K8s object it needs. For Redis: StatefulSet (not Deployment — why StatefulSet for stateful apps?), Service, PersistentVolumeClaim, ConfigMap for redis.conf, Secret for AUTH token. Estimate total lines of YAML.
+(2) Redis has a production gotcha: if you don't set maxmemory and maxmemory-policy in redis.conf, Redis consumes all available node memory and gets OOMKilled. How would you know to configure this writing YAML by hand vs using a Helm chart where an operator already built it in?
+(3) What happens when Redis 7.2 releases a security patch — which files change, and what's the risk of doing it wrong?
+(4) What Helm gives you instead: one install command, battle-tested defaults, operator knowledge baked in as values.
+(5) What Helm does NOT solve: your own application code, data migration between major versions, backup strategy. Helm installs the service — you still own the operational decisions.</div>
+          <div class="chain-hint">StatefulSets give each Pod a stable network identity (<code style="font-size:11px;color:var(--accent2);">redis-0</code>, <code style="font-size:11px;color:var(--accent2);">redis-1</code>) and a stable PVC — because Redis replicas have roles (primary vs replica) and data must be tied to a specific Pod, not float between them.</div>
+        </div>
+      </div>
+
+      <div class="chain-item" onclick="toggleChain15(this,1)">
+        <div class="chain-num">2</div>
+        <div class="chain-body">
+          <div class="chain-q">Run <code>helm create myapp</code>. Explore the generated structure. How does a value in <code>values.yaml</code> flow through to a <code>{{ .Values.image.tag }}</code> reference in a template?</div>
+          <div class="chain-prompt">Walk me through the chart structure helm create generates:
+(1) List and explain every generated file: Chart.yaml, values.yaml, templates/deployment.yaml, templates/service.yaml, templates/ingress.yaml, templates/_helpers.tpl, templates/NOTES.txt, .helmignore.
+(2) Open values.yaml. Show image.tag. Then show the {{ .Values.image.tag }} reference in templates/deployment.yaml. Explain the dot-notation path: .Values is root, image is nested key, tag is field.
+(3) What is _helpers.tpl? Why does the leading underscore matter? What is a named template ({{- define "myapp.fullname" -}})?
+(4) Run: helm template . to render with defaults. Then: helm template . --set image.tag=v2.0.0 — show the difference.
+(5) What happens if you reference a key that doesn't exist in values.yaml — error or empty string?
+Key takeaway: helm template . --debug is your dry-run before every helm install. Render first, apply second.</div>
+          <div class="chain-hint"><code style="font-size:11px;color:var(--accent2);">helm template . --debug</code> renders the full YAML locally with template file names above each block. Run this before every <code style="font-size:11px;color:var(--accent2);">helm install</code> to catch template errors without touching the cluster.</div>
+        </div>
+      </div>
+
+      <div class="chain-item" onclick="toggleChain15(this,2)">
+        <div class="chain-num">3</div>
+        <div class="chain-body">
+          <div class="chain-q">Add the Bitnami repository. Find the chart for your project's 3rd-party service. Inspect its values — and identify the three keys you must override before installing.</div>
+          <div class="chain-prompt">Walk me through adding a Helm repo and inspecting a chart before install:
+(1) Add and update:
+   helm repo add bitnami https://charts.bitnami.com/bitnami
+   helm repo update
+   helm search repo [service-name]
+   What does the output show — chart name, chart version, app version, description?
+(2) Inspect the chart's values: helm show values bitnami/[chart-name]
+   This outputs 300–600 lines. Navigate efficiently:
+   helm show values bitnami/redis | grep -A 10 "auth:"
+   helm show values bitnami/redis | grep -A 5 "persistence:"
+   helm show values bitnami/redis | grep -A 5 "resources:"
+(3) For my project I need to override: (a) auth credential, (b) persistence storage size, (c) resource limits suitable for dev. Show me those key names in the chart.
+(4) Write a minimal my-[service]-values.yaml with only those three overrides. Everything else uses the chart default — that is the point.
+(5) Why NOT to use --set for the password: it appears in shell history and in the Helm release Secret stored in etcd.</div>
+          <div class="chain-hint">Run <code style="font-size:11px;color:var(--accent2);">helm show values bitnami/redis | wc -l</code> to see how many configurable values exist — usually 400+. You override the handful that differ from defaults. The rest is production knowledge you get for free.</div>
+        </div>
+      </div>
+
+      <div class="chain-item" onclick="toggleChain15(this,3)">
+        <div class="chain-num">4</div>
+        <div class="chain-body">
+          <div class="chain-q">Install the chart using your overrides file. Read the post-install NOTES carefully — they contain the exact service name your application must use to connect.</div>
+          <div class="chain-prompt">Install [Redis/RabbitMQ/other] for my project:
+(1) Install command: helm install my-redis bitnami/redis -f my-redis-values.yaml --namespace default
+   What does Helm print after a successful install? (The NOTES.txt — read every line. It contains the hostname and the connection test command.)
+(2) Verify running: kubectl get pods, kubectl get svc. What is the Service name Helm created? Write it down — this is the hostname your app uses.
+(3) The service name follows the pattern: [release-name]-[chart-component]. For helm install my-redis bitnami/redis, the master service is my-redis-master. The NOTES tells you this. Do not guess.
+(4) helm list — what columns does it show? What does the STATUS column value "deployed" mean vs "failed"?
+(5) If the install fails or a Pod is Pending: kubectl describe pod [helm-pod-name] — Events section shows the reason. Most common in minikube: PVC pending because the default StorageClass doesn't exist. Fix: add --set persistence.enabled=false for dev.</div>
+          <div class="chain-hint">The NOTES.txt Helm prints is not decoration. It contains the exact connection string and a test command. Trainees who skip reading NOTES spend 20 minutes guessing the service name that was printed right in front of them.</div>
+        </div>
+      </div>
+
+      <div class="chain-item" onclick="toggleChain15(this,4)">
+        <div class="chain-num">5</div>
+        <div class="chain-body">
+          <div class="chain-q">Update your application's ConfigMap with the Helm service name. Restart the affected Deployment. Verify the connection from inside your app Pod.</div>
+          <div class="chain-prompt">Connect my application to the installed chart service:
+(1) Which env var in my application's ConfigMap holds REDIS_HOST (or AMQP_URL, or DATABASE_HOST)? Change its value from the old Docker Compose hostname to the Helm service name from Q4.
+(2) Apply the updated ConfigMap: kubectl apply -f [app]-cm.yaml. Then force the Deployment to pick it up: kubectl rollout restart deployment [app-name]. Watch: kubectl rollout status deployment [app-name].
+(3) Test the connection from inside the app Pod:
+   For Redis: kubectl exec -it [app-pod] -- redis-cli -h my-redis-master ping → should return PONG
+   For RabbitMQ: kubectl exec -it [app-pod] -- [connection test command from your app]
+   For PostgreSQL: kubectl exec -it [app-pod] -- psql -h my-postgresql -U [user] -c "\l"
+(4) If the connection fails: check kubectl get svc | grep redis — is the service Running? Check kubectl exec [app-pod] -- nslookup my-redis-master — does DNS resolve?
+(5) Once connected: kubectl get all should show both your project services and the Helm-installed service Running side by side. Take a screenshot for the report.</div>
+          <div class="chain-hint">After <code style="font-size:11px;color:var(--accent2);">kubectl rollout restart</code>, watch the new Pods come up: <code style="font-size:11px;color:var(--accent2);">kubectl get pods -w</code>. You should see one old Pod terminate as one new Pod reaches Running — the env var update happened cleanly.</div>
+        </div>
+      </div>
+
+      <div class="chain-item" onclick="toggleChain15(this,5)">
+        <div class="chain-num">6</div>
+        <div class="chain-body">
+          <div class="chain-q">Explore the Helm release model: what does a release track, what is a revision, and what does <code>helm history</code> show?</div>
+          <div class="chain-prompt">Explain the Helm release model using my installed release:
+(1) Run: helm list. What columns appear — name, namespace, revision, status, chart, app version. What does a revision of 1 mean?
+(2) Run: helm history my-redis. What does each row show — revision number, timestamp, status, chart version, description. How is "install" shown differently from "upgrade"?
+(3) Where does Helm store this history? (Answer: as Kubernetes Secrets in the same namespace — run kubectl get secrets | grep helm to see them.) Why does this mean Helm releases survive pod restarts?
+(4) The key insight: helm rollback my-redis 1 reverts ALL objects in the release atomically — StatefulSet, Service, ConfigMap, PVC references — as one unit. Compare to kubectl rollout undo which only reverts a Deployment.
+(5) Demonstration: make a small change to my-redis-values.yaml (e.g. change a label), run helm upgrade my-redis bitnami/redis -f my-redis-values.yaml, then helm history my-redis — confirm revision 2 appears.</div>
+          <div class="chain-hint"><code style="font-size:11px;color:var(--accent2);">helm upgrade --install my-redis bitnami/redis -f values.yaml</code> is the idempotent form — installs if release doesn't exist, upgrades if it does. This is the form used in CI/CD pipelines.</div>
+        </div>
+      </div>
+
+      <div class="chain-item" onclick="toggleChain15(this,6)">
+        <div class="chain-num">7</div>
+        <div class="chain-body">
+          <div class="chain-q">Run a real <code>helm upgrade</code> — change a value, verify the revision increments. Then run <code>helm rollback</code> and confirm the cluster reverts.</div>
+          <div class="chain-prompt">Practice the helm upgrade → rollback workflow:
+(1) Make a meaningful change to my-redis-values.yaml — e.g. change resources.requests.memory from 128Mi to 256Mi. Run: helm upgrade my-redis bitnami/redis -f my-redis-values.yaml. Verify: helm history my-redis shows revision 2 or higher.
+(2) Check the change applied: kubectl describe statefulset my-redis-master | grep -A 5 "Limits" — confirm the new resource value is present.
+(3) Simulate a bad upgrade: change a value to something invalid (e.g. a non-existent image tag). Run helm upgrade. What happens — does Helm roll back automatically, or does the old release stay running?
+(4) Run: helm rollback my-redis [previous-revision]. Then helm history — rollback creates a NEW revision, it does not rewrite history. Confirm the cluster is back to the previous state.
+(5) When to rollback vs fix-forward: rollback immediately if a production health check fails post-upgrade. Fix-forward (new upgrade with corrected values) when you have time to investigate properly. Never leave a release in FAILED status in production.</div>
+          <div class="chain-hint">Helm rollback creates a new revision rather than rewinding history — so <code style="font-size:11px;color:var(--accent2);">helm history</code> always shows the full audit trail: install → upgrade → rollback. This is intentional — you should always be able to see what happened.</div>
+        </div>
+      </div>
+
+      <div class="chain-item" onclick="toggleChain15(this,7)">
+        <div class="chain-num">8</div>
+        <div class="chain-body">
+          <div class="chain-q">Write <code>memory/helm-basics.md</code> — your agent's reference for every future Helm task on this project.</div>
+          <div class="chain-prompt">Help me write memory/helm-basics.md. This file is loaded by my agent at the start of every Helm task.
+
+1. Three core concepts — one sentence each:
+   - Chart: a versioned package of K8s manifests + parameterized values
+   - Release: a named installed instance of a chart, tracked in the cluster with revision history
+   - Repository: a server hosting versioned charts (like apt, npm)
+
+2. Install workflow — exact commands:
+   helm repo add bitnami [url] → helm repo update → helm search repo [name] → helm show values [chart] | grep [key] → write overrides.yaml → helm install [rel] [chart] -f overrides.yaml → read NOTES.txt for service name
+
+3. Five operations with syntax: install, upgrade, rollback, list, uninstall
+
+4. Values override precedence: base values.yaml → --values file → --set. Rightmost wins.
+
+5. How to find service name after install: read NOTES.txt or kubectl get svc | grep [release-name]
+
+6. Common failure modes:
+   - PVC Pending in minikube: add --set persistence.enabled=false
+   - "resource already exists": release name conflict — use helm upgrade --install
+   - App can't connect: check NOTES.txt for real service name, run nslookup from inside app Pod
+
+7. Project's installed charts: table — release name, chart, service hostname, what it provides
+
+Format: tables and bullets. No prose.</div>
+          <div class="chain-hint">The "project's installed charts" table at the bottom is the most practically useful part. Your agent needs to know that <code style="font-size:11px;color:var(--accent2);">my-redis-master</code> is the Redis hostname — without looking it up every time.</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- D15 ARTIFACTS -->
+  <div class="section-block" id="d15-artifact">
+    <div class="sec-label">Artifacts</div>
+    <div class="artifact-card">
+      <div class="artifact-head"><div class="artifact-title">3rd-Party Chart Installed + App Connected</div><div class="artifact-file">helm list + running Pod</div></div>
+      <div class="artifact-body">
+        <div class="artifact-row"><div class="ar-dot"></div><div class="ar-text"><strong>Chart installed</strong> — <code>helm list</code> shows the release as <code>deployed</code>. <code>kubectl get pods</code> shows the chart's Pod(s) as Running.</div></div>
+        <div class="artifact-row"><div class="ar-dot"></div><div class="ar-text"><strong>Custom values file committed</strong> — <code>k8s/my-[service]-values.yaml</code> in the repo. Not installed with raw <code>--set</code> flags.</div></div>
+        <div class="artifact-row"><div class="ar-dot"></div><div class="ar-text"><strong>Application connected</strong> — ConfigMap updated with Helm service name, Deployment restarted, connection tested from inside the app Pod.</div></div>
+        <div class="artifact-row"><div class="ar-dot"></div><div class="ar-text"><strong>helm upgrade + rollback practiced</strong> — <code>helm history</code> shows at least 2 revisions.</div></div>
+        <div class="artifact-fail"><strong>Weak signals:</strong> Chart installed but app still has old hostname in ConfigMap — connection never tested. Installed with --set password=xxx and no values file in the repo. helm rollback never run.</div>
+      </div>
+    </div>
+    <div class="artifact-card">
+      <div class="artifact-head"><div class="artifact-title">Helm Basics Memory File</div><div class="artifact-file">memory/helm-basics.md</div></div>
+      <div class="artifact-body">
+        <div class="artifact-row"><div class="ar-dot"></div><div class="ar-text"><strong>Three core concepts defined</strong> — chart, release, repository. One sentence each, non-circular.</div></div>
+        <div class="artifact-row"><div class="ar-dot"></div><div class="ar-text"><strong>Install workflow + five operations</strong> — exact commands from repo add through helm list.</div></div>
+        <div class="artifact-row"><div class="ar-dot"></div><div class="ar-text"><strong>Project's installed charts table</strong> — release names, service hostnames, what they provide. Agent reads this before every Helm task.</div></div>
+        <div class="artifact-fail"><strong>Weak signals:</strong> Written as prose paragraphs. Missing the "project's installed charts" table — agent will look up service names on every task.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- D15 IQ -->
+  <div class="iq-section" id="d15-interview">
+    <div class="iq-header"><div class="iq-title">Interview Questions</div><div class="iq-subtitle">Click when you can answer without notes.</div></div>
+    <div class="iq-body">
+      <div class="iq-item" onclick="toggleIQ(this)"><div class="iq-q"><span class="iq-num">Q1</span><span class="iq-text">What is the difference between a Helm chart, a Helm release, and a Helm repository?</span><span class="iq-check">&#10003;</span></div></div>
+      <div class="iq-item" onclick="toggleIQ(this)"><div class="iq-q"><span class="iq-num">Q2</span><span class="iq-text">You run <code>helm install my-redis bitnami/redis</code>. How do you find the hostname your application should use to connect to it?</span><span class="iq-check">&#10003;</span></div></div>
+      <div class="iq-item" onclick="toggleIQ(this)"><div class="iq-q"><span class="iq-num">Q3</span><span class="iq-text">When do you use <code>--set</code> vs <code>--values</code>? Give one scenario where using <code>--set</code> is wrong even if it works.</span><span class="iq-check">&#10003;</span></div></div>
+      <div class="iq-item" onclick="toggleIQ(this)"><div class="iq-q"><span class="iq-num">Q4</span><span class="iq-text">What does <code>helm template . --debug</code> do and why should you run it before <code>helm install</code>?</span><span class="iq-check">&#10003;</span></div></div>
+      <div class="iq-item" onclick="toggleIQ(this)"><div class="iq-q"><span class="iq-num">Q5</span><span class="iq-text">Why does Redis use a StatefulSet rather than a Deployment? What does StatefulSet give you that Deployment does not?</span><span class="iq-check">&#10003;</span></div></div>
+      <div class="iq-item" onclick="toggleIQ(this)"><div class="iq-q"><span class="iq-num">Q6</span><span class="iq-text"><code>helm rollback</code> reverts the release. Does it rewrite the revision history or create a new revision? What does <code>helm history</code> show after a rollback?</span><span class="iq-check">&#10003;</span></div></div>
+      <div class="iq-item" onclick="toggleIQ(this)"><div class="iq-q"><span class="iq-num">Q7</span><span class="iq-text">A Helm-installed Redis Pod is Pending in minikube. <code>kubectl describe pod</code> shows "persistentvolumeclaim not bound." What is the quickest fix for a dev cluster?</span><span class="iq-check">&#10003;</span></div></div>
+      <div class="iq-item" onclick="toggleIQ(this)"><div class="iq-q"><span class="iq-num">Q8</span><span class="iq-text">Your teammate used <code>helm install redis bitnami/redis --set auth.password=secret123</code>. What are the two problems with this, and what should they have done?</span><span class="iq-check">&#10003;</span></div></div>
+    </div>
+  </div>
+
+  <!-- D15 DONE -->
+  <div class="section-block" id="d15-done">
+    <div class="sec-label">Done criteria</div>
+    <div class="criteria">
+      <div class="crit" onclick="toggleCrit(this)"><div class="crit-box"><span class="crit-check">&#10003;</span></div><div class="crit-text">Day 14 fully complete — all project services Running before starting Day 15.</div></div>
+      <div class="crit" onclick="toggleCrit(this)"><div class="crit-box"><span class="crit-check">&#10003;</span></div><div class="crit-text">Helm video watched: 00:32:00 → 2:03:00.</div></div>
+      <div class="crit" onclick="toggleCrit(this)"><div class="crit-box"><span class="crit-check">&#10003;</span></div><div class="crit-text">Helm installed: <code style="font-size:11px;color:var(--accent2);">helm version</code> shows v3.x.</div></div>
+      <div class="crit" onclick="toggleCrit(this)"><div class="crit-box"><span class="crit-check">&#10003;</span></div><div class="crit-text"><code style="font-size:11px;color:var(--accent2);">helm create myapp</code> run and chart structure explored — you can explain what each generated file does.</div></div>
+      <div class="crit" onclick="toggleCrit(this)"><div class="crit-box"><span class="crit-check">&#10003;</span></div><div class="crit-text">Bitnami repo added and searched. <code style="font-size:11px;color:var(--accent2);">helm show values</code> run on the chart before install.</div></div>
+      <div class="crit" onclick="toggleCrit(this)"><div class="crit-box"><span class="crit-check">&#10003;</span></div><div class="crit-text">Overrides file written and committed: <code style="font-size:11px;color:var(--accent2);">k8s/my-[service]-values.yaml</code>.</div></div>
+      <div class="crit" onclick="toggleCrit(this)"><div class="crit-box"><span class="crit-check">&#10003;</span></div><div class="crit-text">Chart installed with <code style="font-size:11px;color:var(--accent2);">-f values-file.yaml</code> — <code style="font-size:11px;color:var(--accent2);">helm list</code> shows release as <code>deployed</code>.</div></div>
+      <div class="crit" onclick="toggleCrit(this)"><div class="crit-box"><span class="crit-check">&#10003;</span></div><div class="crit-text">Application connected to chart service — ConfigMap updated with Helm service name, connection tested from inside the app Pod.</div></div>
+      <div class="crit" onclick="toggleCrit(this)"><div class="crit-box"><span class="crit-check">&#10003;</span></div><div class="crit-text"><code style="font-size:11px;color:var(--accent2);">helm upgrade</code> run at least once. <code style="font-size:11px;color:var(--accent2);">helm rollback</code> run at least once. <code style="font-size:11px;color:var(--accent2);">helm history</code> shows 2+ revisions.</div></div>
+      <div class="crit" onclick="toggleCrit(this)"><div class="crit-box"><span class="crit-check">&#10003;</span></div><div class="crit-text"><code style="font-size:11px;color:var(--accent2);">memory/helm-basics.md</code> written — three concepts, install workflow, five operations, project's installed charts table.</div></div>
+      <div class="crit" onclick="toggleCrit(this)"><div class="crit-box"><span class="crit-check">&#10003;</span></div><div class="crit-text">Git commit pushed: <code style="font-size:11px;color:var(--accent2);">Day 15 — Helm intro: [chart-name] installed + memory/helm-basics.md</code></div></div>
+      <div class="crit" onclick="toggleCrit(this)"><div class="crit-box"><span class="crit-check">&#10003;</span></div><div class="crit-text">Daily log filled — Tomorrow's Context Block notes what Helm feature you want to understand next (chart creation, multi-env values, upgrade pipelines).</div></div>
+    </div>
+  </div>
+
+  <div class="explore-section">
+    <div class="explore-header"><span class="label">Explore further</span><span class="sublabel">Only after all done criteria checked &#10003;</span></div>
+    <div class="explore-body">
+      <div style="font-size:11px;color:var(--dim);margin-bottom:4px;">Optional. Only if everything above is done.</div>
+      <div class="explore-item"><strong>Multi-environment values pattern.</strong> Ask Claude: <em>"Show me how to deploy the same Redis chart to dev and prod with different storage sizes and replica counts using base values.yaml + values-dev.yaml + values-prod.yaml. What is the two-file install command?"</em></div>
+      <div class="explore-item"><strong>Helm hooks.</strong> Ask Claude: <em>"What is a Helm hook? Show me a pre-upgrade hook that runs a database migration Job before the new application version starts. What annotation makes it a hook, and what happens if the Job fails?"</em></div>
+      <div class="explore-item"><strong>Helmfile for multi-release management.</strong> Ask Claude: <em>"I need to deploy postgres, redis, rabbitmq, and my api in the right order. What is Helmfile and how does it manage multiple releases declaratively with per-environment values?"</em></div>
+    </div>
+  </div>
+
+</div><!-- /main D15 -->
+
+<!-- D15 SIDEBAR -->
+<div class="sidebar">
+  <div class="widget">
+    <div class="widget-title">Progress — Day 15</div>
+    <div class="progress-count" id="d15-count">0 / 8</div>
+    <div style="margin-bottom:8px;"><div class="progress-bar"><div class="progress-fill" id="d15-fill" style="width:0%"></div></div><div class="progress-label" id="d15-label">Watch the video first</div></div>
+  </div>
+  <div class="widget">
+    <div class="widget-title">Today's Artifacts</div>
+    <div class="as-row"><div class="as-dot" id="d15-chart"></div><div class="as-name">3rd-party chart installed</div></div>
+    <div class="as-row"><div class="as-dot" id="d15-values"></div><div class="as-name">values file committed to repo</div></div>
+    <div class="as-row"><div class="as-dot" id="d15-conn"></div><div class="as-name">App connected to chart service</div></div>
+    <div class="as-row"><div class="as-dot" id="d15-rollback"></div><div class="as-name">helm upgrade + rollback done</div></div>
+    <div class="as-row"><div class="as-dot" id="d15-mem"></div><div class="as-name">memory/helm-basics.md</div></div>
+  </div>
+  <div class="widget" style="background:rgba(52,211,153,.04);border-color:rgba(52,211,153,.2);">
+    <div class="widget-title" style="color:var(--green);">Helm quick map</div>
+    <div style="font-size:11px;color:var(--muted);line-height:1.9;font-family:'Cascadia Code','Fira Code',monospace;">
+      helm repo add [name] [url]<br>
+      helm repo update<br>
+      helm search repo [name]<br>
+      helm show values [chart]<br>
+      helm install [rel] [chart] -f v.yaml<br>
+      helm list &nbsp;·&nbsp; helm history [rel]<br>
+      helm upgrade [rel] [chart] -f v.yaml<br>
+      helm rollback [rel] [rev]<br>
+      helm uninstall [rel]
+    </div>
+  </div>
+  <div class="widget">
+    <div class="widget-title">Connects To</div>
+    <div style="display:flex;flex-direction:column;gap:6px;">
+      <div class="conn-row"><span class="conn-dir">&larr; Day 14</span><span style="font-size:11px;color:var(--muted);">Project services deployed — Helm adds the 3rd-party layer</span></div>
+      <div class="conn-row"><span class="conn-dir">&rarr; Day 16</span><span style="font-size:11px;color:var(--muted);">Helm deeper: chart creation, multi-env values, CI pipeline integration</span></div>
+      <div class="conn-row"><span class="conn-dir">&rarr; Day 24</span><span style="font-size:11px;color:var(--muted);">helm upgrade --install in GitHub Actions pipeline</span></div>
+    </div>
+  </div>
+  <div class="report-box">
+    <div class="report-title">End-of-day report</div>
+    <div class="report-step"><span class="report-step-num">1.</span> Fill daily log + context block</div>
+    <div class="report-step"><span class="report-step-num">2.</span> git commit + push values file + memory file</div>
+    <div class="report-step"><span class="report-step-num">3.</span> Paste <code style="font-size:10px;color:var(--accent);">=== Day 15 |</code> to trainer channel</div>
+    <div style="margin-top:8px;padding:6px 8px;background:rgba(52,211,153,.06);border:1px solid rgba(52,211,153,.2);border-radius:5px;font-size:10px;color:var(--green);line-height:1.5;">Include: <code>helm list</code> + <code>helm history [release]</code> showing install + upgrade + rollback revisions</div>
+  </div>
+</div>
+</div><!-- /layout-15 -->
+
+<script>
+function switchDay(day) {
+  document.getElementById('layout-14').style.display = day === 14 ? 'grid' : 'none';
+  document.getElementById('layout-15').style.display = day === 15 ? 'grid' : 'none';
+  document.getElementById('tab-14').classList.toggle('active', day === 14);
+  document.getElementById('tab-15').classList.toggle('active', day === 15);
+  document.getElementById('nav-badge').textContent = day === 14 ? 'Week 3 · Day 14 · Group Lab' : 'Week 3 · Day 15 · Hands-On';
+  window.scrollTo(0, 0);
+}
+
+const done14 = new Array(8).fill(false);
+function toggleChain14(el, i) {
+  done14[i] = !done14[i];
+  el.classList.toggle('done', done14[i]);
+  const n = done14.filter(Boolean).length;
+  document.getElementById('d14-count').textContent = n + ' / 8';
+  document.getElementById('d14-fill').style.width = (n/8*100) + '%';
+  const lbl = ['Keep going','Keep going','Halfway','Halfway','Almost there','Almost there','Almost there','Done!'];
+  document.getElementById('d14-label').textContent = n === 0 ? 'Discovery chain' : lbl[n-1];
+  if (n >= 2) document.getElementById('d14-cm').classList.add('done');
+  if (n >= 3) document.getElementById('d14-sec').classList.add('done');
+  if (n >= 4) document.getElementById('d14-first').classList.add('done');
+  if (n >= 6) document.getElementById('d14-stack').classList.add('done');
+  if (n >= 7) document.getElementById('d14-ing').classList.add('done');
+  if (n >= 8) document.getElementById('d14-mem').classList.add('done');
+}
+
+const done15 = new Array(8).fill(false);
+function toggleChain15(el, i) {
+  done15[i] = !done15[i];
+  el.classList.toggle('done', done15[i]);
+  const n = done15.filter(Boolean).length;
+  document.getElementById('d15-count').textContent = n + ' / 8';
+  document.getElementById('d15-fill').style.width = (n/8*100) + '%';
+  const lbl = ['Keep going','Keep going','Halfway','Halfway','Almost there','Almost there','Almost there','Done!'];
+  document.getElementById('d15-label').textContent = n === 0 ? 'Watch the video first' : lbl[n-1];
+  if (n >= 2) document.getElementById('d15-chart').classList.add('done');
+  if (n >= 3) document.getElementById('d15-values').classList.add('done');
+  if (n >= 5) document.getElementById('d15-conn').classList.add('done');
+  if (n >= 7) document.getElementById('d15-rollback').classList.add('done');
+  if (n >= 8) document.getElementById('d15-mem').classList.add('done');
+}
+
+function toggleIQ(el) { el.classList.toggle('answered'); }
+function toggleCrit(el) { el.classList.toggle('done'); }
+</script>
+</body>
+</html>

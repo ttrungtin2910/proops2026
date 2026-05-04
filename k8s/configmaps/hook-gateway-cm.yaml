@@ -1,0 +1,114 @@
+# ╔══════════════════════════════════════════════════════════════════════════╗
+# ║  ConfigMap — hook-gateway-cm  (first service)                          ║
+# ║  kubectl apply  -f hook-gateway-cm.yaml                                ║
+# ║  kubectl get configmap hook-gateway-cm -o yaml                         ║
+# ╚══════════════════════════════════════════════════════════════════════════╝
+#
+# NOTE — stringData vs data:
+#   • ConfigMap  → always uses `data`.  Values are plain strings already;
+#                  no encoding step needed.  "stringData" does not exist here.
+#   • Secret     → use `stringData` (K8s encodes to base64 internally).
+#                  That is where the checklist item (2) applies.
+# ──────────────────────────────────────────────────────────────────────────
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: hook-gateway-cm        # ← CRITICAL: must match every envFrom / valueFrom
+  namespace: default
+  labels:
+    app: hook-gateway
+    tier: backend
+data:
+  # ── Kafka (K8s DNS: kafka.default.svc.cluster.local:9092) ─────────────────
+  KAFKA_BOOTSTRAP_SERVERS:   "kafka:9092"
+  KAFKA_TOPIC_QNA_INCOMING:  "dev.qna.incoming.msg"
+
+  # ── Runtime ────────────────────────────────────────────────────────────────
+  APP_ENV:                   "dev"
+  PORT:                      "8080"
+  RATE_LIMIT_PERMIT:         "10"
+  RATE_LIMIT_WINDOW_SECONDS: "1"
+  JWT_TOKEN_LIFETIME_HOURS:  "24"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# DEPLOYMENT SNIPPET — both methods side by side (copy one block into your
+# Deployment YAML; delete the other)
+# ══════════════════════════════════════════════════════════════════════════════
+#
+# ┌─────────────────────────────────────────────────────────────────────────┐
+# │  METHOD A  —  envFrom.configMapRef                                      │
+# │  Injects ALL keys at once as env vars.                                  │
+# │  Use when: every key is needed and naming is already consistent.        │
+# └─────────────────────────────────────────────────────────────────────────┘
+#
+#   spec:
+#     containers:
+#       - name: hook-gateway
+#         image: ttrungtin2910/hook-gateway:day10
+#         ports:
+#           - containerPort: 8080
+#         envFrom:
+#           - configMapRef:
+#               name: hook-gateway-cm      # ← must equal metadata.name above
+#           - secretRef:
+#               name: hook-gateway-secret  # JWT_SECRET lives here (not in CM)
+#
+# ┌─────────────────────────────────────────────────────────────────────────┐
+# │  METHOD B  —  env.valueFrom.configMapKeyRef                             │
+# │  Pulls ONE key at a time; lets you rename it inside the container.      │
+# │  Use when: pulling from multiple ConfigMaps or renaming a key.         │
+# └─────────────────────────────────────────────────────────────────────────┘
+#
+#   spec:
+#     containers:
+#       - name: hook-gateway
+#         image: ttrungtin2910/hook-gateway:day10
+#         ports:
+#           - containerPort: 8080
+#         env:
+#           - name: KAFKA_BOOTSTRAP_SERVERS        # name inside the container
+#             valueFrom:
+#               configMapKeyRef:
+#                 name: hook-gateway-cm            # ConfigMap to read from
+#                 key:  KAFKA_BOOTSTRAP_SERVERS    # key inside that ConfigMap
+#           - name: KAFKA_TOPIC_QNA_INCOMING
+#             valueFrom:
+#               configMapKeyRef:
+#                 name: hook-gateway-cm
+#                 key:  KAFKA_TOPIC_QNA_INCOMING
+#           - name: APP_ENV
+#             valueFrom:
+#               configMapKeyRef:
+#                 name: hook-gateway-cm
+#                 key:  APP_ENV
+#           - name: RATE_LIMIT_PERMIT
+#             valueFrom:
+#               configMapKeyRef:
+#                 name: hook-gateway-cm
+#                 key:  RATE_LIMIT_PERMIT
+#           - name: JWT_SECRET                     # pulled from Secret, not CM
+#             valueFrom:
+#               secretKeyRef:
+#                 name: hook-gateway-secret
+#                 key:  JWT_SECRET
+#
+# ══════════════════════════════════════════════════════════════════════════════
+# CRITICAL — what happens when metadata.name does NOT match configMapRef.name
+# ══════════════════════════════════════════════════════════════════════════════
+#
+#  Bad Deployment fragment:
+#    envFrom:
+#      - configMapRef:
+#          name: hook-gatewy-cm    # ← typo: "gatewy" instead of "gateway"
+#
+#  Pod will stay in Pending.  kubectl describe pod hook-gateway-xxx shows:
+#
+#    Events:
+#      Type     Reason   Age  From     Message
+#      -------  ------   ---  ----     -------
+#      Warning  Failed   5s   kubelet  Error: configmap "hook-gatewy-cm" not found
+#
+#  Fix: correct the name in the Deployment and re-apply, OR rename the
+#  ConfigMap to match (kubectl delete + re-apply; ConfigMaps are immutable
+#  in-place for the name field).
+# ──────────────────────────────────────────────────────────────────────────

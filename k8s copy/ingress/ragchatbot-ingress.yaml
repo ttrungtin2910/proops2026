@@ -1,0 +1,72 @@
+# ╔══════════════════════════════════════════════════════════════════════════╗
+# ║  Ingress — ragchatbot                                                  ║
+# ║  kubectl apply  -f ragchatbot-ingress.yaml                             ║
+# ║  kubectl get ingress                                                   ║
+# ╚══════════════════════════════════════════════════════════════════════════╝
+#
+# ROUTE MAP
+# ─────────────────────────────────────────────────────────────────────────
+# Browser                  Ingress              frontend nginx (K8s DNS)
+# ──────────────────────   ────────────────      ──────────────────────────
+# GET  /                → frontend:80    →  Angular SPA (static)
+# POST /webchat         → frontend:80    →  hook-gateway:8080/webchat
+# GET  /auth/token      → frontend:80    →  hook-gateway:8080/auth/token
+# WS   /ws              → frontend:80    →  websocket-responder:8085/ws
+# GET  /api/health      → frontend:80    →  hook-gateway:8080/health
+#
+# The nginx container inside the frontend pod handles all backend proxying
+# via in-cluster DNS.  The Ingress needs only one rule.
+#
+# ACCESS FROM OUTSIDE MINIKUBE
+# ─────────────────────────────────────────────────────────────────────────
+# Option A — minikube tunnel (run in a separate terminal):
+#   minikube tunnel
+#   curl -H "Host: ragchatbot.local" http://127.0.0.1/api/health
+#
+# Option B — minikube ip:
+#   curl -H "Host: ragchatbot.local" http://$(minikube ip)/api/health
+#
+# Option C — add to hosts file (persistent):
+#   Windows: C:\Windows\System32\drivers\etc\hosts
+#   Add:  127.0.0.1  ragchatbot.local        (with minikube tunnel running)
+#   Then: curl http://ragchatbot.local/api/health
+#
+# DIAGNOSE ERRORS
+# ─────────────────────────────────────────────────────────────────────────
+# 502 Bad Gateway:
+#   kubectl get endpoints frontend
+#   → "NotReadyAddresses" or empty means Pod not Ready (probe failing)
+#   → selector mismatch: compare Ingress backend.service.name with
+#     Service metadata.name (they must be identical)
+#
+# 404 from nginx-ingress (not from app):
+#   path rule didn't match — check pathType and exact path string
+#   kubectl describe ingress ragchatbot-ingress
+#
+# CRITICAL — backend.service.name must match Service metadata.name exactly:
+#   backend.service.name: frontend   ← must equal Service metadata.name below
+# ──────────────────────────────────────────────────────────────────────────
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ragchatbot-ingress
+  namespace: default
+  labels:
+    app: ragchatbot
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"   # keep WebSocket alive
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-body-size: "1m"
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: ragchatbot.local
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: frontend    # ← must match Service metadata.name exactly
+                port:
+                  number: 80      # ← must match Service spec.ports.port

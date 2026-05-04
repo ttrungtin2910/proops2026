@@ -1,0 +1,63 @@
+# ╔══════════════════════════════════════════════════════════════════════════╗
+# ║  Deployment — frontend (Angular + nginx)                               ║
+# ║  kubectl apply  -f frontend-deployment.yaml                            ║
+# ║  kubectl rollout status deployment/frontend                            ║
+# ╚══════════════════════════════════════════════════════════════════════════╝
+#
+# The nginx inside this container acts as a reverse proxy — it handles ALL
+# backend routing via K8s in-cluster DNS:
+#   /webchat    → http://hook-gateway:8080/webchat
+#   /auth/token → http://hook-gateway:8080/auth/token
+#   /ws         → http://websocket-responder:8085/ws  (WebSocket)
+#   /api/health → http://hook-gateway:8080/health
+#   /           → Angular SPA static files
+#
+# The Ingress therefore only needs one rule: / → frontend:80
+# ──────────────────────────────────────────────────────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend
+  namespace: default
+  labels:
+    app: frontend
+    tier: frontend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: frontend
+  template:
+    metadata:
+      labels:
+        app: frontend
+    spec:
+      containers:
+        - name: frontend
+          image: ttrungtin2910/frontend:day10
+          ports:
+            - containerPort: 80    # nginx listens on 80
+
+          resources:
+            requests:
+              cpu:    100m
+              memory: 64Mi
+            limits:
+              cpu:    200m
+              memory: 128Mi
+
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 10
+            periodSeconds:       10
+            failureThreshold:    3
+
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 5
+            periodSeconds:       5
+            failureThreshold:    3

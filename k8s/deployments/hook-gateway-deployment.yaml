@@ -1,0 +1,93 @@
+# ╔══════════════════════════════════════════════════════════════════════════╗
+# ║  Deployment — hook-gateway                                             ║
+# ║  kubectl apply  -f hook-gateway-deployment.yaml                        ║
+# ║  kubectl rollout status deployment/hook-gateway                        ║
+# ╚══════════════════════════════════════════════════════════════════════════╝
+#
+# APPLY ORDER — must satisfy before this file:
+#   1. kubectl apply -f k8s/configmaps/hook-gateway-cm.yaml
+#   2. kubectl create secret generic hook-gateway-secret --from-literal=...
+#   If either is missing → Pod enters CreateContainerConfigError.
+# ──────────────────────────────────────────────────────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hook-gateway
+  namespace: default
+  labels:
+    app: hook-gateway
+    tier: backend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: hook-gateway        # ← must match template.metadata.labels below
+  template:
+    metadata:
+      labels:
+        app: hook-gateway
+    spec:
+      containers:
+        - name: hook-gateway
+          image: ttrungtin2910/hook-gateway:day10
+          ports:
+            - containerPort: 8080   # ← must match Service.spec.ports.targetPort
+
+          # ── Config (non-sensitive) ────────────────────────────────────────
+          envFrom:
+            - configMapRef:
+                name: hook-gateway-cm        # injects all 7 keys at once
+
+          # ── Secrets (sensitive — one key per entry) ───────────────────────
+          env:
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: hook-gateway-secret  # ← must match Secret metadata.name
+                  key:  JWT_SECRET
+
+          # ── Resource requests ─────────────────────────────────────────────
+          resources:
+            requests:
+              cpu:    100m
+              memory: 128Mi
+            limits:
+              cpu:    500m
+              memory: 512Mi
+
+          # ── Health probe ──────────────────────────────────────────────────
+          # GET /health → { "status": "ok", "service": "hook-gateway" }
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 20   # .NET 8 cold-start buffer
+            periodSeconds:       10
+            failureThreshold:    3
+
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 15
+            periodSeconds:       5
+            failureThreshold:    3
+
+# ══════════════════════════════════════════════════════════════════════════════
+# TROUBLESHOOTING
+# ══════════════════════════════════════════════════════════════════════════════
+#
+# 1. Pod stuck in CreateContainerConfigError
+#    → ConfigMap or Secret not found.
+#    kubectl describe pod <pod> | grep -A5 Events
+#
+# 2. CrashLoopBackOff
+#    → App crashed on startup (missing env var, bad Kafka address, etc.)
+#    kubectl logs <pod> --previous   ← crashed container output
+#    Error is almost always in the last 10 lines.
+#
+# 3. Env var wrong value after ConfigMap update
+#    kubectl apply -f k8s/configmaps/hook-gateway-cm.yaml
+#    kubectl rollout restart deployment/hook-gateway
+#    Pods are replaced; new Pods pick up updated ConfigMap values.
+# ──────────────────────────────────────────────────────────────────────────

@@ -1,0 +1,32 @@
+# ╔══════════════════════════════════════════════════════════════════════════╗
+# ║  Service — websocket-responder (ClusterIP)                             ║
+# ║  kubectl apply  -f websocket-responder-svc.yaml                        ║
+# ║  kubectl get svc websocket-responder                                   ║
+# ╚══════════════════════════════════════════════════════════════════════════╝
+#
+# ClusterIP — reachable only inside the cluster.
+# Frontend (Angular) connects to websocket-responder via WebSocket through Ingress.
+# Ingress routes ws:// traffic → this Service → Pod on port 8085.
+#
+# CRITICAL — targetPort must equal containerPort in the Deployment exactly.
+#   Deployment containerPort: 8085
+#   Service    targetPort:    8085   ← must match
+# ──────────────────────────────────────────────────────────────────────────
+apiVersion: v1
+kind: Service
+metadata:
+  name: websocket-responder
+  namespace: default
+  labels:
+    app: websocket-responder
+    tier: backend
+spec:
+  type: ClusterIP
+  selector:
+    app: websocket-responder     # ← must match Deployment template.metadata.labels
+  ports:
+    - name:       http
+      protocol:   TCP
+      port:       8085           # port exposed inside the cluster
+      targetPort: 8085           # port the container actually listens on
+# ──────────────────────────────────────────────────────────────────────────

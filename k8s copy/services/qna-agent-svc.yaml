@@ -1,0 +1,32 @@
+# ╔══════════════════════════════════════════════════════════════════════════╗
+# ║  Service — qna-agent (ClusterIP)                                       ║
+# ║  kubectl apply  -f qna-agent-svc.yaml                                  ║
+# ║  kubectl get svc qna-agent                                             ║
+# ╚══════════════════════════════════════════════════════════════════════════╝
+#
+# ClusterIP — reachable only inside the cluster.
+# qna-agent is an internal service — no Ingress needed.
+# It communicates exclusively via Kafka (consumes qna.incoming, publishes response).
+#
+# CRITICAL — targetPort must equal containerPort in the Deployment exactly.
+#   Deployment containerPort: 8000
+#   Service    targetPort:    8000   ← must match
+# ──────────────────────────────────────────────────────────────────────────
+apiVersion: v1
+kind: Service
+metadata:
+  name: qna-agent
+  namespace: default
+  labels:
+    app: qna-agent
+    tier: backend
+spec:
+  type: ClusterIP
+  selector:
+    app: qna-agent               # ← must match Deployment template.metadata.labels
+  ports:
+    - name:       http
+      protocol:   TCP
+      port:       8000           # port exposed inside the cluster
+      targetPort: 8000           # port the container actually listens on
+# ──────────────────────────────────────────────────────────────────────────

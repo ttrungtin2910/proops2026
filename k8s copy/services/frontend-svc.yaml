@@ -1,0 +1,25 @@
+# ╔══════════════════════════════════════════════════════════════════════════╗
+# ║  Service — frontend (ClusterIP)                                        ║
+# ║  kubectl apply  -f frontend-svc.yaml                                   ║
+# ╚══════════════════════════════════════════════════════════════════════════╝
+#
+# ClusterIP — Ingress routes external traffic here.
+# targetPort 80 must match nginx containerPort in Deployment exactly.
+# ──────────────────────────────────────────────────────────────────────────
+apiVersion: v1
+kind: Service
+metadata:
+  name: frontend              # ← Ingress backend.service.name must match this
+  namespace: default
+  labels:
+    app: frontend
+    tier: frontend
+spec:
+  type: ClusterIP
+  selector:
+    app: frontend             # ← must match Deployment template.metadata.labels
+  ports:
+    - name:       http
+      protocol:   TCP
+      port:       80
+      targetPort: 80          # must equal containerPort in Deployment

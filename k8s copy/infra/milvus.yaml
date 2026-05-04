@@ -1,0 +1,57 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: milvus
+  namespace: default
+  labels:
+    app: milvus
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: milvus
+  template:
+    metadata:
+      labels:
+        app: milvus
+    spec:
+      containers:
+        - name: milvus
+          image: milvusdb/milvus:v2.4.0
+          ports:
+            - containerPort: 19530
+          command: ["milvus", "run", "standalone"]
+          env:
+            - name: ETCD_ENDPOINTS
+              value: "etcd:2379"       # K8s DNS: etcd.default.svc.cluster.local
+            - name: MINIO_ADDRESS
+              value: "minio:9000"      # K8s DNS: minio.default.svc.cluster.local
+          resources:
+            requests:
+              cpu:    200m
+              memory: 512Mi
+            limits:
+              cpu:    1000m
+              memory: 2Gi
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 9091
+            initialDelaySeconds: 30
+            periodSeconds:       10
+            failureThreshold:    8
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: milvus
+  namespace: default
+  labels:
+    app: milvus
+spec:
+  type: ClusterIP
+  selector:
+    app: milvus
+  ports:
+    - port: 19530
+      targetPort: 19530
