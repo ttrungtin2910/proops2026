@@ -50,8 +50,16 @@ spec:
             - name: OPENAI_API_KEY
               valueFrom:
                 secretKeyRef:
-                  name: qna-agent-secret     # ← must match Secret metadata.name
+                  name: qna-agent-secret
                   key:  OPENAI_API_KEY
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: redis-auth-secret
+                  key:  redis-password
+            # K8s $(VAR) interpolation — REDIS_PASSWORD phải khai báo TRƯỚC dòng này
+            - name: REDIS_URL
+              value: "redis://:$(REDIS_PASSWORD)@my-redis-master:6379/0"
 
           # ── Resource requests ─────────────────────────────────────────────
           resources:

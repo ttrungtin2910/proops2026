@@ -47,41 +47,47 @@ kubectl exec -n default $POD -- env | Select-String "REDIS"
 
 # ── BƯỚC 6: Test DNS resolve từ trong Pod ────────────────────
 Write-Host "`n=== TEST DNS RESOLVE ===" -ForegroundColor Cyan
-kubectl exec -n default $POD -- nslookup my-redis-master
+kubectl exec -n default $POD -- python -c "import socket; print(socket.gethostbyname('my-redis-master'))"
 # Phải resolve ra IP của Service
 
 # ── BƯỚC 7: Test TCP kết nối ─────────────────────────────────
 Write-Host "`n=== TEST TCP PORT 6379 ===" -ForegroundColor Cyan
-kubectl exec -n default $POD -- nc -zv my-redis-master 6379
+kubectl exec -n default $POD -- python -c "import socket,sys; s=socket.socket(); s.settimeout(3); s.connect(('my-redis-master',6379)); print('TCP OK'); s.close()"
 # Output: Connection to my-redis-master 6379 port succeeded!
 
 # ── BƯỚC 8: Test Redis PING từ trong app Pod ─────────────────
 Write-Host "`n=== TEST REDIS PING ===" -ForegroundColor Cyan
 
-# Lấy password
-$REDIS_PASS = kubectl get secret redis-auth-secret -n default `
-  -o jsonpath="{.data.redis-password}"
+# Lấy password từ K8s Secret ra biến PowerShell
 $REDIS_PASS = [System.Text.Encoding]::UTF8.GetString(
-  [System.Convert]::FromBase64String($REDIS_PASS)
+  [System.Convert]::FromBase64String(
+    (kubectl get secret redis-auth-secret -n default -o jsonpath="{.data.redis-password}")
+  )
 )
 
-kubectl exec -n default $POD -- `
-  redis-cli -h my-redis-master -a $REDIS_PASS ping
-# Kết quả: PONG
+# PowerShell expand $REDIS_PASS trước khi gửi vào container
+kubectl exec -n default $POD -- python -c "
+import redis
+r = redis.from_url('redis://:$REDIS_PASS@my-redis-master:6379/0')
+print(r.ping())
+"
+# Kết quả: True
+# Kết quả: True  (tương đương PONG — redis-cli không có trong Python slim image)
 
 # ── BƯỚC 9: Test LangGraph checkpoint (Python) ───────────────
 Write-Host "`n=== TEST PYTHON REDIS CONNECTION ===" -ForegroundColor Cyan
-kubectl exec -n default $POD -- python -c @"
-import redis, os
-url = os.environ.get('REDIS_URL', '')
+# $REDIS_PASS đã được lấy ở block trên — PowerShell expand trước khi gửi vào container
+kubectl exec -n default $POD -- python -c "
+import redis
+url = 'redis://:$REDIS_PASS@my-redis-master:6379/0'
 print(f'REDIS_URL = {url}')
 r = redis.from_url(url)
-r.set('helm-connection-test', 'ok-day14')
+r.set('helm-connection-test', 'ok-day15')
 val = r.get('helm-connection-test').decode()
 print(f'Redis value = {val}')
 r.delete('helm-connection-test')
 print('Connection test PASSED')
-"@
+"
 
 # ── CHECKPOINT ───────────────────────────────────────────────
 Write-Host "`n=== CHECKPOINT ===" -ForegroundColor Yellow

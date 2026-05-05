@@ -49,8 +49,8 @@ helm show chart bitnami/redis
 # helm show readme bitnami/redis | more   # bỏ comment nếu muốn đọc
 
 # ── CHECKPOINT ───────────────────────────────────────────────
-Write-Host "`n=== CHECKPOINT — Trả lời 3 câu hỏi sau ===" -ForegroundColor Yellow
-Write-Host "1. Chart version của bitnami/redis hiện tại là bao nhiêu?"
-Write-Host "2. Số replica mặc định (replica.replicaCount) là bao nhiêu?"
-Write-Host "3. Key nào trong values kiểm soát Redis AUTH password trực tiếp?"
-Write-Host "   (Gợi ý: auth.______ — nhìn output bước 4a)"
+# Write-Host "`n=== CHECKPOINT — Trả lời 3 câu hỏi sau ===" -ForegroundColor Yellow
+# Write-Host "1. Chart version của bitnami/redis hiện tại là bao nhiêu?"
+# Write-Host "2. Số replica mặc định (replica.replicaCount) là bao nhiêu?"
+# Write-Host "3. Key nào trong values kiểm soát Redis AUTH password trực tiếp?"
+# Write-Host "   (Gợi ý: auth.______ — nhìn output bước 4a)"

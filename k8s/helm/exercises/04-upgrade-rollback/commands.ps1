@@ -15,8 +15,14 @@ Write-Host "=== PHẦN A: UPGRADE THÀNH CÔNG ===" -ForegroundColor Green
 helm list -n default
 helm history my-redis -n default
 
-# A2. Diff: xem sẽ thay đổi gì (nếu có plugin helm-diff)
-# helm diff upgrade my-redis bitnami/redis -f values-v2.yaml -n default
+# A2. Diff: xem sẽ thay đổi gì — 2 cách:
+# Cách 1: cài plugin trước → helm plugin install https://github.com/databus23/helm-diff
+#          sau đó: helm diff upgrade my-redis bitnami/redis -f values-v2.yaml -n default
+# Cách 2: không cần plugin
+helm get manifest my-redis -n default > current.yaml
+helm template my-redis bitnami/redis -f values-v2.yaml -n default > new.yaml
+Compare-Object (Get-Content current.yaml) (Get-Content new.yaml)
+Remove-Item current.yaml, new.yaml
 
 # A3. Chạy upgrade
 helm upgrade my-redis bitnami/redis `
