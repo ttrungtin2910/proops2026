@@ -1,0 +1,582 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Day 18 — Applied Bash: Git, Docker, AWS, Log Monitoring · ProOps2026</title>
+<style>
+:root {
+  --bg:#0b0d14; --surface:#13161f; --surface2:#1c2030; --border:#252a3a;
+  --accent:#6c8ef7; --accent2:#a78bfa;
+  --green:#34d399; --yellow:#fbbf24; --orange:#fb923c;
+  --red:#f87171; --teal:#22d3ee; --blue:#60a5fa;
+  --text:#e8edf5; --muted:#7c87a0; --dim:#3a4258;
+}
+* { box-sizing:border-box; margin:0; padding:0; }
+body { background:var(--bg); color:var(--text); font-family:'Segoe UI',system-ui,sans-serif; font-size:15px; line-height:1.6; }
+
+nav { background:var(--surface);border-bottom:1px solid var(--border);padding:0 32px;height:50px;display:flex;align-items:center;gap:6px;position:sticky;top:0;z-index:200; }
+nav .brand { font-weight:800;font-size:14px;color:var(--accent);margin-right:12px; }
+nav a { color:var(--muted);text-decoration:none;font-size:12px;font-weight:600;padding:5px 12px;border-radius:6px;transition:all .15s;white-space:nowrap; }
+nav a:hover { color:var(--text);background:var(--surface2); }
+nav .spacer { flex:1; }
+nav .badge { background:rgba(52,211,153,.12);border:1px solid rgba(52,211,153,.25);color:var(--green);font-size:11px;font-weight:700;padding:3px 12px;border-radius:20px; }
+
+.layout { display:grid;grid-template-columns:1fr 260px;gap:32px;max-width:1100px;margin:0 auto;padding:40px 32px; }
+.main { min-width:0; }
+.sidebar { position:sticky;top:70px;height:fit-content;display:flex;flex-direction:column;gap:14px; }
+
+.day-header { margin-bottom:32px; }
+.day-meta { display:flex;align-items:center;gap:10px;margin-bottom:12px; }
+.day-pill { font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;padding:3px 12px;border-radius:20px;background:rgba(108,142,247,.12);border:1px solid rgba(108,142,247,.25);color:var(--accent); }
+.day-tag { font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;padding:3px 12px;border-radius:20px;background:rgba(52,211,153,.08);border:1px solid rgba(52,211,153,.2);color:var(--green); }
+.day-title { font-size:26px;font-weight:800;letter-spacing:-.3px;margin-bottom:8px; }
+.day-question { font-size:15px;color:var(--accent2);font-style:italic;border-left:3px solid var(--accent2);padding-left:14px;margin-bottom:16px;line-height:1.6; }
+.day-why { font-size:13px;color:var(--muted);line-height:1.7;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:14px 16px; }
+.day-why strong { color:var(--text); }
+
+.section-block { margin-bottom:32px; }
+.sec-label { font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:var(--dim);margin-bottom:14px;display:flex;align-items:center;gap:10px; }
+.sec-label::after { content:'';flex:1;height:1px;background:var(--border); }
+
+.chain { display:flex;flex-direction:column;gap:10px; }
+.chain-item { display:grid;grid-template-columns:32px 1fr;gap:14px;padding:14px 16px;background:var(--surface);border:1px solid var(--border);border-radius:10px;cursor:pointer;transition:border-color .15s; }
+.chain-item:hover { border-color:rgba(167,139,250,.4); }
+.chain-item.done { border-color:rgba(52,211,153,.3);background:rgba(52,211,153,.03); }
+.chain-num { width:32px;height:32px;border-radius:50%;background:var(--surface2);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;color:var(--muted);flex-shrink:0;transition:all .15s; }
+.chain-item.done .chain-num { background:rgba(52,211,153,.15);border-color:rgba(52,211,153,.4);color:var(--green); }
+.chain-q { font-size:13px;font-weight:600;margin-bottom:6px;line-height:1.5; }
+.chain-item.done .chain-q { color:var(--muted);text-decoration:line-through;text-decoration-color:var(--dim); }
+.chain-prompt { font-size:11px;font-family:'Cascadia Code','Fira Code',monospace;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:8px 12px;color:var(--accent2);line-height:1.6;margin-top:8px;white-space:pre-wrap; }
+.chain-hint { font-size:11px;color:var(--dim);margin-top:6px;line-height:1.5; }
+.chain-note { font-size:11px;color:var(--yellow);margin-top:6px;line-height:1.5;padding:6px 10px;background:rgba(251,191,36,.06);border:1px solid rgba(251,191,36,.15);border-radius:5px; }
+
+.cat-grid { display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:14px; }
+.cat-card { background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:12px 14px; }
+.cat-num { font-size:10px;font-weight:800;color:var(--accent2);text-transform:uppercase;letter-spacing:1.2px;margin-bottom:4px; }
+.cat-title { font-size:13px;font-weight:700;color:var(--text);margin-bottom:5px; }
+.cat-desc { font-size:11px;color:var(--muted);line-height:1.6; }
+.cat-desc code { font-size:10px;color:var(--accent2);background:var(--bg);padding:1px 5px;border-radius:3px; }
+
+.rule-banner { background:linear-gradient(135deg,rgba(108,142,247,.08),rgba(167,139,250,.06));border:1px solid rgba(108,142,247,.3);border-radius:10px;padding:14px 18px;margin-bottom:18px; }
+.rule-banner-title { font-size:12px;font-weight:800;color:var(--accent);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:6px; }
+.rule-banner-body { font-size:13px;color:var(--text);line-height:1.7; }
+.rule-banner-body strong { color:var(--accent2); }
+
+.artifact-card { background:var(--surface);border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:14px; }
+.artifact-head { padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px; }
+.artifact-title { font-size:13px;font-weight:700;flex:1; }
+.artifact-file { font-family:'Cascadia Code','Fira Code',monospace;font-size:11px;color:var(--green);background:rgba(52,211,153,.08);border:1px solid rgba(52,211,153,.2);padding:2px 10px;border-radius:5px; }
+.artifact-body { padding:16px 18px; }
+.artifact-row { display:flex;gap:10px;margin-bottom:8px;font-size:12px;align-items:flex-start; }
+.artifact-row:last-child { margin-bottom:0; }
+.ar-dot { width:5px;height:5px;border-radius:50%;background:var(--green);flex-shrink:0;margin-top:6px; }
+.ar-text { color:var(--muted);line-height:1.5; }
+.ar-text strong { color:var(--text); }
+.artifact-fail { margin-top:14px;padding:10px 14px;background:rgba(248,113,113,.06);border:1px solid rgba(248,113,113,.2);border-radius:7px;font-size:11px;color:var(--muted);line-height:1.6; }
+.artifact-fail strong { color:var(--red); }
+
+.iq-section { margin-bottom:32px; }
+.iq-header { padding:14px 18px;background:rgba(167,139,250,.06);border:1px solid rgba(167,139,250,.25);border-radius:10px 10px 0 0;border-bottom:none; }
+.iq-title { font-size:12px;font-weight:700;color:var(--accent2);margin-bottom:4px; }
+.iq-subtitle { font-size:11px;color:var(--muted);line-height:1.6; }
+.iq-body { padding:14px 18px;background:rgba(167,139,250,.02);border:1px solid rgba(167,139,250,.25);border-radius:0 0 10px 10px;display:flex;flex-direction:column;gap:8px; }
+.iq-item { background:var(--surface);border:1px solid var(--border);border-radius:8px;overflow:hidden;cursor:pointer;transition:border-color .15s; }
+.iq-item:hover { border-color:rgba(167,139,250,.35); }
+.iq-item.answered { border-color:rgba(52,211,153,.3); }
+.iq-q { display:flex;align-items:flex-start;gap:12px;padding:10px 14px; }
+.iq-num { font-size:10px;font-weight:800;color:var(--accent2);background:rgba(167,139,250,.1);border:1px solid rgba(167,139,250,.2);padding:2px 7px;border-radius:4px;flex-shrink:0;margin-top:2px; }
+.iq-item.answered .iq-num { background:rgba(52,211,153,.12);border-color:rgba(52,211,153,.3);color:var(--green); }
+.iq-text { font-size:12px;color:var(--text);line-height:1.6;flex:1; }
+.iq-item.answered .iq-text { color:var(--muted); }
+.iq-check { font-size:11px;color:var(--dim);flex-shrink:0;margin-top:3px; }
+.iq-item.answered .iq-check { color:var(--green); }
+
+.criteria { display:flex;flex-direction:column;gap:8px; }
+.crit { display:flex;gap:10px;align-items:flex-start;padding:10px 14px;background:var(--surface);border:1px solid var(--border);border-radius:8px;font-size:12px;cursor:pointer;transition:border-color .15s; }
+.crit:hover { border-color:rgba(52,211,153,.3); }
+.crit.done { border-color:rgba(52,211,153,.35);background:rgba(52,211,153,.03); }
+.crit-box { width:16px;height:16px;border-radius:4px;border:1.5px solid var(--border);flex-shrink:0;margin-top:1px;display:flex;align-items:center;justify-content:center;transition:all .15s; }
+.crit.done .crit-box { background:var(--green);border-color:var(--green); }
+.crit-check { color:#0b0d14;font-size:10px;font-weight:900;display:none; }
+.crit.done .crit-check { display:block; }
+.crit-text { color:var(--muted);line-height:1.5; }
+.crit.done .crit-text { color:var(--dim); }
+
+.widget { background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px; }
+.widget-title { font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--dim);margin-bottom:12px; }
+.progress-bar { height:5px;background:var(--surface2);border-radius:10px;overflow:hidden;margin-bottom:6px; }
+.progress-fill { height:100%;background:linear-gradient(90deg,var(--accent),var(--green));border-radius:10px;transition:width .3s; }
+.progress-label { font-size:11px;color:var(--muted); }
+.progress-count { font-size:22px;font-weight:800;color:var(--text);margin-bottom:2px; }
+.as-row { display:flex;align-items:center;gap:8px;font-size:11px;margin-bottom:4px; }
+.as-dot { width:7px;height:7px;border-radius:50%;background:var(--dim);flex-shrink:0; }
+.as-dot.done { background:var(--green); }
+.as-name { color:var(--muted);flex:1; }
+.conn-row { font-size:11px;color:var(--muted);display:flex;gap:8px;align-items:flex-start; }
+.conn-dir { color:var(--dim);flex-shrink:0;width:48px; }
+.report-box { background:rgba(108,142,247,.06);border:1px solid rgba(108,142,247,.2);border-radius:10px;padding:14px 16px; }
+.report-title { font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--accent);margin-bottom:8px; }
+.report-step { font-size:11px;color:var(--muted);margin-bottom:6px;display:flex;gap:8px; }
+.report-step-num { color:var(--accent);font-weight:700;flex-shrink:0; }
+
+.explore-section { margin-bottom:32px; }
+.explore-header { display:flex;align-items:center;gap:12px;padding:12px 16px;background:rgba(251,191,36,.04);border:1px solid rgba(251,191,36,.2);border-radius:10px 10px 0 0;border-bottom:none; }
+.explore-header .label { font-size:12px;font-weight:700;color:var(--yellow); }
+.explore-header .sublabel { font-size:11px;color:var(--muted);margin-left:auto; }
+.explore-body { padding:14px 16px;background:rgba(251,191,36,.02);border:1px solid rgba(251,191,36,.2);border-radius:0 0 10px 10px;display:flex;flex-direction:column;gap:10px; }
+.explore-item { font-size:12px;color:var(--muted);line-height:1.6;padding-left:14px;position:relative; }
+.explore-item::before { content:'';position:absolute;left:0;top:7px;width:5px;height:5px;border-radius:50%;background:var(--yellow); }
+.explore-item strong { color:var(--text); }
+.explore-item code { font-size:10px;color:var(--accent2);background:var(--surface2);padding:1px 5px;border-radius:3px; }
+</style>
+</head>
+<body>
+
+<nav>
+  <span class="brand">ProOps2026</span>
+  <a href="#concept">Categories</a>
+  <a href="#chain">Discovery</a>
+  <a href="#artifact">Artifacts</a>
+  <a href="#interview">IQ</a>
+  <a href="#done">Done</a>
+  <div class="spacer"></div>
+  <span class="badge">Week 4 · Day 18</span>
+</nav>
+
+<div class="layout">
+<div class="main">
+
+  <!-- HEADER -->
+  <div class="day-header">
+    <div class="day-meta">
+      <span class="day-pill">Week 4 · Day 18</span>
+      <span class="day-tag">Hands-On</span>
+    </div>
+    <div class="day-title">Applied Bash — Automate Git, Docker, AWS, Log Monitoring</div>
+    <div class="day-question">Yesterday you learned the patterns. Today: can you take the real, repetitive DevOps tasks you've been doing manually — and turn them into scripts robust enough that someone else can run them without breaking anything?</div>
+    <div class="day-why">
+      The gap between a DevOps engineer who knows tools and one who operates at scale is automation. <strong>Every task done manually more than twice should be a script.</strong> Day 17 gave you the production-safety patterns; today you apply them to the four categories DevOps engineers automate first — Git, Docker, AWS CLI, and log monitoring. Tomorrow's deploy script is today's healthcheck.sh with three more steps. Day 24's CI/CD pipeline is today's deploy script wrapped in a GitHub Actions YAML.
+    </div>
+  </div>
+
+  <!-- THE RULE -->
+  <div class="rule-banner">
+    <div class="rule-banner-title">The rule that drives the day</div>
+    <div class="rule-banner-body">If you've done it manually <strong>twice</strong>, the third time it should be a script. By the end of today every command sequence you executed manually on Day 16 (push to ECR, deploy to EKS, verify, teardown) is a candidate for tomorrow's automation work.</div>
+  </div>
+
+  <!-- CONCEPT: FOUR CATEGORIES -->
+  <div class="section-block" id="concept">
+    <div class="sec-label">Four automation categories — what DevOps engineers script first</div>
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:18px 20px;">
+      <div style="font-size:13px;color:var(--muted);line-height:1.7;">Real-world bash automation lives almost entirely inside these four boxes. Day 17's six patterns + today's four categories = the toolkit you need before any CI/CD work in Week 5.</div>
+      <div class="cat-grid">
+        <div class="cat-card">
+          <div class="cat-num">Category 1</div>
+          <div class="cat-title">Git</div>
+          <div class="cat-desc"><code>git rev-parse HEAD</code>, <code>git pull</code> with conflict guard, commit-hash diff for idempotent deploys.</div>
+        </div>
+        <div class="cat-card">
+          <div class="cat-num">Category 2</div>
+          <div class="cat-title">Docker</div>
+          <div class="cat-desc"><code>docker build</code> with platform flag, registry login, push, image-exists check before deploy.</div>
+        </div>
+        <div class="cat-card">
+          <div class="cat-num">Category 3</div>
+          <div class="cat-title">AWS CLI</div>
+          <div class="cat-desc"><code>aws ec2 describe-instance-status</code>, <code>aws ec2 wait</code>, pre-flight resource checks.</div>
+        </div>
+        <div class="cat-card">
+          <div class="cat-num">Category 4</div>
+          <div class="cat-title">Log monitoring</div>
+          <div class="cat-desc"><code>tail -F</code> + <code>grep</code> + dedup state file + cron schedule for production alerting.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- DISCOVERY CHAIN -->
+  <div class="section-block" id="chain">
+    <div class="sec-label">Discovery chain — 8 questions</div>
+    <div class="chain">
+
+      <!-- Q1 DEPLOY SCRIPT -->
+      <div class="chain-item" onclick="toggleChain(this,0)">
+        <div class="chain-num">1</div>
+        <div>
+          <div class="chain-q">Write a single bash script that runs <code>git pull</code> → <code>docker build</code> → <code>docker push</code> → deploy, validates each step before moving to the next, and prints clear timestamped success/failure messages.</div>
+          <div class="chain-prompt">Help me build a deploy.sh that chains the four steps with proper error handling:
+(1) Header (Day 17 patterns): #!/bin/bash, set -euo pipefail, usage(), die() helper.
+(2) Phase 1 — git: `git pull --ff-only` (NOT plain pull — fails fast on diverged branch instead of forcing a merge). Capture the new HEAD: `COMMIT=$(git rev-parse --short HEAD)`.
+(3) Phase 2 — build: `docker build --platform=linux/amd64 -t myapp:$COMMIT .`. Tagging by commit hash, not :latest, makes every build traceable to a git state.
+(4) Phase 3 — push: `docker push [registry]/myapp:$COMMIT`. Must check exit code — a failed push that the script ignores breaks every deploy after.
+(5) Phase 4 — deploy: depends on the target. For EKS-style: `kubectl set image deployment/myapp myapp=[registry]/myapp:$COMMIT && kubectl rollout status deployment/myapp --timeout=120s`. For docker-compose: `docker-compose up -d --no-build`.
+(6) Logging: between every phase, `log "[$(date -u +%H:%M:%S)] phase X starting..."`. Use the log/err/die helpers from yesterday's memory file.
+(7) The two failure modes a manual process wouldn't catch: (a) git pull conflicted but you didn't notice — script catches via --ff-only failing, (b) docker push silently failed due to expired registry token — script catches via exit code check.</div>
+          <div class="chain-hint">Tag images by commit hash (<code style="font-size:11px;color:var(--accent2);">myapp:abc123f</code>) not <code style="font-size:11px;color:var(--accent2);">:latest</code>. When you debug a production issue at 2am, you need to know exactly which commit is running. <code style="font-size:11px;color:var(--accent2);">:latest</code> tells you nothing.</div>
+        </div>
+      </div>
+
+      <!-- Q2 IDEMPOTENT -->
+      <div class="chain-item" onclick="toggleChain(this,1)">
+        <div class="chain-num">2</div>
+        <div>
+          <div class="chain-q">Your script always builds and pushes — even when nothing changed. How do you skip the work when the current commit equals the last deployed one?</div>
+          <div class="chain-prompt">Make deploy.sh idempotent via commit-hash diff:
+(1) Where to store the last-deployed hash. A state file is simplest: `.last-deploy` in the repo (gitignored) or /var/lib/myapp/last-deploy.
+(2) Read the previous hash: `LAST=$(cat .last-deploy 2>/dev/null || echo "")`. The `|| echo ""` handles the first-run case where no file exists.
+(3) Compare: `if [[ "$COMMIT" == "$LAST" ]]; then log "no changes since last deploy ($COMMIT) — skipping"; exit 0; fi`. Exit 0 because skipping is success, not failure.
+(4) After successful deploy, write the new hash: `echo "$COMMIT" > .last-deploy`. ONLY after the deploy succeeded — if you write it before, a failed deploy looks succeeded next run.
+(5) Why this matters: every deploy script that gets used in cron or a scheduled job becomes idempotent eventually. Either you build it in from day one, or you add it after a 3am incident where the script ran 12 times and broke production.
+(6) Edge: what if someone manually deployed a different image? The .last-deploy file lies. Real production solutions write the deployed commit as a Kubernetes annotation or a git tag — but for today, the file is enough.</div>
+          <div class="chain-hint">Idempotent = safe to run twice. The mental test: if a cron job runs your script every 5 minutes for an hour, does anything bad happen? If yes, it's not idempotent yet.</div>
+        </div>
+      </div>
+
+      <!-- Q3 AWS PRE-FLIGHT -->
+      <div class="chain-item" onclick="toggleChain(this,2)">
+        <div class="chain-num">3</div>
+        <div>
+          <div class="chain-q">Add an AWS pre-flight check: before deploying, verify the target instance is running and the health endpoint returns 200. Abort the deploy if either fails.</div>
+          <div class="chain-prompt">Wire AWS CLI checks into deploy.sh as a preflight() function:
+(1) Instance state check:
+   STATE=$(aws ec2 describe-instances --instance-ids "$INSTANCE_ID" --query 'Reservations[0].Instances[0].State.Name' --output text)
+   [[ "$STATE" == "running" ]] || die "instance $INSTANCE_ID is in state: $STATE — aborting"
+(2) Endpoint health check:
+   STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 5 "http://$HOST/health" || echo "000")
+   [[ "$STATUS" == "200" ]] || die "health endpoint returned $STATUS — aborting"
+   The `|| echo "000"` matters: if curl fails entirely (timeout, DNS failure), we still get a string we can compare.
+(3) Wrap both in a `preflight()` function called at the top of main(). If preflight fails, the deploy never starts.
+(4) `aws ec2 wait` for state-change loops: `aws ec2 wait instance-running --instance-ids $INSTANCE_ID` blocks until the instance is running. Useful when the deploy itself spins up infrastructure.
+(5) The deploy/preflight philosophy: every check you add is a 3am incident you don't have. Pre-flight is cheap; debugging a half-deployed system at 3am is not.</div>
+          <div class="chain-hint">For HTTP checks, always use <code style="font-size:11px;color:var(--accent2);">--max-time 5</code> on curl. Without it, an unreachable host can hang the script for 2 minutes (default TCP timeout). Bounded waits everywhere.</div>
+        </div>
+      </div>
+
+      <!-- Q4 STRUCTURED LOGGING -->
+      <div class="chain-item" onclick="toggleChain(this,3)">
+        <div class="chain-num">4</div>
+        <div>
+          <div class="chain-q">The script does git, docker, AWS, deploy. A teammate runs it, hits an error, has no idea which step failed. Add structured logging — every step prints with timestamp and status.</div>
+          <div class="chain-prompt">Build a structured logging pattern for the deploy script:
+(1) Convention: every phase emits two lines:
+   [2026-04-27T14:30:00Z] [git] START pulling latest
+   [2026-04-27T14:30:01Z] [git] OK at abc123f
+or on failure:
+   [2026-04-27T14:30:01Z] [git] FAIL fast-forward not possible — branch diverged
+(2) Helper functions:
+   _ts() { date -u +%Y-%m-%dT%H:%M:%SZ; }
+   start() { echo "[$(_ts)] [$1] START $2"; }
+   ok()    { echo "[$(_ts)] [$1] OK $2"; }
+   fail()  { echo "[$(_ts)] [$1] FAIL $2" >&2; exit 1; }
+(3) Phase pattern: `start git "pulling latest"; git pull --ff-only || fail git "$?"; ok git "at $COMMIT"`.
+(4) Why structured: a CI log viewer can grep for FAIL across thousands of lines. A grep for `\[git\] FAIL` shows you exactly which deploys broke at the git phase.
+(5) Even better — JSON logging if your log aggregator supports it: `printf '{"ts":"%s","phase":"%s","status":"%s","msg":"%s"}\n' "$(_ts)" "$1" OK "$2"`. Day 18 stays text — JSON is a nice-to-have for production.</div>
+          <div class="chain-hint">Always emit logs to stdout (normal) and stderr (failures). When the script's stdout is captured to a file but stderr goes to the terminal, the human sees the failure even though the log captures everything.</div>
+        </div>
+      </div>
+
+      <!-- Q5 LOG MONITORING -->
+      <div class="chain-item" onclick="toggleChain(this,4)">
+        <div class="chain-num">5</div>
+        <div>
+          <div class="chain-q">Write a separate script <code>log-monitor.sh</code> that watches a log file for ERROR patterns and alerts. Avoid alert spam by deduplicating repeated errors.</div>
+          <div class="chain-prompt">Build a log monitoring script with deduplication:
+(1) Real-time tail: `tail -F /var/log/app.log` — capital F follows the file even after rotation. Lowercase -f stops following if the file is rotated, which breaks log monitoring constantly.
+(2) Filter for ERROR lines: pipe through grep:
+   tail -F /var/log/app.log | grep --line-buffered -E '\[ERROR\]|\bERROR\b' | while read -r line; do ...; done
+   `--line-buffered` matters in pipes: without it grep buffers lines and your alerts come in batches, not real time.
+(3) Deduplication: hash each error message, store the hash in a file with a timestamp:
+   key=$(echo "$line" | sha256sum | cut -c1-12)
+   if grep -q "^$key " "$DEDUP_FILE" 2>/dev/null; then
+     continue   # already alerted
+   fi
+   echo "$key $(date -u +%s)" >> "$DEDUP_FILE"
+   send_alert "$line"
+(4) Periodic dedup-file pruning: entries older than 1 hour can be re-alerted. Add a cleanup step at script start:
+   awk -v cutoff=$(($(date +%s) - 3600)) '$2 > cutoff' "$DEDUP_FILE" > "$DEDUP_FILE.tmp" && mv "$DEDUP_FILE.tmp" "$DEDUP_FILE"
+(5) The send_alert function: today, just `echo` to a file. In a real env, curl to a webhook (Slack, Discord, PagerDuty). Same pattern.
+(6) Why dedup: without it, an error in a tight loop fires 10,000 alerts in a minute. Engineers turn off alerts. Production goes down silently next time.</div>
+          <div class="chain-hint">Use <code style="font-size:11px;color:var(--accent2);">tail -F</code> (capital F), not <code style="font-size:11px;color:var(--accent2);">tail -f</code> (lowercase). The capital follows through file rotation. Trainees who use -f spend an hour wondering why the monitor stopped working overnight.</div>
+        </div>
+      </div>
+
+      <!-- Q6 CRON -->
+      <div class="chain-item" onclick="toggleChain(this,5)">
+        <div class="chain-num">6</div>
+        <div>
+          <div class="chain-q">Schedule the log monitor to run every 5 minutes via cron. The two things that always break cron jobs: PATH and environment variables. How do you prevent both?</div>
+          <div class="chain-prompt">Cron crash course + safe cron-script template:
+(1) crontab syntax: `MIN HOUR DOM MON DOW command`. `*/5 * * * *` = every 5 minutes. `0 2 * * *` = 2am daily. View current: `crontab -l`. Edit: `crontab -e`.
+(2) Why cron jobs fail: cron runs scripts in a minimal environment. No ~/.bashrc. PATH is usually `/usr/bin:/bin` only. HOME may be unset. So your beautifully-working script fails with "jq: command not found" or "AWS credentials missing".
+(3) Fix #1 — explicit PATH at top of script:
+   export PATH="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin"
+   Or in the crontab itself:
+   PATH=/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin
+   */5 * * * * /home/me/scripts/log-monitor.sh
+(4) Fix #2 — explicit env vars / source a profile:
+   */5 * * * * . /home/me/.profile && /home/me/scripts/log-monitor.sh
+   Or set vars inline: `*/5 * * * * AWS_PROFILE=prod /home/me/scripts/log-monitor.sh`.
+(5) Capture cron output. Default cron mails it nowhere. Redirect explicitly:
+   */5 * * * * /home/me/scripts/log-monitor.sh >> /var/log/log-monitor.log 2>&1
+(6) Test before scheduling: run the script with cron's restricted env: `env -i PATH=/usr/bin:/bin /home/me/scripts/log-monitor.sh`. If it works under that, cron will too.</div>
+          <div class="chain-hint">First test the script under <code style="font-size:11px;color:var(--accent2);">env -i PATH=/usr/bin:/bin SHELL=/bin/sh /path/to/script.sh</code>. That simulates cron's environment exactly — if it works, cron will work; if it fails, cron will fail in the same way.</div>
+          <div class="chain-note">Always redirect cron output to a log file. <code style="font-size:11px;color:var(--accent2);">&gt;&gt; /tmp/myjob.log 2&gt;&amp;1</code>. Without it, errors disappear into the void.</div>
+        </div>
+      </div>
+
+      <!-- Q7 DRY-RUN -->
+      <div class="chain-item" onclick="toggleChain(this,6)">
+        <div class="chain-num">7</div>
+        <div>
+          <div class="chain-q">Add a <code>--dry-run</code> flag to deploy.sh. In dry-run mode it prints what it would do but doesn't change anything. Why is this essential for any script that touches production?</div>
+          <div class="chain-prompt">The dry-run pattern:
+(1) Parse flags. Simple form:
+   DRY_RUN=0
+   while [[ $# -gt 0 ]]; do
+     case "$1" in
+       --dry-run) DRY_RUN=1; shift ;;
+       --help) usage; exit 0 ;;
+       *) break ;;
+     esac
+   done
+(2) The execution pattern:
+   run() {
+     if [[ $DRY_RUN -eq 1 ]]; then
+       echo "DRY-RUN: $*"
+     else
+       "$@"
+     fi
+   }
+   Then every change becomes: `run docker push myapp:$COMMIT` instead of `docker push myapp:$COMMIT`.
+(3) Read-only commands (git rev-parse, aws describe-*) should NOT go through `run` — they're safe to execute in dry-run mode and the output is needed for downstream logic.
+(4) Why dry-run is non-negotiable: every production-grade DevOps tool has it (terraform plan, kubectl --dry-run=client, helm install --dry-run). It's how you review changes before they happen. Without dry-run, "let me see what this would do" is impossible without actually doing it.
+(5) The strongest validation: run with --dry-run on a fresh checkout, scan the output, then run for real. The output should match. Dry-run that diverges from real execution is worse than no dry-run.</div>
+          <div class="chain-hint">Treat dry-run as a feature, not a bolt-on. If your script does 8 things, all 8 must be wrapped through <code style="font-size:11px;color:var(--accent2);">run ...</code>. One unwrapped command and dry-run is a lie.</div>
+        </div>
+      </div>
+
+      <!-- Q8 SKILL FILE -->
+      <div class="chain-item" onclick="toggleChain(this,7)">
+        <div class="chain-num">8</div>
+        <div>
+          <div class="chain-q">Write <code>skills/bash-automation.md</code> — the playbook for taking ANY repetitive DevOps task and turning it into a production-safe bash script. What's the six-question design checklist?</div>
+          <div class="chain-prompt">Help me write skills/bash-automation.md. Unlike yesterday's memory file (reference), this is a SKILL — a procedure my agent invokes when I say "automate this".
+
+Structure:
+
+1. Trigger condition: when to apply this skill
+   - Any task done manually 2+ times
+   - Any task that runs in cron, CI, or scheduled
+   - Any task whose failure costs money or sleep
+
+2. Six design questions to answer BEFORE writing line one:
+   Q1. What does the script do, in one sentence?
+   Q2. What inputs does it take? Which are required vs optional?
+   Q3. What can go wrong at each step? (network, permission, missing tool, conflicting state)
+   Q4. What should it check BEFORE making changes? (preflight)
+   Q5. How does it report status — success and failure separately?
+   Q6. Is it idempotent — safe to run twice?
+
+3. Standard script skeleton (copy-paste template):
+   - Header: shebang, set -euo pipefail
+   - Constants (readonly UPPERCASE)
+   - Helpers: _ts, log, err, die, run (for dry-run)
+   - usage()
+   - preflight() — tool checks, AWS state, network reachability
+   - main() — orchestrates phases
+   - Phase functions: phase_git(), phase_build(), phase_deploy()
+   - Last line: main "$@"
+
+4. Four canonical patterns from today:
+   - Deploy chain (git → build → push → deploy with idempotency)
+   - AWS preflight check
+   - Log monitor with dedup
+   - Cron-safe scheduling
+
+5. Five pitfalls + fixes — yours from today, not generic.
+
+6. The dry-run rule: every change wrapped in `run`, every read-only command bare.
+
+Format: short bullets and code blocks, no prose paragraphs.</div>
+          <div class="chain-hint">A skills file differs from a memory file: memory is reference data ("here's the syntax for X"), skill is a procedure ("when I say automate this, do this checklist first"). Frame the file in the imperative — "do this", not "this is".</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ARTIFACTS -->
+  <div class="section-block" id="artifact">
+    <div class="sec-label">Artifacts</div>
+    <div class="artifact-card">
+      <div class="artifact-head">
+        <div class="artifact-title">Deploy Script</div>
+        <div class="artifact-file">scripts/deploy.sh</div>
+      </div>
+      <div class="artifact-body">
+        <div class="artifact-row"><div class="ar-dot"></div><div class="ar-text"><strong>Five-phase chain</strong> — git pull (--ff-only) → docker build (--platform=linux/amd64) → docker push → deploy → health check.</div></div>
+        <div class="artifact-row"><div class="ar-dot"></div><div class="ar-text"><strong>Idempotent</strong> — checks last-deployed commit, skips when nothing changed.</div></div>
+        <div class="artifact-row"><div class="ar-dot"></div><div class="ar-text"><strong>AWS preflight</strong> — instance state + endpoint health verified before any change.</div></div>
+        <div class="artifact-row"><div class="ar-dot"></div><div class="ar-text"><strong>Structured logs</strong> — every phase emits <code>[ts] [phase] STATUS msg</code>.</div></div>
+        <div class="artifact-row"><div class="ar-dot"></div><div class="ar-text"><strong><code>--dry-run</code> flag</strong> — every state-changing command wrapped, output matches real run.</div></div>
+        <div class="artifact-row"><div class="ar-dot"></div><div class="ar-text"><strong>shellcheck clean</strong> — zero warnings.</div></div>
+        <div class="artifact-fail"><strong>Weak signals:</strong> No idempotency check (always rebuilds). Tags image as <code>:latest</code> (untraceable in prod). No <code>--dry-run</code>. Health check uses unbounded curl (can hang 2 min).</div>
+      </div>
+    </div>
+    <div class="artifact-card">
+      <div class="artifact-head">
+        <div class="artifact-title">Log Monitor Script</div>
+        <div class="artifact-file">scripts/log-monitor.sh</div>
+      </div>
+      <div class="artifact-body">
+        <div class="artifact-row"><div class="ar-dot"></div><div class="ar-text"><strong><code>tail -F</code> + grep + while-read loop</strong> — survives log rotation, real-time alerting.</div></div>
+        <div class="artifact-row"><div class="ar-dot"></div><div class="ar-text"><strong>Deduplication</strong> — hash-based, time-windowed, prevents alert flood on repeated errors.</div></div>
+        <div class="artifact-row"><div class="ar-dot"></div><div class="ar-text"><strong>Cron-safe</strong> — explicit PATH at top, output redirected, tested under <code>env -i</code>.</div></div>
+        <div class="artifact-row"><div class="ar-dot"></div><div class="ar-text"><strong>Dedup-file pruning</strong> — old entries removed at start so retransient errors can re-alert after a window.</div></div>
+        <div class="artifact-fail"><strong>Weak signals:</strong> Uses <code>tail -f</code> (lowercase). No dedup — alerts on every duplicate. Doesn't survive cron's minimal env.</div>
+      </div>
+    </div>
+    <div class="artifact-card">
+      <div class="artifact-head">
+        <div class="artifact-title">Bash Automation Skill</div>
+        <div class="artifact-file">skills/bash-automation.md</div>
+      </div>
+      <div class="artifact-body">
+        <div class="artifact-row"><div class="ar-dot"></div><div class="ar-text"><strong>Trigger condition</strong> — when to apply this skill (anything done 2+ times manually, anything in cron/CI).</div></div>
+        <div class="artifact-row"><div class="ar-dot"></div><div class="ar-text"><strong>Six design questions</strong> — what / inputs / failure modes / preflight / status / idempotency.</div></div>
+        <div class="artifact-row"><div class="ar-dot"></div><div class="ar-text"><strong>Script skeleton template</strong> — copy-paste starting point for every new script.</div></div>
+        <div class="artifact-row"><div class="ar-dot"></div><div class="ar-text"><strong>Four patterns</strong> — deploy chain, AWS preflight, log monitor with dedup, cron scheduling.</div></div>
+        <div class="artifact-row"><div class="ar-dot"></div><div class="ar-text"><strong>Pitfalls</strong> — your real ones from today, not blog-post boilerplate.</div></div>
+        <div class="artifact-fail"><strong>Weak signals:</strong> Reads as a diary of today's work, not a procedure. No design checklist. Missing dry-run pattern. No cron section.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- INTERVIEW QUESTIONS -->
+  <div class="iq-section" id="interview">
+    <div class="iq-header">
+      <div class="iq-title">Interview Questions</div>
+      <div class="iq-subtitle">Click when you can answer without notes.</div>
+    </div>
+    <div class="iq-body">
+      <div class="iq-item" onclick="toggleIQ(this)"><div class="iq-q"><span class="iq-num">Q1</span><span class="iq-text">Why do you tag Docker images by commit hash and not <code>:latest</code> in production deploys?</span><span class="iq-check">&#10003;</span></div></div>
+      <div class="iq-item" onclick="toggleIQ(this)"><div class="iq-q"><span class="iq-num">Q2</span><span class="iq-text">Difference between <code>git pull</code> and <code>git pull --ff-only</code>? Why does the difference matter inside a deploy script?</span><span class="iq-check">&#10003;</span></div></div>
+      <div class="iq-item" onclick="toggleIQ(this)"><div class="iq-q"><span class="iq-num">Q3</span><span class="iq-text">What does it mean for a script to be "idempotent" — and what's the simplest way to make a deploy script idempotent against unchanged code?</span><span class="iq-check">&#10003;</span></div></div>
+      <div class="iq-item" onclick="toggleIQ(this)"><div class="iq-q"><span class="iq-num">Q4</span><span class="iq-text">Difference between <code>tail -f</code> and <code>tail -F</code> on a log file? Which one breaks first in production and why?</span><span class="iq-check">&#10003;</span></div></div>
+      <div class="iq-item" onclick="toggleIQ(this)"><div class="iq-q"><span class="iq-num">Q5</span><span class="iq-text">A log monitoring script alerts on every matching line. After 5 minutes of a tight error loop, your team has 10,000 alerts. What pattern fixes this without losing real signals?</span><span class="iq-check">&#10003;</span></div></div>
+      <div class="iq-item" onclick="toggleIQ(this)"><div class="iq-q"><span class="iq-num">Q6</span><span class="iq-text">A script works in your shell but fails when run via cron. Two most common causes? How do you simulate cron's environment locally to debug?</span><span class="iq-check">&#10003;</span></div></div>
+      <div class="iq-item" onclick="toggleIQ(this)"><div class="iq-q"><span class="iq-num">Q7</span><span class="iq-text">Why is <code>--dry-run</code> non-negotiable for any script that changes production state? What's the implementation pattern that makes dry-run reliable?</span><span class="iq-check">&#10003;</span></div></div>
+      <div class="iq-item" onclick="toggleIQ(this)"><div class="iq-q"><span class="iq-num">Q8</span><span class="iq-text">Six questions you should answer before writing the first line of an automation script. Name as many as you can.</span><span class="iq-check">&#10003;</span></div></div>
+    </div>
+  </div>
+
+  <!-- DONE CRITERIA -->
+  <div class="section-block" id="done">
+    <div class="sec-label">Done criteria</div>
+    <div class="criteria">
+      <div class="crit" onclick="toggleCrit(this)"><div class="crit-box"><span class="crit-check">&#10003;</span></div><div class="crit-text"><code style="font-size:11px;color:var(--accent2);">scripts/deploy.sh</code> written — git → build → push → deploy chain with idempotency, AWS preflight, structured logs, <code>--dry-run</code>.</div></div>
+      <div class="crit" onclick="toggleCrit(this)"><div class="crit-box"><span class="crit-check">&#10003;</span></div><div class="crit-text">deploy.sh tested in dry-run mode and real mode — outputs match.</div></div>
+      <div class="crit" onclick="toggleCrit(this)"><div class="crit-box"><span class="crit-check">&#10003;</span></div><div class="crit-text">deploy.sh tested for idempotency — running it twice with no code change exits 0 without rebuild.</div></div>
+      <div class="crit" onclick="toggleCrit(this)"><div class="crit-box"><span class="crit-check">&#10003;</span></div><div class="crit-text"><code style="font-size:11px;color:var(--accent2);">scripts/log-monitor.sh</code> written — <code>tail -F</code>, grep, dedup, cron-safe.</div></div>
+      <div class="crit" onclick="toggleCrit(this)"><div class="crit-box"><span class="crit-check">&#10003;</span></div><div class="crit-text">log-monitor.sh tested — generated 5 duplicate errors, only 1 alert sent (dedup works).</div></div>
+      <div class="crit" onclick="toggleCrit(this)"><div class="crit-box"><span class="crit-check">&#10003;</span></div><div class="crit-text">log-monitor.sh tested under <code style="font-size:11px;color:var(--accent2);">env -i PATH=/usr/bin:/bin</code> — survives cron-minimal environment.</div></div>
+      <div class="crit" onclick="toggleCrit(this)"><div class="crit-box"><span class="crit-check">&#10003;</span></div><div class="crit-text">Both scripts pass <code style="font-size:11px;color:var(--accent2);">shellcheck</code> with zero warnings.</div></div>
+      <div class="crit" onclick="toggleCrit(this)"><div class="crit-box"><span class="crit-check">&#10003;</span></div><div class="crit-text"><code style="font-size:11px;color:var(--accent2);">skills/bash-automation.md</code> written — six design questions, script skeleton, four patterns, real pitfalls.</div></div>
+      <div class="crit" onclick="toggleCrit(this)"><div class="crit-box"><span class="crit-check">&#10003;</span></div><div class="crit-text">Git commit pushed: <code style="font-size:11px;color:var(--accent2);">Day 18 — Applied bash: deploy.sh, log-monitor.sh, skills/bash-automation.md</code></div></div>
+      <div class="crit" onclick="toggleCrit(this)"><div class="crit-box"><span class="crit-check">&#10003;</span></div><div class="crit-text">Daily log filled — Tomorrow's Context Block names which Day-16 EKS command sequence you'd script next using today's patterns.</div></div>
+    </div>
+  </div>
+
+  <!-- EXPLORE FURTHER -->
+  <div class="explore-section">
+    <div class="explore-header">
+      <span class="label">Explore further</span>
+      <span class="sublabel">Only after all done criteria checked &#10003;</span>
+    </div>
+    <div class="explore-body">
+      <div style="font-size:11px;color:var(--dim);margin-bottom:4px;">Optional. These previewed concepts you'll see again in Days 19–24.</div>
+      <div class="explore-item"><strong>Library scripts.</strong> Ask Claude: <em>"Refactor my helper functions (log, err, die, run) into <code>lib/common.sh</code>. Show me how to source it from deploy.sh and log-monitor.sh. What goes in lib/ vs scripts/?"</em></div>
+      <div class="explore-item"><strong>trap for cleanup.</strong> Ask Claude: <em>"Add a <code>trap cleanup EXIT</code> to deploy.sh that always removes my temp files and writes the dedup state, even if the script crashes. Why is EXIT trap better than explicit cleanup at the end?"</em></div>
+      <div class="explore-item"><strong>aws ec2 wait patterns.</strong> Ask Claude: <em>"Show me <code>aws ec2 wait</code> for instance-running, instance-status-ok, network-interface-available. When would I use each in a deploy script that bootstraps infra?"</em></div>
+      <div class="explore-item"><strong>Bats tests.</strong> Ask Claude: <em>"Write 3 bats tests for deploy.sh: missing required arg, dry-run mode produces no side effects, idempotency check skips on unchanged commit. How do I mock <code>git</code>, <code>docker</code>, <code>aws</code> in bash tests?"</em></div>
+    </div>
+  </div>
+
+</div><!-- /main -->
+
+<!-- SIDEBAR -->
+<div class="sidebar">
+  <div class="widget">
+    <div class="widget-title">Progress — Day 18</div>
+    <div class="progress-count" id="d18-count">0 / 8</div>
+    <div style="margin-bottom:8px;"><div class="progress-bar"><div class="progress-fill" id="d18-fill" style="width:0%"></div></div><div class="progress-label" id="d18-label">Discovery chain</div></div>
+  </div>
+  <div class="widget">
+    <div class="widget-title">Today's Artifacts</div>
+    <div class="as-row"><div class="as-dot" id="d18-deploy"></div><div class="as-name">scripts/deploy.sh</div></div>
+    <div class="as-row"><div class="as-dot" id="d18-monitor"></div><div class="as-name">scripts/log-monitor.sh</div></div>
+    <div class="as-row"><div class="as-dot" id="d18-shellcheck"></div><div class="as-name">shellcheck clean (both)</div></div>
+    <div class="as-row"><div class="as-dot" id="d18-skill"></div><div class="as-name">skills/bash-automation.md</div></div>
+  </div>
+  <div class="widget" style="background:rgba(108,142,247,.04);border-color:rgba(108,142,247,.2);">
+    <div class="widget-title" style="color:var(--accent);">The 2x rule</div>
+    <div style="font-size:11px;color:var(--muted);line-height:1.6;">If you've done it manually <strong style="color:var(--text);">twice</strong>, the third time it's a script. Don't wait for the fourth.</div>
+  </div>
+  <div class="widget" style="background:rgba(167,139,250,.04);border-color:rgba(167,139,250,.2);">
+    <div class="widget-title" style="color:var(--accent2);">Automation map</div>
+    <div style="font-size:10.5px;color:var(--muted);line-height:1.9;font-family:'Cascadia Code','Fira Code',monospace;">
+      git rev-parse HEAD<br>
+      git pull --ff-only<br>
+      docker build --platform=...<br>
+      docker tag $IMG:$COMMIT<br>
+      aws ec2 describe-instances<br>
+      aws ec2 wait instance-running<br>
+      curl --max-time 5<br>
+      tail -F | grep --line-buffered<br>
+      sha256sum (dedup)<br>
+      env -i (cron simulation)<br>
+      run() { ... } (dry-run)
+    </div>
+  </div>
+  <div class="widget">
+    <div class="widget-title">Connects To</div>
+    <div style="display:flex;flex-direction:column;gap:6px;">
+      <div class="conn-row"><span class="conn-dir">&larr; Day 17</span><span style="font-size:11px;color:var(--muted);">Bash patterns — applied to real DevOps tasks today</span></div>
+      <div class="conn-row"><span class="conn-dir">&larr; Day 16</span><span style="font-size:11px;color:var(--muted);">EKS commands you ran by hand — script targets for tomorrow</span></div>
+      <div class="conn-row"><span class="conn-dir">&rarr; Day 19</span><span style="font-size:11px;color:var(--muted);">Terraform + Ansible — declarative replaces some of these scripts</span></div>
+      <div class="conn-row"><span class="conn-dir">&rarr; Day 24</span><span style="font-size:11px;color:var(--muted);">deploy.sh becomes a GitHub Actions step</span></div>
+    </div>
+  </div>
+  <div class="report-box">
+    <div class="report-title">End-of-day report</div>
+    <div class="report-step"><span class="report-step-num">1.</span> Fill daily log + context block</div>
+    <div class="report-step"><span class="report-step-num">2.</span> git commit + push scripts/ + skills/</div>
+    <div class="report-step"><span class="report-step-num">3.</span> Paste <code style="font-size:10px;color:var(--accent);">=== Day 18 |</code> to trainer channel</div>
+    <div style="margin-top:8px;padding:6px 8px;background:rgba(52,211,153,.06);border:1px solid rgba(52,211,153,.2);border-radius:5px;font-size:10px;color:var(--green);line-height:1.5;">Include: clean shellcheck output for both scripts + screenshot of <code>--dry-run</code> output</div>
+  </div>
+</div>
+
+</div><!-- /layout -->
+
+<script>
+const done = new Array(8).fill(false);
+function toggleChain(el, i) {
+  done[i] = !done[i];
+  el.classList.toggle('done', done[i]);
+  const n = done.filter(Boolean).length;
+  document.getElementById('d18-count').textContent = n + ' / 8';
+  document.getElementById('d18-fill').style.width = (n/8*100) + '%';
+  const lbl = ['Keep going','Keep going','Halfway','Halfway','Almost there','Almost there','Almost there','Done!'];
+  document.getElementById('d18-label').textContent = n === 0 ? 'Discovery chain' : lbl[n-1];
+  if (n >= 4) document.getElementById('d18-deploy').classList.add('done');
+  if (n >= 6) document.getElementById('d18-monitor').classList.add('done');
+  if (n >= 7) document.getElementById('d18-shellcheck').classList.add('done');
+  if (n >= 8) document.getElementById('d18-skill').classList.add('done');
+}
+function toggleIQ(el) { el.classList.toggle('answered'); }
+function toggleCrit(el) { el.classList.toggle('done'); }
+</script>
+</body>
+</html>
