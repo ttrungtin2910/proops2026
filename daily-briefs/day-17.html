@@ -1,0 +1,566 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Day 17 — Bash Scripting Foundation · ProOps2026</title>
+<style>
+:root {
+  --bg:#0b0d14; --surface:#13161f; --surface2:#1c2030; --border:#252a3a;
+  --accent:#6c8ef7; --accent2:#a78bfa;
+  --green:#34d399; --yellow:#fbbf24; --orange:#fb923c;
+  --red:#f87171; --teal:#22d3ee; --blue:#60a5fa;
+  --text:#e8edf5; --muted:#7c87a0; --dim:#3a4258;
+}
+* { box-sizing:border-box; margin:0; padding:0; }
+body { background:var(--bg); color:var(--text); font-family:'Segoe UI',system-ui,sans-serif; font-size:15px; line-height:1.6; }
+
+nav { background:var(--surface);border-bottom:1px solid var(--border);padding:0 32px;height:50px;display:flex;align-items:center;gap:6px;position:sticky;top:0;z-index:200; }
+nav .brand { font-weight:800;font-size:14px;color:var(--accent);margin-right:12px; }
+nav a { color:var(--muted);text-decoration:none;font-size:12px;font-weight:600;padding:5px 12px;border-radius:6px;transition:all .15s;white-space:nowrap; }
+nav a:hover { color:var(--text);background:var(--surface2); }
+nav .spacer { flex:1; }
+nav .badge { background:rgba(52,211,153,.12);border:1px solid rgba(52,211,153,.25);color:var(--green);font-size:11px;font-weight:700;padding:3px 12px;border-radius:20px; }
+
+.layout { display:grid;grid-template-columns:1fr 260px;gap:32px;max-width:1100px;margin:0 auto;padding:40px 32px; }
+.main { min-width:0; }
+.sidebar { position:sticky;top:70px;height:fit-content;display:flex;flex-direction:column;gap:14px; }
+
+.day-header { margin-bottom:32px; }
+.day-meta { display:flex;align-items:center;gap:10px;margin-bottom:12px; }
+.day-pill { font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;padding:3px 12px;border-radius:20px;background:rgba(108,142,247,.12);border:1px solid rgba(108,142,247,.25);color:var(--accent); }
+.day-tag { font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;padding:3px 12px;border-radius:20px;background:rgba(52,211,153,.08);border:1px solid rgba(52,211,153,.2);color:var(--green); }
+.day-title { font-size:26px;font-weight:800;letter-spacing:-.3px;margin-bottom:8px; }
+.day-question { font-size:15px;color:var(--accent2);font-style:italic;border-left:3px solid var(--accent2);padding-left:14px;margin-bottom:16px;line-height:1.6; }
+.day-why { font-size:13px;color:var(--muted);line-height:1.7;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:14px 16px; }
+.day-why strong { color:var(--text); }
+
+.section-block { margin-bottom:32px; }
+.sec-label { font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:var(--dim);margin-bottom:14px;display:flex;align-items:center;gap:10px; }
+.sec-label::after { content:'';flex:1;height:1px;background:var(--border); }
+
+.chain { display:flex;flex-direction:column;gap:10px; }
+.chain-item { display:grid;grid-template-columns:32px 1fr;gap:14px;padding:14px 16px;background:var(--surface);border:1px solid var(--border);border-radius:10px;cursor:pointer;transition:border-color .15s; }
+.chain-item:hover { border-color:rgba(167,139,250,.4); }
+.chain-item.done { border-color:rgba(52,211,153,.3);background:rgba(52,211,153,.03); }
+.chain-num { width:32px;height:32px;border-radius:50%;background:var(--surface2);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;color:var(--muted);flex-shrink:0;transition:all .15s; }
+.chain-item.done .chain-num { background:rgba(52,211,153,.15);border-color:rgba(52,211,153,.4);color:var(--green); }
+.chain-q { font-size:13px;font-weight:600;margin-bottom:6px;line-height:1.5; }
+.chain-item.done .chain-q { color:var(--muted);text-decoration:line-through;text-decoration-color:var(--dim); }
+.chain-prompt { font-size:11px;font-family:'Cascadia Code','Fira Code',monospace;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:8px 12px;color:var(--accent2);line-height:1.6;margin-top:8px;white-space:pre-wrap; }
+.chain-hint { font-size:11px;color:var(--dim);margin-top:6px;line-height:1.5; }
+.chain-note { font-size:11px;color:var(--yellow);margin-top:6px;line-height:1.5;padding:6px 10px;background:rgba(251,191,36,.06);border:1px solid rgba(251,191,36,.15);border-radius:5px; }
+
+.pattern-grid { display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:14px; }
+.pattern-card { background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:12px 14px; }
+.pattern-num { font-size:10px;font-weight:800;color:var(--accent);text-transform:uppercase;letter-spacing:1.2px;margin-bottom:4px; }
+.pattern-title { font-size:13px;font-weight:700;color:var(--text);margin-bottom:5px; }
+.pattern-desc { font-size:11px;color:var(--muted);line-height:1.6; }
+.pattern-desc code { font-size:10px;color:var(--accent2);background:var(--bg);padding:1px 5px;border-radius:3px; }
+
+.compare { display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px; }
+.cmp-card { padding:14px 16px;border-radius:10px; }
+.cmp-card.bad { background:rgba(248,113,113,.04);border:1px solid rgba(248,113,113,.25); }
+.cmp-card.good { background:rgba(52,211,153,.04);border:1px solid rgba(52,211,153,.25); }
+.cmp-label { font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px; }
+.cmp-card.bad .cmp-label { color:var(--red); }
+.cmp-card.good .cmp-label { color:var(--green); }
+.cmp-code { font-family:'Cascadia Code','Fira Code',monospace;font-size:11px;color:var(--text);line-height:1.7;white-space:pre; }
+
+.artifact-card { background:var(--surface);border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:14px; }
+.artifact-head { padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px; }
+.artifact-title { font-size:13px;font-weight:700;flex:1; }
+.artifact-file { font-family:'Cascadia Code','Fira Code',monospace;font-size:11px;color:var(--green);background:rgba(52,211,153,.08);border:1px solid rgba(52,211,153,.2);padding:2px 10px;border-radius:5px; }
+.artifact-body { padding:16px 18px; }
+.artifact-row { display:flex;gap:10px;margin-bottom:8px;font-size:12px;align-items:flex-start; }
+.artifact-row:last-child { margin-bottom:0; }
+.ar-dot { width:5px;height:5px;border-radius:50%;background:var(--green);flex-shrink:0;margin-top:6px; }
+.ar-text { color:var(--muted);line-height:1.5; }
+.ar-text strong { color:var(--text); }
+.artifact-fail { margin-top:14px;padding:10px 14px;background:rgba(248,113,113,.06);border:1px solid rgba(248,113,113,.2);border-radius:7px;font-size:11px;color:var(--muted);line-height:1.6; }
+.artifact-fail strong { color:var(--red); }
+
+.iq-section { margin-bottom:32px; }
+.iq-header { padding:14px 18px;background:rgba(167,139,250,.06);border:1px solid rgba(167,139,250,.25);border-radius:10px 10px 0 0;border-bottom:none; }
+.iq-title { font-size:12px;font-weight:700;color:var(--accent2);margin-bottom:4px; }
+.iq-subtitle { font-size:11px;color:var(--muted);line-height:1.6; }
+.iq-body { padding:14px 18px;background:rgba(167,139,250,.02);border:1px solid rgba(167,139,250,.25);border-radius:0 0 10px 10px;display:flex;flex-direction:column;gap:8px; }
+.iq-item { background:var(--surface);border:1px solid var(--border);border-radius:8px;overflow:hidden;cursor:pointer;transition:border-color .15s; }
+.iq-item:hover { border-color:rgba(167,139,250,.35); }
+.iq-item.answered { border-color:rgba(52,211,153,.3); }
+.iq-q { display:flex;align-items:flex-start;gap:12px;padding:10px 14px; }
+.iq-num { font-size:10px;font-weight:800;color:var(--accent2);background:rgba(167,139,250,.1);border:1px solid rgba(167,139,250,.2);padding:2px 7px;border-radius:4px;flex-shrink:0;margin-top:2px; }
+.iq-item.answered .iq-num { background:rgba(52,211,153,.12);border-color:rgba(52,211,153,.3);color:var(--green); }
+.iq-text { font-size:12px;color:var(--text);line-height:1.6;flex:1; }
+.iq-item.answered .iq-text { color:var(--muted); }
+.iq-check { font-size:11px;color:var(--dim);flex-shrink:0;margin-top:3px; }
+.iq-item.answered .iq-check { color:var(--green); }
+
+.criteria { display:flex;flex-direction:column;gap:8px; }
+.crit { display:flex;gap:10px;align-items:flex-start;padding:10px 14px;background:var(--surface);border:1px solid var(--border);border-radius:8px;font-size:12px;cursor:pointer;transition:border-color .15s; }
+.crit:hover { border-color:rgba(52,211,153,.3); }
+.crit.done { border-color:rgba(52,211,153,.35);background:rgba(52,211,153,.03); }
+.crit-box { width:16px;height:16px;border-radius:4px;border:1.5px solid var(--border);flex-shrink:0;margin-top:1px;display:flex;align-items:center;justify-content:center;transition:all .15s; }
+.crit.done .crit-box { background:var(--green);border-color:var(--green); }
+.crit-check { color:#0b0d14;font-size:10px;font-weight:900;display:none; }
+.crit.done .crit-check { display:block; }
+.crit-text { color:var(--muted);line-height:1.5; }
+.crit.done .crit-text { color:var(--dim); }
+
+.widget { background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px; }
+.widget-title { font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--dim);margin-bottom:12px; }
+.progress-bar { height:5px;background:var(--surface2);border-radius:10px;overflow:hidden;margin-bottom:6px; }
+.progress-fill { height:100%;background:linear-gradient(90deg,var(--accent),var(--green));border-radius:10px;transition:width .3s; }
+.progress-label { font-size:11px;color:var(--muted); }
+.progress-count { font-size:22px;font-weight:800;color:var(--text);margin-bottom:2px; }
+.as-row { display:flex;align-items:center;gap:8px;font-size:11px;margin-bottom:4px; }
+.as-dot { width:7px;height:7px;border-radius:50%;background:var(--dim);flex-shrink:0; }
+.as-dot.done { background:var(--green); }
+.as-name { color:var(--muted);flex:1; }
+.conn-row { font-size:11px;color:var(--muted);display:flex;gap:8px;align-items:flex-start; }
+.conn-dir { color:var(--dim);flex-shrink:0;width:48px; }
+.report-box { background:rgba(108,142,247,.06);border:1px solid rgba(108,142,247,.2);border-radius:10px;padding:14px 16px; }
+.report-title { font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--accent);margin-bottom:8px; }
+.report-step { font-size:11px;color:var(--muted);margin-bottom:6px;display:flex;gap:8px; }
+.report-step-num { color:var(--accent);font-weight:700;flex-shrink:0; }
+
+.explore-section { margin-bottom:32px; }
+.explore-header { display:flex;align-items:center;gap:12px;padding:12px 16px;background:rgba(251,191,36,.04);border:1px solid rgba(251,191,36,.2);border-radius:10px 10px 0 0;border-bottom:none; }
+.explore-header .label { font-size:12px;font-weight:700;color:var(--yellow); }
+.explore-header .sublabel { font-size:11px;color:var(--muted);margin-left:auto; }
+.explore-body { padding:14px 16px;background:rgba(251,191,36,.02);border:1px solid rgba(251,191,36,.2);border-radius:0 0 10px 10px;display:flex;flex-direction:column;gap:10px; }
+.explore-item { font-size:12px;color:var(--muted);line-height:1.6;padding-left:14px;position:relative; }
+.explore-item::before { content:'';position:absolute;left:0;top:7px;width:5px;height:5px;border-radius:50%;background:var(--yellow); }
+.explore-item strong { color:var(--text); }
+.explore-item code { font-size:10px;color:var(--accent2);background:var(--surface2);padding:1px 5px;border-radius:3px; }
+</style>
+</head>
+<body>
+
+<nav>
+  <span class="brand">ProOps2026</span>
+  <a href="#concept">Patterns</a>
+  <a href="#chain">Discovery</a>
+  <a href="#artifact">Artifact</a>
+  <a href="#interview">IQ</a>
+  <a href="#done">Done</a>
+  <div class="spacer"></div>
+  <span class="badge">Week 4 · Day 17</span>
+</nav>
+
+<div class="layout">
+<div class="main">
+
+  <!-- HEADER -->
+  <div class="day-header">
+    <div class="day-meta">
+      <span class="day-pill">Week 4 · Day 17</span>
+      <span class="day-tag">Hands-On</span>
+    </div>
+    <div class="day-title">Bash Scripting Foundation — From Manual Commands to Production-Safe Scripts</div>
+    <div class="day-question">How do you turn a sequence of manual commands into a reliable, reusable script that works correctly in all conditions — not just the happy path?</div>
+    <div class="day-why">
+      A DevOps engineer who can only run commands interactively is limited to manual operations. Bash is the glue that turns discrete commands into automation: health checks, deployment scripts, backup jobs, log processors. <strong>The difference between a bash script that works and one that is production-safe is exactly what this day covers</strong> — error handling, input validation, and making the script behave correctly when things go wrong, not just when everything is fine.
+    </div>
+  </div>
+
+  <!-- CONCEPT: SIX PATTERNS -->
+  <div class="section-block" id="concept">
+    <div class="sec-label">The six patterns — what makes a script production-safe</div>
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:18px 20px;">
+      <div style="font-size:13px;color:var(--muted);line-height:1.7;">Every production-grade bash script applies all six. A script missing any one of these will eventually fail silently in a way that's hard to diagnose. By EoD, every line of these is in your memory file with concrete syntax.</div>
+      <div class="pattern-grid">
+        <div class="pattern-card">
+          <div class="pattern-num">Pattern 1</div>
+          <div class="pattern-title">Error handling</div>
+          <div class="pattern-desc"><code>set -euo pipefail</code> — exit on error, error on undefined vars, fail on pipe errors.</div>
+        </div>
+        <div class="pattern-card">
+          <div class="pattern-num">Pattern 2</div>
+          <div class="pattern-title">Input validation</div>
+          <div class="pattern-desc"><code>$#</code> for arg count, <code>${1:?Usage...}</code> for required args, usage function.</div>
+        </div>
+        <div class="pattern-card">
+          <div class="pattern-num">Pattern 3</div>
+          <div class="pattern-title">Conditional checks</div>
+          <div class="pattern-desc"><code>-f</code> file exists, <code>-d</code> dir exists, <code>-z</code>/<code>-n</code> empty/non-empty. <code>[[ ]]</code> for safety.</div>
+        </div>
+        <div class="pattern-card">
+          <div class="pattern-num">Pattern 4</div>
+          <div class="pattern-title">Stdout vs stderr</div>
+          <div class="pattern-desc">Errors to <code>&gt;&amp;2</code>, normal output to stdout. <code>2&gt;/dev/null</code> to silence noise.</div>
+        </div>
+        <div class="pattern-card">
+          <div class="pattern-num">Pattern 5</div>
+          <div class="pattern-title">Functions</div>
+          <div class="pattern-desc">Definition syntax, return via exit code (not <code>return</code> value), <code>local</code> variables.</div>
+        </div>
+        <div class="pattern-card">
+          <div class="pattern-num">Pattern 6</div>
+          <div class="pattern-title">Shebang + PATH hygiene</div>
+          <div class="pattern-desc"><code>#!/bin/bash</code> first line, full paths or explicit <code>PATH=</code> for cron/CI safety.</div>
+        </div>
+      </div>
+    </div>
+
+    <div style="margin-top:16px;">
+      <div style="font-size:11px;font-weight:700;color:var(--dim);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:10px;">The single most important line</div>
+      <div class="compare">
+        <div class="cmp-card bad">
+          <div class="cmp-label">Naive — runs, but silently lies</div>
+          <div class="cmp-code">#!/bin/bash
+echo "running checks..."
+bad_command  # exits non-zero
+echo "all good!"  # still prints
+exit 0  # script "succeeds"</div>
+        </div>
+        <div class="cmp-card good">
+          <div class="cmp-label">Production-safe</div>
+          <div class="cmp-code">#!/bin/bash
+set -euo pipefail
+echo "running checks..."
+bad_command  # script exits HERE
+echo "all good!"  # never reached</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- DISCOVERY CHAIN -->
+  <div class="section-block" id="chain">
+    <div class="sec-label">Discovery chain — 8 questions</div>
+    <div class="chain">
+
+      <!-- Q1 -->
+      <div class="chain-item" onclick="toggleChain(this,0)">
+        <div class="chain-num">1</div>
+        <div>
+          <div class="chain-q">You write a script that pings an endpoint, checks disk space, then tails an error log. The endpoint is unreachable — the ping hangs 30 seconds and the rest runs anyway. What's wrong, and how do you fix it?</div>
+          <div class="chain-prompt">Walk me through error-aware scripting:
+(1) What is an exit code? Show me how to check the exit code of the previous command (`$?`) and what 0 vs non-zero means.
+(2) Without `set -e`, what does bash do when a command fails — does the next line still run? Why is that dangerous in a multi-step script?
+(3) `set -e` — when a command fails, the script exits immediately. Show me the same script with and without `set -e`.
+(4) Why `set -euo pipefail` is the canonical opening: -e exit on error, -u error on undefined var, -o pipefail makes pipes fail on the first failing command (not just the last).
+(5) The hang problem: ping waits 30 seconds before timing out. Use `timeout 3 ping -c 1 host` or `ping -W 2 -c 1 host` to bound the wait. Show both.
+(6) The fixed script — show the diff: shebang, set line, and timeout-wrapped commands.</div>
+          <div class="chain-hint"><code style="font-size:11px;color:var(--accent2);">set -euo pipefail</code> on line 2 of every script. If you only remember one thing from today, this is it.</div>
+        </div>
+      </div>
+
+      <!-- Q2 -->
+      <div class="chain-item" onclick="toggleChain(this,1)">
+        <div class="chain-num">2</div>
+        <div>
+          <div class="chain-q">Now <code>set -e</code> kills the script on any failure. But sometimes you want to <em>handle</em> a failure, not exit. How do you distinguish "exit on failure" from "check if it failed and react"?</div>
+          <div class="chain-prompt">Teach me the distinction between strict-mode and explicit error handling:
+(1) Inside an `if` test, `set -e` is suppressed for the test command. So `if ping host; then ...; else ...; fi` works correctly even with -e on.
+(2) When to use `if cmd; then` vs letting -e exit:
+   - Use if/else when failure is a normal expected branch (file missing, host down → fall back).
+   - Let -e exit when failure means the script can't continue (required tool not installed, required argument missing).
+(3) Capturing output AND exit code: `if output=$(curl -s --max-time 5 "$URL"); then echo "got: $output"; else echo "fetch failed" >&2; fi`.
+(4) Force a single command to be allowed to fail: `failing_command || true`. When is this OK and when is it dangerous?
+(5) Exit code conventions: 0 = success, 1 = generic failure, 2 = misuse (bad args), 64–78 = sysexits.h codes, 126/127 = command not found / not executable.</div>
+          <div class="chain-hint">A common bug: <code style="font-size:11px;color:var(--accent2);">grep pattern file</code> with -e on. If grep finds no match, exit code is 1 — the script dies. Wrap as <code style="font-size:11px;color:var(--accent2);">if grep -q pattern file; then ...; else ...; fi</code>.</div>
+        </div>
+      </div>
+
+      <!-- Q3 -->
+      <div class="chain-item" onclick="toggleChain(this,2)">
+        <div class="chain-num">3</div>
+        <div>
+          <div class="chain-q">Your script needs a hostname argument. A teammate runs it with no args — it proceeds against an empty string and produces confusing errors downstream. How do you validate inputs and print a usage message?</div>
+          <div class="chain-prompt">Show me the input validation patterns:
+(1) `$#` is the count of arguments. Show: `if [[ $# -lt 1 ]]; then echo "Usage: $0 <hostname>" >&2; exit 2; fi`.
+(2) The `${var:?msg}` pattern: `HOST="${1:?Usage: $0 <hostname>}"`. If $1 is unset or empty, prints "Usage: ..." to stderr and exits non-zero — replaces the manual check above.
+(3) The usage function pattern — write a `usage()` function, call it on `--help` or invalid args, exit 2 (misuse). Show me a 5-line usage function.
+(4) Validating values, not just presence: e.g. require a numeric arg with `[[ $1 =~ ^[0-9]+$ ]] || die "must be numeric"`. Define `die() { echo "$@" >&2; exit 1; }` once.
+(5) Why exit 2 for bad args (not exit 1)? Convention: 2 = caller misused the script. Lets calling scripts distinguish "tool failed" from "I called it wrong".</div>
+          <div class="chain-hint">Always send error messages to stderr (<code style="font-size:11px;color:var(--accent2);">&gt;&amp;2</code>). When the script's stdout is redirected to a log or piped to another command, error messages still surface to the human.</div>
+        </div>
+      </div>
+
+      <!-- Q4 -->
+      <div class="chain-item" onclick="toggleChain(this,3)">
+        <div class="chain-num">4</div>
+        <div>
+          <div class="chain-q">You redirect script output to a log file. <code>curl</code>'s progress bar appears mixed in with your real output. What's the difference between stdout and stderr, and how do you separate them?</div>
+          <div class="chain-prompt">Stream redirection deep dive:
+(1) File descriptors: 0 = stdin, 1 = stdout, 2 = stderr. Every process has these three. `>` is shorthand for `1>`, so `cmd > file` redirects stdout only.
+(2) Common patterns:
+   `cmd > out.log`            stdout to file, stderr to terminal
+   `cmd 2> err.log`           stderr to file, stdout to terminal
+   `cmd > out.log 2>&1`       merge both streams to one file (ORDER MATTERS — see #4)
+   `cmd > out.log 2> err.log` separate files
+   `cmd &> all.log`           bash shorthand for both to one file
+   `cmd 2>/dev/null`          discard noise, keep stdout
+(3) curl progress: it goes to stderr by default. Use `curl -s` (silent) to suppress, or `curl -sS` (silent but show errors).
+(4) Why `>file 2>&1` order matters: 2>&1 means "make 2 point to wherever 1 currently points". If you write `2>&1 >file`, 2 still points to terminal because the redirect happened first.
+(5) A logging function pattern:
+   log() { echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] $*"; }
+   err() { echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] ERROR: $*" >&2; }
+Use these instead of bare `echo` everywhere. Timestamps + stderr split for free.</div>
+          <div class="chain-hint">When debugging "why didn't I see the error", check whether the calling code redirected stderr. <code style="font-size:11px;color:var(--accent2);">cmd 2&gt;&amp;1 | tee log</code> is the right shape for logs that capture everything.</div>
+        </div>
+      </div>
+
+      <!-- Q5 -->
+      <div class="chain-item" onclick="toggleChain(this,4)">
+        <div class="chain-num">5</div>
+        <div>
+          <div class="chain-q">You parse a log at <code>$LOG_FILE</code>. The file may not exist. How do you check before opening it — and what do <code>-f</code>, <code>-d</code>, <code>-e</code> mean?</div>
+          <div class="chain-prompt">Conditional checks for files, strings, and numbers:
+(1) File tests inside `[[ ]]`:
+   -e exists (any type)
+   -f exists AND is a regular file
+   -d exists AND is a directory
+   -r readable, -w writable, -x executable
+   -s exists AND is non-empty
+   Why prefer -f over -e for log files? Because -e returns true for directories too — if /var/log/app.log is a directory by mistake, your read fails confusingly.
+(2) String tests:
+   -z str   true if empty
+   -n str   true if non-empty (default — so `[[ $var ]]` works)
+   == / !=  string equality (use inside [[ ]], NOT inside [ ])
+(3) Number tests: -eq -ne -lt -le -gt -ge. NOT < > = inside [[ ]] for numbers — those are string compares.
+(4) `[[ ]]` vs `[ ]`: always use `[[ ]]` in bash. Safer (no word splitting), supports regex (=~), supports && and ||. `[ ]` is POSIX-portable but you don't need that for #!/bin/bash.
+(5) The check-then-act idiom:
+   if [[ -f "$LOG_FILE" ]]; then
+     while read -r line; do ...; done < "$LOG_FILE"
+   else
+     err "log file not found: $LOG_FILE"
+     exit 1
+   fi</div>
+          <div class="chain-hint">Always quote variable expansions: <code style="font-size:11px;color:var(--accent2);">"$var"</code>, not <code style="font-size:11px;color:var(--accent2);">$var</code>. Unquoted variables word-split on whitespace and break on filenames with spaces.</div>
+        </div>
+      </div>
+
+      <!-- Q6 -->
+      <div class="chain-item" onclick="toggleChain(this,5)">
+        <div class="chain-num">6</div>
+        <div>
+          <div class="chain-q">Your script is now 80 lines. A teammate reading it has no idea what each section does. Show me the structure of a readable, function-organized bash script.</div>
+          <div class="chain-prompt">Bash script structure for readability:
+(1) Function syntax — all three forms work, prefer the first:
+   check_disk() { df -h | awk '$5+0 > 80 {print}'; }
+   function check_disk { ... }     # bash-only, avoid for portability
+(2) Local variables: inside functions, declare with `local var=value`. Otherwise the variable leaks to global scope and your refactor breaks distantly.
+(3) Functions return via EXIT CODE, not a "return value". `return 0` is success, `return 1` is failure. To capture output, use `result=$(my_func arg)`.
+(4) Standard structure:
+   1. Shebang + set -euo pipefail
+   2. Constants (uppercase by convention): readonly LOG_FILE=/var/log/app.log
+   3. Helper functions: log(), err(), die(), usage()
+   4. Domain functions: check_disk(), check_endpoint(), parse_log()
+   5. main() function — orchestrates everything
+   6. Last line: main "$@"  — pass all script args to main
+(5) Comments: section headers and WHY, not WHAT. Don't comment `# get disk usage` above an obvious df command. Do comment `# Server is in PRC, must use TZ=Asia/Shanghai for log timestamps`.</div>
+          <div class="chain-hint">Run <code style="font-size:11px;color:var(--accent2);">shellcheck script.sh</code> — a static analyzer that catches 90% of bash bugs before runtime. Install via <code>brew install shellcheck</code>. Make it a habit before every commit.</div>
+          <div class="chain-note">Use <code style="font-size:11px;color:var(--accent2);">readonly</code> for values that should never change: <code style="font-size:11px;color:var(--accent2);">readonly DEPLOY_USER=deploy</code>. Catches accidental reassignment.</div>
+        </div>
+      </div>
+
+      <!-- Q7 -->
+      <div class="chain-item" onclick="toggleChain(this,6)">
+        <div class="chain-num">7</div>
+        <div>
+          <div class="chain-q">Script works locally but fails in CI with <code>jq: command not found</code>. What's PATH, why is it different in CI vs your shell — and how do you make scripts work regardless?</div>
+          <div class="chain-prompt">PATH and environment hygiene for cron/CI:
+(1) `echo $PATH` in interactive shell: long, includes /opt/homebrew/bin, ~/bin, asdf shims, etc. — populated by your shell rc files (~/.bashrc, ~/.zshrc).
+(2) `cron` and CI runners use a minimal PATH (usually `/usr/bin:/bin`). Your shell rc files DON'T run. So `jq` installed in /opt/homebrew/bin is invisible.
+(3) Three fixes ranked from worst to best:
+   - Worst: hardcode full path: `/opt/homebrew/bin/jq` — breaks when teammate has Linux paths.
+   - Middle: set PATH at top of script: `export PATH="/usr/local/bin:/usr/bin:/bin:$PATH"`.
+   - Best: explicitly check at script start that required tools exist:
+     for cmd in jq curl aws; do command -v "$cmd" >/dev/null || die "missing required tool: $cmd"; done
+(4) `command -v` is the modern replacement for `which` — POSIX-portable, exit code is reliable.
+(5) Other env quirks in cron: no TERM, no HOME shortcut, working directory is $HOME. If your script does `cd somewhere` first, it works the same in cron and shell.
+(6) For CI, also ensure: container image has the required tools installed (apt-get install jq in Dockerfile or setup step), or use an image that bundles them.</div>
+          <div class="chain-hint">Add a "preflight" function at the top of every nontrivial script that checks every required command is on PATH. Five seconds of boilerplate saves an hour of "why is it failing only in CI".</div>
+        </div>
+      </div>
+
+      <!-- Q8 -->
+      <div class="chain-item" onclick="toggleChain(this,7)">
+        <div class="chain-num">8</div>
+        <div>
+          <div class="chain-q">All six patterns understood. Write <code>memory/bash-scripting.md</code> + a working example script that demonstrates every pattern in 30 lines.</div>
+          <div class="chain-prompt">Help me write memory/bash-scripting.md and a reference example.
+
+memory/bash-scripting.md structure:
+1. Header pattern (shebang + set -euo pipefail explanation per flag)
+2. Input validation (the three patterns: $#, ${1:?...}, usage function)
+3. Conditionals table — file tests (-f -d -e -r -w -s), string tests (-z -n ==), number tests (-eq -lt -gt). [[ ]] vs [ ]. ALWAYS quote variable expansions.
+4. Functions (definition syntax, return-via-exit-code, `local`, `readonly`)
+5. Output handling (stdout vs stderr, log/err/die helper functions, > 2> 2>&1 patterns)
+6. PATH hygiene (preflight check pattern, command -v over which)
+7. shellcheck — install + run before commit
+
+Then a 25–30 line example script `scripts/healthcheck.sh` that demonstrates ALL six patterns:
+- Takes a hostname arg, validates it
+- Pings (timeout-bounded)
+- curls /health endpoint, checks status code
+- Logs a timestamped line per check
+- Exits with proper exit codes
+- Uses functions, local vars, set -euo pipefail
+- Has a usage() function and preflight tool check
+- Passes shellcheck without warnings
+
+Format the memory file as tables and short code blocks, not prose. The example script gets its own file.</div>
+          <div class="chain-hint">After writing the script, run <code style="font-size:11px;color:var(--accent2);">shellcheck scripts/healthcheck.sh</code> — fix every warning. A clean shellcheck pass is the strongest signal that the script is actually production-safe and not just "looks right".</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ARTIFACT -->
+  <div class="section-block" id="artifact">
+    <div class="sec-label">Artifacts</div>
+    <div class="artifact-card">
+      <div class="artifact-head">
+        <div class="artifact-title">Bash Scripting Memory File</div>
+        <div class="artifact-file">memory/bash-scripting.md</div>
+      </div>
+      <div class="artifact-body">
+        <div class="artifact-row"><div class="ar-dot"></div><div class="ar-text"><strong>Header pattern</strong> — <code>#!/bin/bash</code> + <code>set -euo pipefail</code> with one-line explanation per flag.</div></div>
+        <div class="artifact-row"><div class="ar-dot"></div><div class="ar-text"><strong>Input validation</strong> — the three patterns side by side: <code>$#</code> count check, <code>${1:?...}</code>, dedicated usage function.</div></div>
+        <div class="artifact-row"><div class="ar-dot"></div><div class="ar-text"><strong>Conditionals table</strong> — file tests, string tests, number tests. <code>[[ ]]</code> vs <code>[ ]</code> rule.</div></div>
+        <div class="artifact-row"><div class="ar-dot"></div><div class="ar-text"><strong>Functions section</strong> — definition syntax, return-via-exit-code, <code>local</code> vars. Why bash returns are different from every other language.</div></div>
+        <div class="artifact-row"><div class="ar-dot"></div><div class="ar-text"><strong>Stdout/stderr patterns</strong> — log/err/die helper functions, <code>&gt; 2&gt; 2&gt;&amp;1</code> chart.</div></div>
+        <div class="artifact-row"><div class="ar-dot"></div><div class="ar-text"><strong>PATH hygiene</strong> — preflight tool-check pattern, <code>command -v</code>, why CI has minimal PATH.</div></div>
+        <div class="artifact-fail"><strong>Weak signals:</strong> No mention of <code>set -euo pipefail</code> — the single most important line in production bash. Functions section that doesn't explain return-via-exit-code (because bash returns are not what most people expect from other languages). No <code>shellcheck</code> reference.</div>
+      </div>
+    </div>
+    <div class="artifact-card">
+      <div class="artifact-head">
+        <div class="artifact-title">Working Example Script</div>
+        <div class="artifact-file">scripts/healthcheck.sh</div>
+      </div>
+      <div class="artifact-body">
+        <div class="artifact-row"><div class="ar-dot"></div><div class="ar-text"><strong>25–30 lines, all six patterns</strong> — header + set, usage function, preflight tool check, log/err helpers, validated input, file/conditional checks, functions with local vars, proper exit codes.</div></div>
+        <div class="artifact-row"><div class="ar-dot"></div><div class="ar-text"><strong>Passes <code>shellcheck</code> with zero warnings</strong> — paste the clean run output in your daily report.</div></div>
+        <div class="artifact-row"><div class="ar-dot"></div><div class="ar-text"><strong>Demonstrably runs end-to-end</strong> — both happy path (server up, returns 200) and failure path (server unreachable → exits non-zero with stderr message).</div></div>
+        <div class="artifact-fail"><strong>Weak signals:</strong> Script that runs but doesn't pass shellcheck. Uses <code>[ ]</code> instead of <code>[[ ]]</code>. No timeout on network commands. Mixes stdout and stderr without distinction.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- INTERVIEW QUESTIONS -->
+  <div class="iq-section" id="interview">
+    <div class="iq-header">
+      <div class="iq-title">Interview Questions</div>
+      <div class="iq-subtitle">Click when you can answer without notes. These map directly to common bash interview questions.</div>
+    </div>
+    <div class="iq-body">
+      <div class="iq-item" onclick="toggleIQ(this)"><div class="iq-q"><span class="iq-num">Q1</span><span class="iq-text">What does <code>set -euo pipefail</code> do — flag by flag? Why is it on line 2 of every production bash script?</span><span class="iq-check">&#10003;</span></div></div>
+      <div class="iq-item" onclick="toggleIQ(this)"><div class="iq-q"><span class="iq-num">Q2</span><span class="iq-text">With <code>set -e</code> on, when is <code>if cmd; then ...; else ...; fi</code> safe — and when does <code>set -e</code> not exit even on a failed command?</span><span class="iq-check">&#10003;</span></div></div>
+      <div class="iq-item" onclick="toggleIQ(this)"><div class="iq-q"><span class="iq-num">Q3</span><span class="iq-text">How do you require a script argument and produce a useful error if missing? Show two ways using <code>$#</code> and <code>${1:?...}</code>.</span><span class="iq-check">&#10003;</span></div></div>
+      <div class="iq-item" onclick="toggleIQ(this)"><div class="iq-q"><span class="iq-num">Q4</span><span class="iq-text">What is the difference between <code>cmd &gt; out 2&gt;&amp;1</code> and <code>cmd 2&gt;&amp;1 &gt; out</code>? Why does the order matter?</span><span class="iq-check">&#10003;</span></div></div>
+      <div class="iq-item" onclick="toggleIQ(this)"><div class="iq-q"><span class="iq-num">Q5</span><span class="iq-text">When checking that a file exists for reading, why is <code>-f</code> safer than <code>-e</code>?</span><span class="iq-check">&#10003;</span></div></div>
+      <div class="iq-item" onclick="toggleIQ(this)"><div class="iq-q"><span class="iq-num">Q6</span><span class="iq-text">A bash function needs to "return" a string. Why isn't <code>return "hello"</code> the right answer — and what is?</span><span class="iq-check">&#10003;</span></div></div>
+      <div class="iq-item" onclick="toggleIQ(this)"><div class="iq-q"><span class="iq-num">Q7</span><span class="iq-text">Your script works in your terminal but fails in cron with <code>jq: command not found</code>. What's the cause and the cleanest fix?</span><span class="iq-check">&#10003;</span></div></div>
+      <div class="iq-item" onclick="toggleIQ(this)"><div class="iq-q"><span class="iq-num">Q8</span><span class="iq-text">Why is <code>[[ ]]</code> preferred over <code>[ ]</code> in bash scripts? Give one concrete bug <code>[[ ]]</code> prevents.</span><span class="iq-check">&#10003;</span></div></div>
+    </div>
+  </div>
+
+  <!-- DONE CRITERIA -->
+  <div class="section-block" id="done">
+    <div class="sec-label">Done criteria</div>
+    <div class="criteria">
+      <div class="crit" onclick="toggleCrit(this)"><div class="crit-box"><span class="crit-check">&#10003;</span></div><div class="crit-text">Can recite all six production-safety patterns from memory.</div></div>
+      <div class="crit" onclick="toggleCrit(this)"><div class="crit-box"><span class="crit-check">&#10003;</span></div><div class="crit-text"><code style="font-size:11px;color:var(--accent2);">scripts/healthcheck.sh</code> written — uses <code>set -euo pipefail</code>, validated inputs, preflight tool check, log/err helpers, functions with local vars.</div></div>
+      <div class="crit" onclick="toggleCrit(this)"><div class="crit-box"><span class="crit-check">&#10003;</span></div><div class="crit-text"><code style="font-size:11px;color:var(--accent2);">shellcheck scripts/healthcheck.sh</code> passes with zero warnings.</div></div>
+      <div class="crit" onclick="toggleCrit(this)"><div class="crit-box"><span class="crit-check">&#10003;</span></div><div class="crit-text">Script tested both happy path (returns 0) and failure path (exits non-zero with clear stderr message).</div></div>
+      <div class="crit" onclick="toggleCrit(this)"><div class="crit-box"><span class="crit-check">&#10003;</span></div><div class="crit-text">Output redirection understood — can explain <code>&gt;file 2&gt;&amp;1</code> vs <code>2&gt;&amp;1 &gt;file</code>.</div></div>
+      <div class="crit" onclick="toggleCrit(this)"><div class="crit-box"><span class="crit-check">&#10003;</span></div><div class="crit-text">PATH hygiene understood — script either uses preflight check or explicit PATH for cron/CI safety.</div></div>
+      <div class="crit" onclick="toggleCrit(this)"><div class="crit-box"><span class="crit-check">&#10003;</span></div><div class="crit-text"><code style="font-size:11px;color:var(--accent2);">memory/bash-scripting.md</code> written — six patterns, conditionals table, functions section, shellcheck reference.</div></div>
+      <div class="crit" onclick="toggleCrit(this)"><div class="crit-box"><span class="crit-check">&#10003;</span></div><div class="crit-text">Git commit pushed: <code style="font-size:11px;color:var(--accent2);">Day 17 — Bash foundation: scripts/healthcheck.sh + memory/bash-scripting.md</code></div></div>
+      <div class="crit" onclick="toggleCrit(this)"><div class="crit-box"><span class="crit-check">&#10003;</span></div><div class="crit-text">Daily log filled — Tomorrow's Context Block names a real workflow you'd like to script next (Day 18 applies bash to Git/Docker/AWS).</div></div>
+    </div>
+  </div>
+
+  <!-- EXPLORE FURTHER -->
+  <div class="explore-section">
+    <div class="explore-header">
+      <span class="label">Explore further</span>
+      <span class="sublabel">Only after all done criteria checked &#10003;</span>
+    </div>
+    <div class="explore-body">
+      <div style="font-size:11px;color:var(--dim);margin-bottom:4px;">Optional. Patterns Day 18 will lean on heavily.</div>
+      <div class="explore-item"><strong>Trap for cleanup.</strong> Ask Claude: <em>"Show me <code>trap cleanup EXIT</code> with a function that removes a temp file. Add SIGINT and SIGTERM handlers. Why is EXIT special vs the signal traps?"</em></div>
+      <div class="explore-item"><strong>Idempotent scripts.</strong> Ask Claude: <em>"Walk me through making a deploy script idempotent — safe to run twice. What guards do I need: file-exists checks, lock files, state-marker files?"</em></div>
+      <div class="explore-item"><strong>Process substitution and here-docs.</strong> Ask Claude: <em>"Show me <code>diff &lt;(cmd1) &lt;(cmd2)</code> and <code>while read line; do ...; done &lt;&lt; EOF ... EOF</code>. When are these the right tool over a regular pipe?"</em></div>
+      <div class="explore-item"><strong>Bats for bash testing.</strong> Ask Claude: <em>"Install <code>bats</code> and write 3 tests for my healthcheck.sh — happy path, missing arg, server down. How do bash tests differ from pytest?"</em></div>
+    </div>
+  </div>
+
+</div><!-- /main -->
+
+<!-- SIDEBAR -->
+<div class="sidebar">
+  <div class="widget">
+    <div class="widget-title">Progress — Day 17</div>
+    <div class="progress-count" id="d17-count">0 / 8</div>
+    <div style="margin-bottom:8px;"><div class="progress-bar"><div class="progress-fill" id="d17-fill" style="width:0%"></div></div><div class="progress-label" id="d17-label">Discovery chain</div></div>
+  </div>
+  <div class="widget">
+    <div class="widget-title">Today's Artifacts</div>
+    <div class="as-row"><div class="as-dot" id="d17-script"></div><div class="as-name">scripts/healthcheck.sh</div></div>
+    <div class="as-row"><div class="as-dot" id="d17-shellcheck"></div><div class="as-name">shellcheck clean</div></div>
+    <div class="as-row"><div class="as-dot" id="d17-mem"></div><div class="as-name">memory/bash-scripting.md</div></div>
+  </div>
+  <div class="widget" style="background:rgba(248,113,113,.04);border-color:rgba(248,113,113,.2);">
+    <div class="widget-title" style="color:var(--red);">The one line</div>
+    <div style="font-size:11px;color:var(--muted);line-height:1.6;">If you remember nothing else from today: <code style="font-size:11px;color:var(--accent2);">set -euo pipefail</code> on line 2 of every script. It prevents 80% of silent-failure bugs.</div>
+  </div>
+  <div class="widget" style="background:rgba(108,142,247,.04);border-color:rgba(108,142,247,.2);">
+    <div class="widget-title" style="color:var(--accent);">Bash quick map</div>
+    <div style="font-size:10.5px;color:var(--muted);line-height:1.9;font-family:'Cascadia Code','Fira Code',monospace;">
+      set -euo pipefail<br>
+      [[ -f "$file" ]]<br>
+      [[ $# -lt 1 ]]<br>
+      "${1:?Usage: $0 ...}"<br>
+      command -v jq<br>
+      err() { echo "$@" &gt;&amp;2; }<br>
+      die() { err "$@"; exit 1; }<br>
+      result=$(my_func "$arg")<br>
+      trap cleanup EXIT<br>
+      shellcheck script.sh
+    </div>
+  </div>
+  <div class="widget">
+    <div class="widget-title">Connects To</div>
+    <div style="display:flex;flex-direction:column;gap:6px;">
+      <div class="conn-row"><span class="conn-dir">&larr; Day 4</span><span style="font-size:11px;color:var(--muted);">Linux basics — today turns commands into scripts</span></div>
+      <div class="conn-row"><span class="conn-dir">&larr; Day 16</span><span style="font-size:11px;color:var(--muted);">EKS lifecycle — today's patterns wrap those commands tomorrow</span></div>
+      <div class="conn-row"><span class="conn-dir">&rarr; Day 18</span><span style="font-size:11px;color:var(--muted);">Applied bash — automate Git, Docker, AWS CLI with these patterns</span></div>
+      <div class="conn-row"><span class="conn-dir">&rarr; Day 23</span><span style="font-size:11px;color:var(--muted);">CI shell steps — every pipeline has bash glue</span></div>
+    </div>
+  </div>
+  <div class="report-box">
+    <div class="report-title">End-of-day report</div>
+    <div class="report-step"><span class="report-step-num">1.</span> Fill daily log + context block</div>
+    <div class="report-step"><span class="report-step-num">2.</span> git commit + push script + memory file</div>
+    <div class="report-step"><span class="report-step-num">3.</span> Paste <code style="font-size:10px;color:var(--accent);">=== Day 17 |</code> to trainer channel</div>
+    <div style="margin-top:8px;padding:6px 8px;background:rgba(52,211,153,.06);border:1px solid rgba(52,211,153,.2);border-radius:5px;font-size:10px;color:var(--green);line-height:1.5;">Include: clean shellcheck output + screenshot of healthcheck.sh running both happy and failure paths</div>
+  </div>
+</div>
+
+</div><!-- /layout -->
+
+<script>
+const done = new Array(8).fill(false);
+function toggleChain(el, i) {
+  done[i] = !done[i];
+  el.classList.toggle('done', done[i]);
+  const n = done.filter(Boolean).length;
+  document.getElementById('d17-count').textContent = n + ' / 8';
+  document.getElementById('d17-fill').style.width = (n/8*100) + '%';
+  const lbl = ['Keep going','Keep going','Halfway','Halfway','Almost there','Almost there','Almost there','Done!'];
+  document.getElementById('d17-label').textContent = n === 0 ? 'Discovery chain' : lbl[n-1];
+  if (n >= 7) document.getElementById('d17-script').classList.add('done');
+  if (n >= 8) { document.getElementById('d17-shellcheck').classList.add('done'); document.getElementById('d17-mem').classList.add('done'); }
+}
+function toggleIQ(el) { el.classList.toggle('answered'); }
+function toggleCrit(el) { el.classList.toggle('done'); }
+</script>
+</body>
+</html>
