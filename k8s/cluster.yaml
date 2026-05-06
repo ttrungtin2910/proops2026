@@ -1,0 +1,33 @@
+apiVersion: eksctl.io/v1alpha5
+kind: ClusterConfig
+
+metadata:
+  name: project-tin-lab
+  region: ap-northeast-2
+  version: "1.32"
+  tags:
+    Owner: tin_tt
+    Email: ttrungtin.work@gmail.com
+
+availabilityZones:
+  - ap-northeast-2a
+  - ap-northeast-2b
+
+vpc:
+  nat:
+    gateway: Disable  # no NAT Gateway — nodes in public subnet, saves ~$30/mo
+
+managedNodeGroups:
+  - name: ng-spot
+    instanceTypes:
+      - t3.medium
+    spot: true
+    desiredCapacity: 1
+    minSize: 1
+    maxSize: 1
+    privateNetworking: false  # nodes in public subnet, no NAT needed
+    iam:
+      attachPolicyARNs:
+        - arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy
+        - arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy
+        - arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly

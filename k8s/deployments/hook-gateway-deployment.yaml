@@ -29,7 +29,7 @@ spec:
     spec:
       containers:
         - name: hook-gateway
-          image: ttrungtin2910/hook-gateway:day10
+          image: 905418181527.dkr.ecr.ap-northeast-2.amazonaws.com/project-tin-hook-gateway:v1
           ports:
             - containerPort: 8080   # ← must match Service.spec.ports.targetPort
 

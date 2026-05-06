@@ -36,7 +36,7 @@ spec:
           command: ['sh', '-c', 'until nc -z kafka 9092; do echo waiting for kafka:9092; sleep 5; done']
       containers:
         - name: qna-agent
-          image: ttrungtin2910/qna-agent:day10
+          image: 905418181527.dkr.ecr.ap-northeast-2.amazonaws.com/project-tin-qna-agent:v1
           ports:
             - containerPort: 8000   # ← must match Service.spec.ports.targetPort
 

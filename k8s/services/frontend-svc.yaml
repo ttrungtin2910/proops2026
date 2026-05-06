@@ -15,7 +15,7 @@ metadata:
     app: frontend
     tier: frontend
 spec:
-  type: ClusterIP
+  type: LoadBalancer
   selector:
     app: frontend             # ← must match Deployment template.metadata.labels
   ports:

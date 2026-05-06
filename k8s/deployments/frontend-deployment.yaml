@@ -34,7 +34,7 @@ spec:
     spec:
       containers:
         - name: frontend
-          image: ttrungtin2910/frontend:day10
+          image: 905418181527.dkr.ecr.ap-northeast-2.amazonaws.com/project-tin-frontend:v1
           ports:
             - containerPort: 80    # nginx listens on 80
 

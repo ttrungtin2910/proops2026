@@ -12,7 +12,7 @@ auth:
 
 master:
   persistence:
-    size: 1Gi                         # dev: nhỏ hơn default 8Gi
+    enabled: false                    # EBS CSI driver không có OIDC → disabled cho lab
 
   resources:
     limits:

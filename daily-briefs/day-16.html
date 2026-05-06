@@ -1,0 +1,626 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Day 16 — EKS Practice: Ship Your Project to AWS · ProOps2026</title>
+<style>
+:root {
+  --bg:#0b0d14; --surface:#13161f; --surface2:#1c2030; --border:#252a3a;
+  --accent:#6c8ef7; --accent2:#a78bfa;
+  --green:#34d399; --yellow:#fbbf24; --orange:#fb923c;
+  --red:#f87171; --teal:#22d3ee; --blue:#60a5fa;
+  --text:#e8edf5; --muted:#7c87a0; --dim:#3a4258;
+}
+* { box-sizing:border-box; margin:0; padding:0; }
+body { background:var(--bg); color:var(--text); font-family:'Segoe UI',system-ui,sans-serif; font-size:15px; line-height:1.6; }
+
+nav { background:var(--surface);border-bottom:1px solid var(--border);padding:0 32px;height:50px;display:flex;align-items:center;gap:6px;position:sticky;top:0;z-index:200; }
+nav .brand { font-weight:800;font-size:14px;color:var(--accent);margin-right:12px; }
+nav a { color:var(--muted);text-decoration:none;font-size:12px;font-weight:600;padding:5px 12px;border-radius:6px;transition:all .15s;white-space:nowrap; }
+nav a:hover { color:var(--text);background:var(--surface2); }
+nav .spacer { flex:1; }
+nav .badge { background:rgba(248,113,113,.12);border:1px solid rgba(248,113,113,.3);color:var(--red);font-size:11px;font-weight:700;padding:3px 12px;border-radius:20px; }
+
+.layout { display:grid;grid-template-columns:1fr 260px;gap:32px;max-width:1100px;margin:0 auto;padding:40px 32px; }
+.main { min-width:0; }
+.sidebar { position:sticky;top:70px;height:fit-content;display:flex;flex-direction:column;gap:14px; }
+
+.day-header { margin-bottom:32px; }
+.day-meta { display:flex;align-items:center;gap:10px;margin-bottom:12px; }
+.day-pill { font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;padding:3px 12px;border-radius:20px;background:rgba(108,142,247,.12);border:1px solid rgba(108,142,247,.25);color:var(--accent); }
+.day-tag { font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;padding:3px 12px;border-radius:20px;background:rgba(52,211,153,.08);border:1px solid rgba(52,211,153,.2);color:var(--green); }
+.day-group { font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;padding:3px 12px;border-radius:20px;background:rgba(251,191,36,.08);border:1px solid rgba(251,191,36,.25);color:var(--yellow); }
+.day-title { font-size:26px;font-weight:800;letter-spacing:-.3px;margin-bottom:8px; }
+.day-question { font-size:15px;color:var(--accent2);font-style:italic;border-left:3px solid var(--accent2);padding-left:14px;margin-bottom:16px;line-height:1.6; }
+.day-why { font-size:13px;color:var(--muted);line-height:1.7;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:14px 16px; }
+.day-why strong { color:var(--text); }
+
+.section-block { margin-bottom:32px; }
+.sec-label { font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:var(--dim);margin-bottom:14px;display:flex;align-items:center;gap:10px; }
+.sec-label::after { content:'';flex:1;height:1px;background:var(--border); }
+
+.chain { display:flex;flex-direction:column;gap:10px; }
+.chain-item { display:grid;grid-template-columns:32px 1fr;gap:14px;padding:14px 16px;background:var(--surface);border:1px solid var(--border);border-radius:10px;cursor:pointer;transition:border-color .15s; }
+.chain-item:hover { border-color:rgba(167,139,250,.4); }
+.chain-item.done { border-color:rgba(52,211,153,.3);background:rgba(52,211,153,.03); }
+.chain-num { width:32px;height:32px;border-radius:50%;background:var(--surface2);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;color:var(--muted);flex-shrink:0;transition:all .15s; }
+.chain-item.done .chain-num { background:rgba(52,211,153,.15);border-color:rgba(52,211,153,.4);color:var(--green); }
+.chain-q { font-size:13px;font-weight:600;margin-bottom:6px;line-height:1.5; }
+.chain-item.done .chain-q { color:var(--muted);text-decoration:line-through;text-decoration-color:var(--dim); }
+.chain-prompt { font-size:11px;font-family:'Cascadia Code','Fira Code',monospace;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:8px 12px;color:var(--accent2);line-height:1.6;margin-top:8px;white-space:pre-wrap; }
+.chain-hint { font-size:11px;color:var(--dim);margin-top:6px;line-height:1.5; }
+.chain-note { font-size:11px;color:var(--yellow);margin-top:6px;line-height:1.5;padding:6px 10px;background:rgba(251,191,36,.06);border:1px solid rgba(251,191,36,.15);border-radius:5px; }
+.chain-warn { font-size:11px;color:var(--red);margin-top:6px;line-height:1.5;padding:8px 10px;background:rgba(248,113,113,.06);border:1px solid rgba(248,113,113,.25);border-radius:5px; }
+.chain-warn strong { color:var(--red); }
+
+.cost-banner { background:linear-gradient(135deg,rgba(248,113,113,.08),rgba(251,191,36,.06));border:1px solid rgba(248,113,113,.4);border-radius:10px;padding:16px 18px;margin-bottom:18px; }
+.cost-banner-title { font-size:12px;font-weight:800;color:var(--red);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:8px;display:flex;align-items:center;gap:8px; }
+.cost-banner-title::before { content:'$';width:22px;height:22px;border-radius:50%;background:var(--red);color:#fff;display:inline-flex;align-items:center;justify-content:center;font-size:13px;font-weight:900; }
+.cost-banner-body { font-size:12.5px;color:var(--muted);line-height:1.7; }
+.cost-banner-body strong { color:var(--text); }
+
+.cost-stack { background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:18px 20px;margin-bottom:14px; }
+.cost-stack-title { font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:var(--accent);margin-bottom:14px; }
+.cost-row { display:grid;grid-template-columns:1fr auto auto;gap:14px;padding:8px 0;border-top:1px solid var(--border);font-size:12px;align-items:center; }
+.cost-row:first-of-type { border-top:none; }
+.cost-name { color:var(--text);font-weight:600; }
+.cost-name span { color:var(--muted);font-weight:400;font-size:11px; }
+.cost-rate { font-family:'Cascadia Code','Fira Code',monospace;font-size:11px;color:var(--accent2); }
+.cost-tag { font-size:10px;font-weight:700;padding:2px 8px;border-radius:4px;text-transform:uppercase;letter-spacing:.8px; }
+.cost-tag.req { background:rgba(248,113,113,.1);color:var(--red);border:1px solid rgba(248,113,113,.25); }
+.cost-tag.skip { background:rgba(52,211,153,.08);color:var(--green);border:1px solid rgba(52,211,153,.2); }
+.cost-tag.opt { background:rgba(251,191,36,.08);color:var(--yellow);border:1px solid rgba(251,191,36,.2); }
+
+.skip-list { background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:18px 20px;margin-bottom:18px; }
+.skip-grid { display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px; }
+.skip-card { padding:10px 12px;border-radius:7px;font-size:12px;line-height:1.55; }
+.skip-card.no { background:rgba(248,113,113,.05);border:1px solid rgba(248,113,113,.2); }
+.skip-card.no strong { color:var(--red); }
+.skip-card.yes { background:rgba(52,211,153,.05);border:1px solid rgba(52,211,153,.2); }
+.skip-card.yes strong { color:var(--green); }
+
+.artifact-card { background:var(--surface);border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:14px; }
+.artifact-head { padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px; }
+.artifact-title { font-size:13px;font-weight:700;flex:1; }
+.artifact-file { font-family:'Cascadia Code','Fira Code',monospace;font-size:11px;color:var(--green);background:rgba(52,211,153,.08);border:1px solid rgba(52,211,153,.2);padding:2px 10px;border-radius:5px; }
+.artifact-body { padding:16px 18px; }
+.artifact-row { display:flex;gap:10px;margin-bottom:8px;font-size:12px;align-items:flex-start; }
+.artifact-row:last-child { margin-bottom:0; }
+.ar-dot { width:5px;height:5px;border-radius:50%;background:var(--green);flex-shrink:0;margin-top:6px; }
+.ar-text { color:var(--muted);line-height:1.5; }
+.ar-text strong { color:var(--text); }
+.artifact-fail { margin-top:14px;padding:10px 14px;background:rgba(248,113,113,.06);border:1px solid rgba(248,113,113,.2);border-radius:7px;font-size:11px;color:var(--muted);line-height:1.6; }
+.artifact-fail strong { color:var(--red); }
+
+.iq-section { margin-bottom:32px; }
+.iq-header { padding:14px 18px;background:rgba(167,139,250,.06);border:1px solid rgba(167,139,250,.25);border-radius:10px 10px 0 0;border-bottom:none; }
+.iq-title { font-size:12px;font-weight:700;color:var(--accent2);margin-bottom:4px; }
+.iq-subtitle { font-size:11px;color:var(--muted);line-height:1.6; }
+.iq-body { padding:14px 18px;background:rgba(167,139,250,.02);border:1px solid rgba(167,139,250,.25);border-radius:0 0 10px 10px;display:flex;flex-direction:column;gap:8px; }
+.iq-item { background:var(--surface);border:1px solid var(--border);border-radius:8px;overflow:hidden;cursor:pointer;transition:border-color .15s; }
+.iq-item:hover { border-color:rgba(167,139,250,.35); }
+.iq-item.answered { border-color:rgba(52,211,153,.3); }
+.iq-q { display:flex;align-items:flex-start;gap:12px;padding:10px 14px; }
+.iq-num { font-size:10px;font-weight:800;color:var(--accent2);background:rgba(167,139,250,.1);border:1px solid rgba(167,139,250,.2);padding:2px 7px;border-radius:4px;flex-shrink:0;margin-top:2px; }
+.iq-item.answered .iq-num { background:rgba(52,211,153,.12);border-color:rgba(52,211,153,.3);color:var(--green); }
+.iq-text { font-size:12px;color:var(--text);line-height:1.6;flex:1; }
+.iq-item.answered .iq-text { color:var(--muted); }
+.iq-check { font-size:11px;color:var(--dim);flex-shrink:0;margin-top:3px; }
+.iq-item.answered .iq-check { color:var(--green); }
+
+.criteria { display:flex;flex-direction:column;gap:8px; }
+.crit { display:flex;gap:10px;align-items:flex-start;padding:10px 14px;background:var(--surface);border:1px solid var(--border);border-radius:8px;font-size:12px;cursor:pointer;transition:border-color .15s; }
+.crit:hover { border-color:rgba(52,211,153,.3); }
+.crit.done { border-color:rgba(52,211,153,.35);background:rgba(52,211,153,.03); }
+.crit.hard { border-color:rgba(248,113,113,.3);background:rgba(248,113,113,.04); }
+.crit.hard.done { border-color:rgba(52,211,153,.4);background:rgba(52,211,153,.05); }
+.crit-box { width:16px;height:16px;border-radius:4px;border:1.5px solid var(--border);flex-shrink:0;margin-top:1px;display:flex;align-items:center;justify-content:center;transition:all .15s; }
+.crit.done .crit-box { background:var(--green);border-color:var(--green); }
+.crit-check { color:#0b0d14;font-size:10px;font-weight:900;display:none; }
+.crit.done .crit-check { display:block; }
+.crit-text { color:var(--muted);line-height:1.5; }
+.crit.done .crit-text { color:var(--dim); }
+.crit.hard .crit-text { color:var(--red);font-weight:600; }
+.crit.hard.done .crit-text { color:var(--green); }
+
+.widget { background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px; }
+.widget-title { font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--dim);margin-bottom:12px; }
+.progress-bar { height:5px;background:var(--surface2);border-radius:10px;overflow:hidden;margin-bottom:6px; }
+.progress-fill { height:100%;background:linear-gradient(90deg,var(--accent),var(--green));border-radius:10px;transition:width .3s; }
+.progress-label { font-size:11px;color:var(--muted); }
+.progress-count { font-size:22px;font-weight:800;color:var(--text);margin-bottom:2px; }
+.as-row { display:flex;align-items:center;gap:8px;font-size:11px;margin-bottom:4px; }
+.as-dot { width:7px;height:7px;border-radius:50%;background:var(--dim);flex-shrink:0; }
+.as-dot.done { background:var(--green); }
+.as-name { color:var(--muted);flex:1; }
+.conn-row { font-size:11px;color:var(--muted);display:flex;gap:8px;align-items:flex-start; }
+.conn-dir { color:var(--dim);flex-shrink:0;width:48px; }
+.report-box { background:rgba(108,142,247,.06);border:1px solid rgba(108,142,247,.2);border-radius:10px;padding:14px 16px; }
+.report-title { font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--accent);margin-bottom:8px; }
+.report-step { font-size:11px;color:var(--muted);margin-bottom:6px;display:flex;gap:8px; }
+.report-step-num { color:var(--accent);font-weight:700;flex-shrink:0; }
+
+.explore-section { margin-bottom:32px; }
+.explore-header { display:flex;align-items:center;gap:12px;padding:12px 16px;background:rgba(251,191,36,.04);border:1px solid rgba(251,191,36,.2);border-radius:10px 10px 0 0;border-bottom:none; }
+.explore-header .label { font-size:12px;font-weight:700;color:var(--yellow); }
+.explore-header .sublabel { font-size:11px;color:var(--muted);margin-left:auto; }
+.explore-body { padding:14px 16px;background:rgba(251,191,36,.02);border:1px solid rgba(251,191,36,.2);border-radius:0 0 10px 10px;display:flex;flex-direction:column;gap:10px; }
+.explore-item { font-size:12px;color:var(--muted);line-height:1.6;padding-left:14px;position:relative; }
+.explore-item::before { content:'';position:absolute;left:0;top:7px;width:5px;height:5px;border-radius:50%;background:var(--yellow); }
+.explore-item strong { color:var(--text); }
+.explore-item code { font-size:10px;color:var(--accent2);background:var(--surface2);padding:1px 5px;border-radius:3px; }
+</style>
+</head>
+<body>
+
+<nav>
+  <span class="brand">ProOps2026</span>
+  <a href="#cost">Cost</a>
+  <a href="#skip">Skip-list</a>
+  <a href="#chain">Discovery</a>
+  <a href="#artifact">Artifact</a>
+  <a href="#interview">IQ</a>
+  <a href="#done">Done</a>
+  <div class="spacer"></div>
+  <span class="badge">Week 4 · Day 16 · Money-safe lab</span>
+</nav>
+
+<div class="layout">
+<div class="main">
+
+  <!-- HEADER -->
+  <div class="day-header">
+    <div class="day-meta">
+      <span class="day-pill">Week 4 · Day 16</span>
+      <span class="day-tag">Hands-On</span>
+      <span class="day-group">Group</span>
+    </div>
+    <div class="day-title">EKS Practice — Ship Your Project from Minikube to AWS</div>
+    <div class="day-question">You can deploy your project to a local cluster. Today: can you deploy the same project to a real AWS-managed Kubernetes cluster, get external traffic flowing through it, and tear it down without leaving a $200 surprise on the bill?</div>
+    <div class="day-why">
+      The skills are not new — Docker, Kubernetes, Helm, AWS basics, you already have all of them. <strong>What's new is integration under real-world constraints.</strong> EKS has more cost surface, more configuration knobs, and more opportunities to lose a day on the wrong problem than any service in AWS. Today you ship the same project you ran in minikube on Day 14–15, learn the EKS-specific moves, and — most importantly — build the muscle to <strong>create a cluster, prove it works, and delete it cleanly</strong>.
+    </div>
+  </div>
+
+  <!-- COST BANNER -->
+  <div class="cost-banner">
+    <div class="cost-banner-title">Money rule for today (read this twice)</div>
+    <div class="cost-banner-body">
+      <strong>An EKS control plane charges $0.10/hr from the moment you create it</strong> — about $2.40/day, every day, even idle. Your cluster MUST be deleted before end of day. We're not creating long-running infra today. We're learning the lifecycle <strong>create → use → delete</strong>. If you forget step 3, you discover the cost on next month's bill. Set a phone alarm right now: <strong>"Delete EKS cluster"</strong> for 17:00.
+    </div>
+  </div>
+
+  <!-- GROUP CALLOUT -->
+  <div style="padding:12px 16px;background:rgba(251,191,36,.06);border:1px solid rgba(251,191,36,.3);border-radius:10px;margin-bottom:18px;">
+    <div style="font-size:12px;font-weight:700;color:var(--yellow);margin-bottom:4px;">Group day — but each partner creates their own cluster</div>
+    <div style="font-size:12px;color:var(--muted);line-height:1.7;">Both partners create + use + delete their own EKS cluster today. Don't share a single cluster — the lesson is the full lifecycle, and each of you needs to own that experience. Use <strong>different cluster names</strong> (e.g. <code style="font-size:11px;color:var(--accent2);">project-name-huy</code> and <code style="font-size:11px;color:var(--accent2);">project-name-tuan</code>) and <strong>both partners delete by 17:00</strong>.</div>
+  </div>
+
+  <!-- COST STACK -->
+  <div class="section-block" id="cost">
+    <div class="sec-label">What costs money today (and what doesn't, if you set it up right)</div>
+    <div class="cost-stack">
+      <div class="cost-stack-title">EKS cost stack — the cheap-lab configuration</div>
+      <div class="cost-row">
+        <div class="cost-name">EKS control plane <span>· always-on, billed per cluster</span></div>
+        <div class="cost-rate">$0.10/hr</div>
+        <div class="cost-tag req">unavoidable</div>
+      </div>
+      <div class="cost-row">
+        <div class="cost-name">1× t3.medium <strong style="color:var(--green);">spot</strong> node <span>· 70% cheaper than on-demand</span></div>
+        <div class="cost-rate">~$0.012/hr</div>
+        <div class="cost-tag req">unavoidable</div>
+      </div>
+      <div class="cost-row">
+        <div class="cost-name">EBS volume for node (gp3, 20 GB)</div>
+        <div class="cost-rate">~$0.002/hr</div>
+        <div class="cost-tag req">unavoidable</div>
+      </div>
+      <div class="cost-row">
+        <div class="cost-name">Classic ELB (Service type LoadBalancer)</div>
+        <div class="cost-rate">~$0.025/hr</div>
+        <div class="cost-tag req">while testing</div>
+      </div>
+      <div class="cost-row">
+        <div class="cost-name">NAT Gateway <span>· DEFAULT in eksctl, ~$30/mo if left running</span></div>
+        <div class="cost-rate">$0.045/hr</div>
+        <div class="cost-tag skip">SKIP today</div>
+      </div>
+      <div class="cost-row">
+        <div class="cost-name">ECR storage (your image, ~200 MB)</div>
+        <div class="cost-rate">~$0.02/mo</div>
+        <div class="cost-tag opt">tiny</div>
+      </div>
+      <div class="cost-row">
+        <div class="cost-name">Data transfer out (curl tests)</div>
+        <div class="cost-rate">~$0.09/GB</div>
+        <div class="cost-tag opt">trivial</div>
+      </div>
+      <div style="margin-top:14px;padding:10px 14px;background:rgba(52,211,153,.05);border:1px solid rgba(52,211,153,.2);border-radius:6px;font-size:12px;color:var(--muted);line-height:1.7;">
+        <strong style="color:var(--green);">Total burn rate today: ~$0.14/hr</strong> — about $1.10 for an 8-hour day if you delete by EoD. <strong style="color:var(--red);">If you leave NAT Gateway + control plane running:</strong> ~$108/month, silent.
+      </div>
+    </div>
+  </div>
+
+  <!-- SKIP LIST -->
+  <div class="section-block" id="skip">
+    <div class="sec-label">Day-1 skip list — what NOT to do today</div>
+    <div class="skip-list">
+      <div style="font-size:13px;color:var(--muted);line-height:1.7;">EKS is huge. Production setups have dozens of moving parts. <strong style="color:var(--text);">For your first cluster, skip everything below.</strong> Each one is a valid topic for a future day, but doing all of them today is how trainees lose 6 hours and create nothing.</div>
+      <div class="skip-grid">
+        <div class="skip-card no"><strong>Skip:</strong> AWS Load Balancer Controller. Use <code style="font-size:11px;color:var(--accent2);">Service type: LoadBalancer</code> → AWS auto-provisions a Classic ELB. Free of setup pain.</div>
+        <div class="skip-card no"><strong>Skip:</strong> IRSA (IAM Roles for Service Accounts) + OIDC provider. Use the node IAM role with <code style="font-size:11px;color:var(--accent2);">AmazonEC2ContainerRegistryReadOnly</code> attached.</div>
+        <div class="skip-card no"><strong>Skip:</strong> Cluster Autoscaler / Karpenter. One fixed-size managed node group is enough.</div>
+        <div class="skip-card no"><strong>Skip:</strong> Fargate. Managed node group with EC2 spot is faster and cheaper for learning.</div>
+        <div class="skip-card no"><strong>Skip:</strong> Private endpoint. Keep the API server endpoint <strong>public</strong> so <code style="font-size:11px;color:var(--accent2);">kubectl</code> from your laptop just works.</div>
+        <div class="skip-card no"><strong>Skip:</strong> CloudWatch Container Insights. Adds cost and complexity. <code style="font-size:11px;color:var(--accent2);">kubectl logs</code> is enough today.</div>
+        <div class="skip-card yes"><strong>Do use:</strong> <code style="font-size:11px;color:var(--accent2);">eksctl</code> with a config file. Console clicks for EKS will eat your day.</div>
+        <div class="skip-card yes"><strong>Do use:</strong> <strong>Spot instances</strong> (~70% off). Fine for ephemeral training clusters.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- DISCOVERY CHAIN -->
+  <div class="section-block" id="chain">
+    <div class="sec-label">Discovery chain — 8 questions</div>
+    <div class="chain">
+
+      <!-- Q1 PRE-FLIGHT -->
+      <div class="chain-item" onclick="toggleChain(this,0)">
+        <div class="chain-num">1</div>
+        <div>
+          <div class="chain-q">Pre-flight check. Install <code>eksctl</code>, confirm your AWS identity is right, pick a region, and write down your delete-by time.</div>
+          <div class="chain-prompt">Walk me through pre-flight before I touch any AWS resource:
+(1) Verify AWS CLI is configured: `aws sts get-caller-identity`. The Account ID and Arn it returns — is this MY personal account, or a shared one? (Important: never create EKS in a shared account without permission.)
+(2) Install eksctl: `brew install eksctl` (macOS) or download the binary on Linux. Verify: `eksctl version` should print 0.x.
+(3) Pick the region. For training, prefer ap-southeast-1 (Singapore — closest latency for Vietnam) or us-east-1 (cheapest data transfer). Set: `export AWS_REGION=ap-southeast-1`. From here on, every command implicitly uses this region.
+(4) Pre-cost check: `aws ec2 describe-availability-zones --region $AWS_REGION` works → CLI + region OK.
+(5) Commitment: the cluster will live for at most 8 hours. Set a phone alarm RIGHT NOW: "Delete EKS cluster" at 17:00. Why a hard alarm? Because lab-day fatigue is real and "I'll do it after dinner" is how engineers get $200 surprises.
+(6) Final: list any existing EKS clusters in your account: `eksctl get cluster --region $AWS_REGION`. If anything is there from previous sessions, delete it before creating a new one.</div>
+          <div class="chain-hint">The single most important AWS habit: every command names the region explicitly or relies on <code style="font-size:11px;color:var(--accent2);">AWS_REGION</code> env var. A command that succeeds in the wrong region creates orphaned resources you can't see and won't delete.</div>
+          <div class="chain-warn"><strong>WARN:</strong> if <code>aws sts get-caller-identity</code> shows a company account or a shared account, STOP. Get explicit permission or switch to a personal training account before proceeding.</div>
+        </div>
+      </div>
+
+      <!-- Q2 ECR + DOCKER -->
+      <div class="chain-item" onclick="toggleChain(this,1)">
+        <div class="chain-num">2</div>
+        <div>
+          <div class="chain-q">Build your project's Docker image and push it to ECR. The M1/M2 Mac trap is real — your image must be <code>linux/amd64</code> or it will <code>CrashLoopBackOff</code> on the EKS node.</div>
+          <div class="chain-prompt">Walk me through ECR + Docker push, including the architecture trap:
+(1) Create the ECR repo (one per service): `aws ecr create-repository --repository-name [project-service-name] --region $AWS_REGION`. Output: a repositoryUri like 123456789.dkr.ecr.ap-southeast-1.amazonaws.com/myapp.
+(2) Login Docker to ECR: `aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin [account-id].dkr.ecr.$AWS_REGION.amazonaws.com`. Token expires in 12 hours — re-run if push starts failing.
+(3) Build for linux/amd64. If you're on M1/M2/M3 Mac, default `docker build` produces arm64 — EKS nodes are amd64 — Pod will CrashLoopBackOff with `exec format error`. The fix:
+   docker buildx build --platform=linux/amd64 -t myapp:v1 .
+   For Linux/x86 hosts: regular `docker build` is fine.
+(4) Tag for ECR: `docker tag myapp:v1 [account-id].dkr.ecr.$AWS_REGION.amazonaws.com/[repo-name]:v1`.
+(5) Push: `docker push [account-id].dkr.ecr.$AWS_REGION.amazonaws.com/[repo-name]:v1`. Verify in console or via `aws ecr list-images --repository-name [repo-name]`.
+(6) Repeat for every service in your project that you build yourself (not for Helm-installed 3rd-party services like Redis — those pull from public registries).</div>
+          <div class="chain-hint">Verify image architecture before push: <code style="font-size:11px;color:var(--accent2);">docker inspect myapp:v1 | grep Architecture</code>. Should print "amd64". If it prints "arm64", you'll burn 30 minutes debugging a CrashLoopBackOff that's actually just wrong-arch.</div>
+          <div class="chain-note">Don't commit the ECR account ID to your repo — use an env var or pull from <code style="font-size:11px;color:var(--accent2);">aws sts get-caller-identity</code>. Account IDs aren't secret, but they're noise in PRs and make code less portable.</div>
+        </div>
+      </div>
+
+      <!-- Q3 CREATE CLUSTER -->
+      <div class="chain-item" onclick="toggleChain(this,2)">
+        <div class="chain-num">3</div>
+        <div>
+          <div class="chain-q">Create the EKS cluster the cost-safe way. <code>eksctl create cluster</code> with default flags will provision a NAT Gateway you don't need. Use a config file with the right knobs.</div>
+          <div class="chain-prompt">Help me write a cost-safe cluster.yaml for eksctl, then create the cluster:
+(1) The defaults to override:
+   - 2 AZs is enough (eksctl default is 3 — saves data transfer)
+   - 1 node, t3.medium, SPOT — not on-demand, not 3 nodes
+   - Public subnets only, NO private subnets, NO NAT Gateway
+   - Cluster + node group in the same managed node group config
+   - Latest stable K8s version (1.30 or whatever current stable is)
+(2) Write cluster.yaml:
+   apiVersion: eksctl.io/v1alpha5
+   kind: ClusterConfig
+   metadata:
+     name: project-[your-name]-lab
+     region: ap-southeast-1
+     version: "1.30"
+   availabilityZones: [ap-southeast-1a, ap-southeast-1b]
+   vpc:
+     nat:
+       gateway: Disable      # <-- saves $30/mo
+   managedNodeGroups:
+     - name: ng-spot
+       instanceTypes: [t3.medium]
+       spot: true
+       desiredCapacity: 1
+       minSize: 1
+       maxSize: 1
+       privateNetworking: false   # <-- nodes in public subnet, no NAT needed
+       iam:
+         attachPolicyARNs:
+           - arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy
+           - arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy
+           - arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly
+   addons:
+     - name: aws-ebs-csi-driver
+(3) Create: `eksctl create cluster -f cluster.yaml`. Wait time: 15–20 minutes — eksctl provisions the VPC, the EKS control plane, and the node group in sequence and prints progress.
+(4) While waiting, open the EKS console in another tab to watch the cluster status flip from CREATING to ACTIVE. Don't panic at long waits — VPC + node group provisioning is naturally slow.
+(5) Failure recovery: if `eksctl create` exits with an error, run `eksctl delete cluster --name [name] --region $AWS_REGION --wait` first to clean up any half-provisioned resources, then fix the config and retry. Never re-run `eksctl create` against a cluster that partially exists.</div>
+          <div class="chain-hint">Two flags carry most of the cost savings: <code style="font-size:11px;color:var(--accent2);">vpc.nat.gateway: Disable</code> (saves $30/mo) and <code style="font-size:11px;color:var(--accent2);">managedNodeGroups[].spot: true</code> (saves 70% on EC2). With both set, an 8-hour lab is ~$1.10. Without either, the same lab plus 30 days idle is $108.</div>
+          <div class="chain-warn"><strong>WARN:</strong> if <code>eksctl create</code> exits with an error, do NOT just retry — run <code>eksctl delete cluster --name [name] --wait</code> first to clean up partial state. Otherwise you accumulate orphaned resources that still cost money.</div>
+        </div>
+      </div>
+
+      <!-- Q4 KUBECTL CONNECT -->
+      <div class="chain-item" onclick="toggleChain(this,3)">
+        <div class="chain-num">4</div>
+        <div>
+          <div class="chain-q">Connect <code>kubectl</code> to your new cluster. Verify the node is Ready and the EBS CSI driver loaded.</div>
+          <div class="chain-prompt">Walk me through kubectl auth and post-create verification:
+(1) Update kubeconfig: `aws eks update-kubeconfig --region $AWS_REGION --name project-[your-name]-lab`. This adds a new context to ~/.kube/config and switches to it. Verify: `kubectl config current-context`.
+(2) Verify nodes: `kubectl get nodes`. Expect: 1 node in Ready state, with INTERNAL-IP and EXTERNAL-IP both populated (because nodes are in public subnets). Roughly 90 seconds after cluster create completes.
+(3) Verify CNI + CoreDNS: `kubectl get pods -n kube-system`. Expect: aws-node, coredns, ebs-csi-* all Running. If something is Pending → describe it for the actual reason.
+(4) Common kubectl errors and what they mean:
+   - "couldn't get current server API group list: ... no such host" → wrong region in update-kubeconfig
+   - "An error occurred (ExpiredToken)" → AWS credentials timed out, re-auth
+   - "error: You must be logged in to the server (Unauthorized)" → wrong AWS profile, the cluster was created by a different identity
+(5) The auth chain: kubectl reads ~/.kube/config → finds the EKS context → calls `aws eks get-token` → AWS returns a bearer token → API server validates it via IAM. If any link is wrong, you get Unauthorized.</div>
+          <div class="chain-hint">If <code style="font-size:11px;color:var(--accent2);">kubectl get nodes</code> shows zero nodes 5 minutes after cluster create completes — the managed node group is still attaching. Wait 2 more minutes, then describe the node group in the console for status. Most often: ASG instance is launching.</div>
+        </div>
+      </div>
+
+      <!-- Q5 APPLY MANIFESTS -->
+      <div class="chain-item" onclick="toggleChain(this,4)">
+        <div class="chain-num">5</div>
+        <div>
+          <div class="chain-q">Apply your Day 14 K8s manifests to EKS. Three things change vs minikube — image URLs, Service exposure, and how Secrets are sourced.</div>
+          <div class="chain-prompt">Help me adapt my Day 14 manifests for EKS:
+(1) Image URL: change `image: myapp:v1` (which worked on minikube via local docker daemon) to `image: [account-id].dkr.ecr.$AWS_REGION.amazonaws.com/myapp:v1`. The node IAM role from Q3 has `AmazonEC2ContainerRegistryReadOnly` — no `imagePullSecrets` needed.
+(2) Service exposure for the public-facing service: change `type: ClusterIP` to `type: LoadBalancer`. EKS auto-provisions a Classic ELB (5–10 min). Run: `kubectl get svc [name] -w` until EXTERNAL-IP populates with a hostname like a1b2c3.elb.ap-southeast-1.amazonaws.com.
+(3) Secrets — same `kubectl create secret generic` workflow as Day 14. For training that's fine. (In production: External Secrets Operator + AWS Secrets Manager, not today.)
+(4) ConfigMaps — apply unchanged. Database hostnames stay as Service DNS names like `postgres-svc.default.svc.cluster.local` — the Helm release in Q6 will publish that name.
+(5) Apply order: ConfigMap → Secret → Deployment → Service. Same as Day 14. Verify each: `kubectl get cm,secret,deploy,svc,pods`.
+(6) Common error: ImagePullBackOff with "401 Unauthorized" → node IAM role missing the ECR policy. Fix: add `AmazonEC2ContainerRegistryReadOnly` to the node group IAM role in IAM console, then `kubectl rollout restart deployment [name]`.</div>
+          <div class="chain-hint">The ELB hostname takes 3–8 minutes to become reachable even after EXTERNAL-IP appears in <code style="font-size:11px;color:var(--accent2);">kubectl get svc</code> — the LB targets need to register and pass health checks. Don't curl immediately; wait until <code style="font-size:11px;color:var(--accent2);">aws elb describe-instance-health</code> shows InService.</div>
+        </div>
+      </div>
+
+      <!-- Q6 HELM ON EKS -->
+      <div class="chain-item" onclick="toggleChain(this,5)">
+        <div class="chain-num">6</div>
+        <div>
+          <div class="chain-q">Install your Day 15 Helm chart (Redis / RabbitMQ / PostgreSQL) on EKS. The values file needs <em>one</em> change vs minikube: storage.</div>
+          <div class="chain-prompt">Help me re-install my Helm chart on EKS:
+(1) On minikube you may have set `persistence.enabled=false` (Day 15) because minikube's default StorageClass was buggy. On EKS, the EBS CSI driver from Q3 provisions PVCs cleanly — so persistence can be enabled.
+(2) Update my-redis-values.yaml (or whichever chart): set `persistence.enabled=true`, `persistence.size=8Gi`, `persistence.storageClass=gp2` (default EKS StorageClass).
+(3) Install: `helm install my-redis bitnami/redis -f my-redis-values.yaml`. Verify: `kubectl get pvc` shows the PVC Bound (not Pending — Pending means the EBS CSI driver isn't running, see Q4).
+(4) Connect your application: same workflow as Day 15. Update your app's ConfigMap REDIS_HOST to the Helm-published service name, `kubectl rollout restart deployment [app]`.
+(5) End-to-end check: from inside your app pod, `kubectl exec -it [app-pod] -- redis-cli -h my-redis-master ping` → PONG.
+(6) Helm release survives node restarts because the release Secret is in the cluster. But it does NOT survive cluster delete — when you delete the cluster in Q8, the chart goes too. That's why we install fresh today.</div>
+          <div class="chain-hint">EKS PVCs use EBS volumes — they're zonal. If your node is in ap-southeast-1a but the PVC was created in 1b (cross-AZ scheduling glitch), the pod can't mount it. Fix: <code style="font-size:11px;color:var(--accent2);">kubectl delete pvc</code> + reinstall, or use a single-AZ node group.</div>
+        </div>
+      </div>
+
+      <!-- Q7 END-TO-END -->
+      <div class="chain-item" onclick="toggleChain(this,6)">
+        <div class="chain-num">7</div>
+        <div>
+          <div class="chain-q">Curl your project from outside AWS — through the ELB, into the cluster, hitting your app, talking to the Helm-installed dependency. Real production-shaped traffic.</div>
+          <div class="chain-prompt">End-to-end verification — I want to prove the whole chain works:
+(1) Get the ELB hostname: `kubectl get svc [public-svc] -o jsonpath='{.status.loadBalancer.ingress[0].hostname}'`. Returns: a1b2c3.elb.ap-southeast-1.amazonaws.com.
+(2) Health check first: `curl http://[elb-hostname]/health` from your laptop. Should return 200 within ~5 minutes of LB creation. If you get connection refused → wait. If 502 → backend pod not ready, check `kubectl get endpoints [svc]`.
+(3) Real application call — exercise actual logic that touches the Helm-installed dep: e.g. `curl -X POST http://[elb-hostname]/api/items -d '{"name":"test"}'` then `curl http://[elb-hostname]/api/items` — does the value persist? If yes, the full chain works: laptop → ELB → Service → Pod → app code → Redis/Postgres.
+(4) `kubectl logs [app-pod] --tail=20` while curling — confirm the request shows up in app logs.
+(5) `kubectl get all` — what does a fully healthy EKS deployment look like? Compare to your Day 14 minikube `get all` output: same shape, EKS adds the LoadBalancer Service with a real EXTERNAL-IP.
+(6) Take a screenshot of the curl output for your daily report.</div>
+          <div class="chain-hint">If the ELB hostname returns 502 for one path but 200 for another → the public Service has no Endpoints for that backend. <code style="font-size:11px;color:var(--accent2);">kubectl get endpoints</code> must show the pod IP. If &lt;none&gt;, the Service selector doesn't match the Pod labels — same debug as Day 14 minikube.</div>
+        </div>
+      </div>
+
+      <!-- Q8 DELETE + MEMORY -->
+      <div class="chain-item" onclick="toggleChain(this,7)">
+        <div class="chain-num">8</div>
+        <div>
+          <div class="chain-q">Delete the cluster cleanly. Verify nothing was left orphaned. Write <code>memory/eks-practice.md</code> — your agent's playbook for the next EKS cluster.</div>
+          <div class="chain-prompt">The most important step. Don't skip the verification.
+
+Task 1 — Delete cleanly:
+(1) Uninstall Helm releases first (releases on a deleted cluster don't cost anything but it's good hygiene): `helm uninstall my-redis`. The PVC and EBS volume go with it.
+(2) `eksctl delete cluster --name project-[your-name]-lab --region $AWS_REGION --wait`. The `--wait` matters — it blocks until eksctl confirms every resource is gone. Without --wait you may exit before deletion completes.
+(3) Verify the cluster is gone: `eksctl get cluster --region $AWS_REGION`. Output should NOT list your cluster name. `aws eks list-clusters --region $AWS_REGION` should return an empty `clusters: []`.
+(4) Sweep for orphans (the part eksctl can miss if something went wrong):
+   - EC2 → Volumes: any volumes tagged with your cluster name? If yes, the PVC didn't release cleanly — delete them manually.
+   - EC2 → Load Balancers: any LBs from your Service of type LoadBalancer? Delete them manually if eksctl missed them.
+   - VPC console: any VPC tagged `alpha.eksctl.io/cluster-name=[your-cluster]`? If yes, manually detach + delete.
+(5) Optional cleanup: `aws ecr delete-repository --repository-name [your-repo] --force` if you don't need the image again. ECR storage is cheap but the image you pushed today is dev-only.
+
+Task 2 — Write memory/eks-practice.md:
+1. Create command (full): `eksctl create cluster -f cluster.yaml` + the file contents
+2. Connect command: `aws eks update-kubeconfig --region X --name Y`
+3. Image URL pattern: `[account].dkr.ecr.[region].amazonaws.com/[repo]:[tag]`
+4. The cost stack: control plane + node + ELB hourly rate
+5. Skip-list (what NOT to enable on a training cluster) — copy from today
+6. Common errors + fixes — your real ones today, not generic
+7. Delete sequence: helm uninstall → eksctl delete --wait → verify with `eksctl get cluster` (empty) + EC2 Volumes (no orphans) + EC2 Load Balancers (no orphans) + VPC tags (no eksctl VPC)
+8. The "minikube vs EKS" diff table — image URL, Service type, persistence, secret source
+
+Format: tables, command blocks, no prose. This file is loaded into agent context, not read by a human.</div>
+          <div class="chain-warn"><strong>HARD STOP:</strong> if <code>eksctl delete cluster --wait</code> exits with an error, DO NOT walk away. Re-run it once. If it still fails, open the EKS, EC2, and VPC consoles, find every resource tagged with your cluster name, and delete them manually. An orphaned NAT Gateway (if you didn't disable it) costs $30/month forever.</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ARTIFACT -->
+  <div class="section-block" id="artifact">
+    <div class="sec-label">Artifacts</div>
+    <div class="artifact-card">
+      <div class="artifact-head">
+        <div class="artifact-title">EKS cluster lifecycle proof</div>
+        <div class="artifact-file">eks/cluster.yaml + screenshots</div>
+      </div>
+      <div class="artifact-body">
+        <div class="artifact-row"><div class="ar-dot"></div><div class="ar-text"><strong><code>eks/cluster.yaml</code> committed</strong> — your eksctl config, with NAT disabled and spot enabled.</div></div>
+        <div class="artifact-row"><div class="ar-dot"></div><div class="ar-text"><strong>Image in ECR</strong> — <code>aws ecr list-images</code> output included in your daily report (proves the linux/amd64 build pushed cleanly).</div></div>
+        <div class="artifact-row"><div class="ar-dot"></div><div class="ar-text"><strong>End-to-end curl</strong> — screenshot of <code>curl http://[elb-hostname]/...</code> returning a real app response.</div></div>
+        <div class="artifact-row"><div class="ar-dot"></div><div class="ar-text"><strong>Cluster deleted, no orphans</strong> — paste of <code>eksctl get cluster --region X</code> (empty) and screenshot of EC2 Volumes / Load Balancers (no resources tagged with your cluster name).</div></div>
+        <div class="artifact-fail"><strong>Weak signals:</strong> Cluster created, manifests applied, end-of-day report submitted — but cluster still running. Image pushed without <code>--platform=linux/amd64</code> on M-series Mac. NAT Gateway left enabled in the eksctl config (will be a recurring monthly charge if you ever forget to delete).</div>
+      </div>
+    </div>
+    <div class="artifact-card">
+      <div class="artifact-head">
+        <div class="artifact-title">EKS Practice Memory File</div>
+        <div class="artifact-file">memory/eks-practice.md</div>
+      </div>
+      <div class="artifact-body">
+        <div class="artifact-row"><div class="ar-dot"></div><div class="ar-text"><strong>Create + connect + delete commands</strong> — exact, copy-paste ready. Region as a variable, not hardcoded.</div></div>
+        <div class="artifact-row"><div class="ar-dot"></div><div class="ar-text"><strong>Cost stack table</strong> — what costs money today, plus the skip-list of expensive things you didn't enable.</div></div>
+        <div class="artifact-row"><div class="ar-dot"></div><div class="ar-text"><strong>Minikube vs EKS diff</strong> — image URL, Service type, persistence, secrets source. Four-row table.</div></div>
+        <div class="artifact-row"><div class="ar-dot"></div><div class="ar-text"><strong>Common errors + fixes</strong> — the actual ones you hit today (not from a blog).</div></div>
+        <div class="artifact-row"><div class="ar-dot"></div><div class="ar-text"><strong>Delete-and-verify sequence</strong> — helm uninstall → eksctl delete --wait → <code>eksctl get cluster</code> empty → EC2 Volumes empty → EC2 Load Balancers empty → VPC tag check.</div></div>
+        <div class="artifact-fail"><strong>Weak signals:</strong> Memory file that's a generic EKS tutorial. No mention of cost or the skip-list. Missing the verify-delete steps — the most load-bearing part.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- INTERVIEW QUESTIONS -->
+  <div class="iq-section" id="interview">
+    <div class="iq-header">
+      <div class="iq-title">Interview Questions</div>
+      <div class="iq-subtitle">Click when you can answer without notes. Several of these come straight out of real DevOps interviews.</div>
+    </div>
+    <div class="iq-body">
+      <div class="iq-item" onclick="toggleIQ(this)"><div class="iq-q"><span class="iq-num">Q1</span><span class="iq-text">An EKS cluster is created and idle for 30 days. What is the approximate cost — and which line items contribute the most?</span><span class="iq-check">&#10003;</span></div></div>
+      <div class="iq-item" onclick="toggleIQ(this)"><div class="iq-q"><span class="iq-num">Q2</span><span class="iq-text">Default <code>eksctl create cluster</code> provisions a NAT Gateway. Why? When can you safely skip it for a training or dev cluster?</span><span class="iq-check">&#10003;</span></div></div>
+      <div class="iq-item" onclick="toggleIQ(this)"><div class="iq-q"><span class="iq-num">Q3</span><span class="iq-text">You build a Docker image on M2 Mac, push to ECR, deploy to EKS — Pod goes <code>CrashLoopBackOff</code> with <code>exec format error</code>. What happened and what's the fix?</span><span class="iq-check">&#10003;</span></div></div>
+      <div class="iq-item" onclick="toggleIQ(this)"><div class="iq-q"><span class="iq-num">Q4</span><span class="iq-text">A Pod on EKS shows <code>ImagePullBackOff</code> with "401 Unauthorized" pulling from ECR. Where is the IAM permission missing — and which policy fixes it?</span><span class="iq-check">&#10003;</span></div></div>
+      <div class="iq-item" onclick="toggleIQ(this)"><div class="iq-q"><span class="iq-num">Q5</span><span class="iq-text">You set <code>type: LoadBalancer</code> on a Service. EKS provisions an ELB. Which kind of ELB do you get by default — and how do you upgrade to ALB or NLB?</span><span class="iq-check">&#10003;</span></div></div>
+      <div class="iq-item" onclick="toggleIQ(this)"><div class="iq-q"><span class="iq-num">Q6</span><span class="iq-text"><code>kubectl get nodes</code> returns zero nodes 10 minutes after <code>eksctl create cluster</code> reported success. What do you check first?</span><span class="iq-check">&#10003;</span></div></div>
+      <div class="iq-item" onclick="toggleIQ(this)"><div class="iq-q"><span class="iq-num">Q7</span><span class="iq-text">A teammate ran <code>eksctl delete cluster</code> yesterday but the AWS bill still shows EKS-related charges. Where do you look first to find what's still running?</span><span class="iq-check">&#10003;</span></div></div>
+      <div class="iq-item" onclick="toggleIQ(this)"><div class="iq-q"><span class="iq-num">Q8</span><span class="iq-text">Why is the EKS API server endpoint <code>public</code> by default in <code>eksctl</code>? When would you switch it to private — and what new problem does that create for kubectl from a developer laptop?</span><span class="iq-check">&#10003;</span></div></div>
+    </div>
+  </div>
+
+  <!-- DONE CRITERIA -->
+  <div class="section-block" id="done">
+    <div class="sec-label">Done criteria</div>
+    <div class="criteria">
+      <div class="crit" onclick="toggleCrit(this)"><div class="crit-box"><span class="crit-check">&#10003;</span></div><div class="crit-text"><code style="font-size:11px;color:var(--accent2);">aws sts get-caller-identity</code> verified — using a personal/training AWS account, not a shared/company one.</div></div>
+      <div class="crit" onclick="toggleCrit(this)"><div class="crit-box"><span class="crit-check">&#10003;</span></div><div class="crit-text">Phone alarm set for cluster delete time.</div></div>
+      <div class="crit" onclick="toggleCrit(this)"><div class="crit-box"><span class="crit-check">&#10003;</span></div><div class="crit-text">Image built with <code>--platform=linux/amd64</code>, pushed to ECR, verified in console or via CLI.</div></div>
+      <div class="crit" onclick="toggleCrit(this)"><div class="crit-box"><span class="crit-check">&#10003;</span></div><div class="crit-text"><code>cluster.yaml</code> written with <code style="font-size:11px;color:var(--accent2);">vpc.nat.gateway: Disable</code> and <code style="font-size:11px;color:var(--accent2);">spot: true</code>. Committed to repo.</div></div>
+      <div class="crit" onclick="toggleCrit(this)"><div class="crit-box"><span class="crit-check">&#10003;</span></div><div class="crit-text">Cluster created via <code>eksctl create cluster -f cluster.yaml</code>. <code>kubectl get nodes</code> shows 1 node Ready.</div></div>
+      <div class="crit" onclick="toggleCrit(this)"><div class="crit-box"><span class="crit-check">&#10003;</span></div><div class="crit-text">Day 14 manifests adapted (ECR image URLs, Service type LoadBalancer) and applied — all Pods <code>Running 1/1</code>.</div></div>
+      <div class="crit" onclick="toggleCrit(this)"><div class="crit-box"><span class="crit-check">&#10003;</span></div><div class="crit-text">Helm chart from Day 15 installed on EKS, app connected, connection tested via <code>kubectl exec</code>.</div></div>
+      <div class="crit" onclick="toggleCrit(this)"><div class="crit-box"><span class="crit-check">&#10003;</span></div><div class="crit-text">End-to-end <code>curl</code> from laptop to ELB returns a real app response — screenshot captured.</div></div>
+      <div class="crit hard" onclick="toggleCrit(this)"><div class="crit-box"><span class="crit-check">&#10003;</span></div><div class="crit-text"><strong>HARD:</strong> <code style="font-size:11px;color:var(--accent2);">eksctl delete cluster --wait</code> completed — exit code 0.</div></div>
+      <div class="crit hard" onclick="toggleCrit(this)"><div class="crit-box"><span class="crit-check">&#10003;</span></div><div class="crit-text"><strong>HARD:</strong> Cluster gone: <code style="font-size:11px;color:var(--accent2);">eksctl get cluster --region X</code> does not list your cluster.</div></div>
+      <div class="crit hard" onclick="toggleCrit(this)"><div class="crit-box"><span class="crit-check">&#10003;</span></div><div class="crit-text"><strong>HARD:</strong> EC2 + VPC console double-check — zero orphaned EBS volumes, zero ELBs, zero VPCs tagged with your cluster name.</div></div>
+      <div class="crit" onclick="toggleCrit(this)"><div class="crit-box"><span class="crit-check">&#10003;</span></div><div class="crit-text"><code style="font-size:11px;color:var(--accent2);">memory/eks-practice.md</code> written — commands, cost stack, minikube-vs-EKS diff, errors-and-fixes, delete-and-verify sequence.</div></div>
+      <div class="crit" onclick="toggleCrit(this)"><div class="crit-box"><span class="crit-check">&#10003;</span></div><div class="crit-text">Git commit pushed: <code style="font-size:11px;color:var(--accent2);">Day 16 — EKS lifecycle: created, deployed, deleted</code></div></div>
+      <div class="crit" onclick="toggleCrit(this)"><div class="crit-box"><span class="crit-check">&#10003;</span></div><div class="crit-text">Daily log filled — Tomorrow's Context Block notes which EKS topic you want to go deeper on (IRSA, ALB Controller, Cluster Autoscaler, etc.) for a future day.</div></div>
+    </div>
+  </div>
+
+  <!-- EXPLORE FURTHER -->
+  <div class="explore-section">
+    <div class="explore-header">
+      <span class="label">Explore further</span>
+      <span class="sublabel">Only AFTER you have deleted the cluster &#10003;</span>
+    </div>
+    <div class="explore-body">
+      <div style="font-size:11px;color:var(--red);margin-bottom:4px;">All of these add cost. Only attempt if cluster lifecycle was clean and you have time.</div>
+      <div class="explore-item"><strong>IRSA (IAM Roles for Service Accounts).</strong> Ask Claude: <em>"Walk me through enabling OIDC on my cluster, creating a service account with a specific IAM role, and verifying with <code>aws sts get-caller-identity</code> from inside a Pod. Why is this preferred over node IAM in production?"</em></div>
+      <div class="explore-item"><strong>AWS Load Balancer Controller.</strong> Ask Claude: <em>"Install the controller via Helm. Convert my Service from type LoadBalancer to an Ingress with annotations. What's the cost / feature difference between Classic ELB and ALB?"</em></div>
+      <div class="explore-item"><strong>Karpenter for autoscaling.</strong> Ask Claude: <em>"What is Karpenter and how is it different from Cluster Autoscaler? Walk me through installing it on a fresh cluster — but first, what does a Karpenter-enabled cluster cost when idle?"</em></div>
+      <div class="explore-item"><strong>EKS pricing deep-dive.</strong> Ask Claude: <em>"Show me how to use AWS Cost Explorer to break down EKS costs. What tags should I put on my cluster resources to make cost attribution work?"</em></div>
+    </div>
+  </div>
+
+</div><!-- /main -->
+
+<!-- SIDEBAR -->
+<div class="sidebar">
+  <div class="widget">
+    <div class="widget-title">Progress — Day 16</div>
+    <div class="progress-count" id="d16-count">0 / 8</div>
+    <div style="margin-bottom:8px;"><div class="progress-bar"><div class="progress-fill" id="d16-fill" style="width:0%"></div></div><div class="progress-label" id="d16-label">Pre-flight first</div></div>
+  </div>
+  <div class="widget">
+    <div class="widget-title">Today's Artifacts</div>
+    <div class="as-row"><div class="as-dot" id="d16-ecr"></div><div class="as-name">Image pushed to ECR</div></div>
+    <div class="as-row"><div class="as-dot" id="d16-cluster"></div><div class="as-name">EKS cluster up + node Ready</div></div>
+    <div class="as-row"><div class="as-dot" id="d16-app"></div><div class="as-name">Project deployed (manifests + Helm)</div></div>
+    <div class="as-row"><div class="as-dot" id="d16-curl"></div><div class="as-name">End-to-end curl through ELB</div></div>
+    <div class="as-row"><div class="as-dot" id="d16-delete"></div><div class="as-name"><strong>Cluster deleted + verified</strong></div></div>
+    <div class="as-row"><div class="as-dot" id="d16-mem"></div><div class="as-name">memory/eks-practice.md</div></div>
+  </div>
+  <div class="widget" style="background:rgba(248,113,113,.05);border-color:rgba(248,113,113,.3);">
+    <div class="widget-title" style="color:var(--red);">Cost guardrails</div>
+    <div style="font-size:11px;color:var(--muted);line-height:1.7;">
+      <strong style="color:var(--text);">Burn rate:</strong> ~$0.14/hr<br>
+      <strong style="color:var(--text);">Hard cap:</strong> 8 hours<br>
+      <strong style="color:var(--text);">Delete by:</strong> 17:00<br>
+      <span style="color:var(--red);font-weight:700;">Phone alarm set?</span>
+    </div>
+  </div>
+  <div class="widget" style="background:rgba(108,142,247,.04);border-color:rgba(108,142,247,.2);">
+    <div class="widget-title" style="color:var(--accent);">EKS quick map</div>
+    <div style="font-size:10.5px;color:var(--muted);line-height:1.9;font-family:'Cascadia Code','Fira Code',monospace;">
+      aws sts get-caller-identity<br>
+      aws ecr create-repository<br>
+      docker buildx --platform=linux/amd64<br>
+      docker push [ecr-uri]<br>
+      eksctl create cluster -f cluster.yaml<br>
+      aws eks update-kubeconfig<br>
+      kubectl get nodes -o wide<br>
+      kubectl apply -f k8s/<br>
+      helm install ... -f values.yaml<br>
+      kubectl get svc -w<br>
+      curl http://[elb-hostname]<br>
+      <span style="color:var(--red);">helm uninstall ...</span><br>
+      <span style="color:var(--red);">eksctl delete cluster --wait</span><br>
+      <span style="color:var(--red);">eksctl get cluster (empty)</span>
+    </div>
+  </div>
+  <div class="widget">
+    <div class="widget-title">Connects To</div>
+    <div style="display:flex;flex-direction:column;gap:6px;">
+      <div class="conn-row"><span class="conn-dir">&larr; Day 7</span><span style="font-size:11px;color:var(--muted);">Docker — image build, today pushes to ECR</span></div>
+      <div class="conn-row"><span class="conn-dir">&larr; Day 14</span><span style="font-size:11px;color:var(--muted);">K8s manifests — adapted to EKS today</span></div>
+      <div class="conn-row"><span class="conn-dir">&larr; Day 15</span><span style="font-size:11px;color:var(--muted);">Helm chart — re-installed on EKS today</span></div>
+      <div class="conn-row"><span class="conn-dir">&larr; Day 5/6</span><span style="font-size:11px;color:var(--muted);">AWS basics — IAM, VPC, regions all in play</span></div>
+      <div class="conn-row"><span class="conn-dir">&rarr; Day 24</span><span style="font-size:11px;color:var(--muted);">CI/CD — GitHub Actions deploys to EKS</span></div>
+    </div>
+  </div>
+  <div class="report-box">
+    <div class="report-title">End-of-day report</div>
+    <div class="report-step"><span class="report-step-num">1.</span> Confirm cluster deleted + no orphan resources</div>
+    <div class="report-step"><span class="report-step-num">2.</span> Fill daily log + context block</div>
+    <div class="report-step"><span class="report-step-num">3.</span> git commit + push <code>eks/cluster.yaml</code> + memory file</div>
+    <div class="report-step"><span class="report-step-num">4.</span> Paste <code style="font-size:10px;color:var(--accent);">=== Day 16 |</code> to trainer channel</div>
+    <div style="margin-top:8px;padding:6px 8px;background:rgba(248,113,113,.06);border:1px solid rgba(248,113,113,.2);border-radius:5px;font-size:10px;color:var(--red);line-height:1.5;font-weight:600;">Include: <code>eksctl get cluster --region X</code> output (cluster not listed) + screenshot of curl through ELB</div>
+  </div>
+</div>
+
+</div><!-- /layout -->
+
+<script>
+const done = new Array(8).fill(false);
+function toggleChain(el, i) {
+  done[i] = !done[i];
+  el.classList.toggle('done', done[i]);
+  const n = done.filter(Boolean).length;
+  document.getElementById('d16-count').textContent = n + ' / 8';
+  document.getElementById('d16-fill').style.width = (n/8*100) + '%';
+  const lbl = ['Image push','Cluster create','Cluster create','kubectl ready','Apps deployed','Helm installed','E2E verified','DELETE NOW'];
+  document.getElementById('d16-label').textContent = n === 0 ? 'Pre-flight first' : lbl[n-1];
+  if (n >= 2) document.getElementById('d16-ecr').classList.add('done');
+  if (n >= 4) document.getElementById('d16-cluster').classList.add('done');
+  if (n >= 6) document.getElementById('d16-app').classList.add('done');
+  if (n >= 7) document.getElementById('d16-curl').classList.add('done');
+  if (n >= 8) { document.getElementById('d16-delete').classList.add('done'); document.getElementById('d16-mem').classList.add('done'); }
+}
+function toggleIQ(el) { el.classList.toggle('answered'); }
+function toggleCrit(el) { el.classList.toggle('done'); }
+</script>
+</body>
+</html>
