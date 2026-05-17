@@ -1,0 +1,9 @@
+# =============================================================================
+# terraform.tfvars.example — TEMPLATE cho người mới clone repo
+# =============================================================================
+# Copy file này: cp terraform.tfvars.example terraform.tfvars
+# Sau đó điền giá trị thực tế của bạn vào terraform.tfvars
+# File .example này được commit vào git — terraform.tfvars thì KHÔNG.
+
+owner_name    = "your_trainee_id"   # e.g. tin_tt, quyet_nc
+instance_type = "t3.micro"

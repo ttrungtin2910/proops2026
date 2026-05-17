@@ -1,0 +1,764 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Day 19 — Terraform + Ansible: Your First Infrastructure as Code · ProOps2026</title>
+<style>
+:root {
+  --bg:#0b0d14; --surface:#13161f; --surface2:#1c2030; --border:#252a3a;
+  --accent:#6c8ef7; --accent2:#a78bfa;
+  --green:#34d399; --yellow:#fbbf24; --orange:#fb923c;
+  --red:#f87171; --teal:#22d3ee; --blue:#60a5fa;
+  --text:#e8edf5; --muted:#7c87a0; --dim:#3a4258;
+}
+* { box-sizing:border-box; margin:0; padding:0; }
+body { background:var(--bg); color:var(--text); font-family:'Segoe UI',system-ui,sans-serif; font-size:15px; line-height:1.6; }
+
+nav { background:var(--surface);border-bottom:1px solid var(--border);padding:0 32px;height:50px;display:flex;align-items:center;gap:6px;position:sticky;top:0;z-index:200; }
+nav .brand { font-weight:800;font-size:14px;color:var(--accent);margin-right:12px; }
+nav a { color:var(--muted);text-decoration:none;font-size:12px;font-weight:600;padding:5px 12px;border-radius:6px;transition:all .15s;white-space:nowrap; }
+nav a:hover { color:var(--text);background:var(--surface2); }
+nav .spacer { flex:1; }
+nav .badge { background:rgba(52,211,153,.12);border:1px solid rgba(52,211,153,.25);color:var(--green);font-size:11px;font-weight:700;padding:3px 12px;border-radius:20px; }
+
+.layout { display:grid;grid-template-columns:1fr 260px;gap:32px;max-width:1100px;margin:0 auto;padding:40px 32px; }
+.main { min-width:0; }
+.sidebar { position:sticky;top:70px;height:fit-content;display:flex;flex-direction:column;gap:14px; }
+
+.day-header { margin-bottom:32px; }
+.day-meta { display:flex;align-items:center;gap:10px;margin-bottom:12px; }
+.day-pill { font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;padding:3px 12px;border-radius:20px;background:rgba(108,142,247,.12);border:1px solid rgba(108,142,247,.25);color:var(--accent); }
+.day-tag { font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;padding:3px 12px;border-radius:20px;background:rgba(52,211,153,.08);border:1px solid rgba(52,211,153,.2);color:var(--green); }
+.day-title { font-size:26px;font-weight:800;letter-spacing:-.3px;margin-bottom:8px; }
+.day-question { font-size:15px;color:var(--accent2);font-style:italic;border-left:3px solid var(--accent2);padding-left:14px;margin-bottom:16px;line-height:1.6; }
+.day-why { font-size:13px;color:var(--muted);line-height:1.7;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:14px 16px; }
+.day-why strong { color:var(--text); }
+
+.section-block { margin-bottom:32px; }
+.sec-label { font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:var(--dim);margin-bottom:14px;display:flex;align-items:center;gap:10px; }
+.sec-label::after { content:'';flex:1;height:1px;background:var(--border); }
+
+.chain { display:flex;flex-direction:column;gap:10px; }
+.chain-item { display:grid;grid-template-columns:32px 1fr;gap:14px;padding:14px 16px;background:var(--surface);border:1px solid var(--border);border-radius:10px;cursor:pointer;transition:border-color .15s; }
+.chain-item:hover { border-color:rgba(167,139,250,.4); }
+.chain-item.done { border-color:rgba(52,211,153,.3);background:rgba(52,211,153,.03); }
+.chain-num { width:32px;height:32px;border-radius:50%;background:var(--surface2);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;color:var(--muted);flex-shrink:0;transition:all .15s; }
+.chain-item.done .chain-num { background:rgba(52,211,153,.15);border-color:rgba(52,211,153,.4);color:var(--green); }
+.chain-q { font-size:13px;font-weight:600;margin-bottom:6px;line-height:1.5; }
+.chain-item.done .chain-q { color:var(--muted);text-decoration:line-through;text-decoration-color:var(--dim); }
+.chain-prompt { font-size:11px;font-family:'Cascadia Code','Fira Code',monospace;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:8px 12px;color:var(--accent2);line-height:1.6;margin-top:8px;white-space:pre-wrap; }
+.chain-hint { font-size:11px;color:var(--dim);margin-top:6px;line-height:1.5; }
+.chain-note { font-size:11px;color:var(--yellow);margin-top:6px;line-height:1.5;padding:6px 10px;background:rgba(251,191,36,.06);border:1px solid rgba(251,191,36,.15);border-radius:5px; }
+
+.two-col { display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:14px; }
+.model-card { background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:14px 16px; }
+.model-label { font-size:10px;font-weight:800;color:var(--accent2);text-transform:uppercase;letter-spacing:1.2px;margin-bottom:6px; }
+.model-title { font-size:14px;font-weight:700;color:var(--text);margin-bottom:8px; }
+.model-row { font-size:11px;color:var(--muted);line-height:1.8;padding-left:12px;position:relative; }
+.model-row::before { content:'·';position:absolute;left:0;color:var(--dim); }
+.model-row code { font-size:10px;color:var(--accent2);background:var(--bg);padding:1px 5px;border-radius:3px; }
+
+.rule-banner { background:linear-gradient(135deg,rgba(108,142,247,.08),rgba(167,139,250,.06));border:1px solid rgba(108,142,247,.3);border-radius:10px;padding:14px 18px;margin-bottom:18px; }
+.rule-banner-title { font-size:12px;font-weight:800;color:var(--accent);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:6px; }
+.rule-banner-body { font-size:13px;color:var(--text);line-height:1.7; }
+.rule-banner-body strong { color:var(--accent2); }
+
+.artifact-card { background:var(--surface);border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:14px; }
+.artifact-head { padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px; }
+.artifact-title { font-size:13px;font-weight:700;flex:1; }
+.artifact-file { font-family:'Cascadia Code','Fira Code',monospace;font-size:11px;color:var(--green);background:rgba(52,211,153,.08);border:1px solid rgba(52,211,153,.2);padding:2px 10px;border-radius:5px; }
+.artifact-body { padding:16px 18px; }
+.artifact-row { display:flex;gap:10px;margin-bottom:8px;font-size:12px;align-items:flex-start; }
+.artifact-row:last-child { margin-bottom:0; }
+.ar-dot { width:5px;height:5px;border-radius:50%;background:var(--green);flex-shrink:0;margin-top:6px; }
+.ar-text { color:var(--muted);line-height:1.5; }
+.ar-text strong { color:var(--text); }
+.artifact-fail { margin-top:14px;padding:10px 14px;background:rgba(248,113,113,.06);border:1px solid rgba(248,113,113,.2);border-radius:7px;font-size:11px;color:var(--muted);line-height:1.6; }
+.artifact-fail strong { color:var(--red); }
+
+.iq-section { margin-bottom:32px; }
+.iq-header { padding:14px 18px;background:rgba(167,139,250,.06);border:1px solid rgba(167,139,250,.25);border-radius:10px 10px 0 0;border-bottom:none; }
+.iq-title { font-size:12px;font-weight:700;color:var(--accent2);margin-bottom:4px; }
+.iq-subtitle { font-size:11px;color:var(--muted);line-height:1.6; }
+.iq-body { padding:14px 18px;background:rgba(167,139,250,.02);border:1px solid rgba(167,139,250,.25);border-radius:0 0 10px 10px;display:flex;flex-direction:column;gap:8px; }
+.iq-item { background:var(--surface);border:1px solid var(--border);border-radius:8px;overflow:hidden;cursor:pointer;transition:border-color .15s; }
+.iq-item:hover { border-color:rgba(167,139,250,.35); }
+.iq-item.answered { border-color:rgba(52,211,153,.3); }
+.iq-q { display:flex;align-items:flex-start;gap:12px;padding:10px 14px; }
+.iq-num { font-size:10px;font-weight:800;color:var(--accent2);background:rgba(167,139,250,.1);border:1px solid rgba(167,139,250,.2);padding:2px 7px;border-radius:4px;flex-shrink:0;margin-top:2px; }
+.iq-item.answered .iq-num { background:rgba(52,211,153,.12);border-color:rgba(52,211,153,.3);color:var(--green); }
+.iq-text { font-size:12px;color:var(--text);line-height:1.6;flex:1; }
+.iq-item.answered .iq-text { color:var(--muted); }
+.iq-check { font-size:11px;color:var(--dim);flex-shrink:0;margin-top:3px; }
+.iq-item.answered .iq-check { color:var(--green); }
+
+.criteria { display:flex;flex-direction:column;gap:8px; }
+.crit { display:flex;gap:10px;align-items:flex-start;padding:10px 14px;background:var(--surface);border:1px solid var(--border);border-radius:8px;font-size:12px;cursor:pointer;transition:border-color .15s; }
+.crit:hover { border-color:rgba(52,211,153,.3); }
+.crit.done { border-color:rgba(52,211,153,.35);background:rgba(52,211,153,.03); }
+.crit-box { width:16px;height:16px;border-radius:4px;border:1.5px solid var(--border);flex-shrink:0;margin-top:1px;display:flex;align-items:center;justify-content:center;transition:all .15s; }
+.crit.done .crit-box { background:var(--green);border-color:var(--green); }
+.crit-check { color:#0b0d14;font-size:10px;font-weight:900;display:none; }
+.crit.done .crit-check { display:block; }
+.crit-text { color:var(--muted);line-height:1.5; }
+.crit.done .crit-text { color:var(--dim); }
+
+.widget { background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px; }
+.widget-title { font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--dim);margin-bottom:12px; }
+.progress-bar { height:5px;background:var(--surface2);border-radius:10px;overflow:hidden;margin-bottom:6px; }
+.progress-fill { height:100%;background:linear-gradient(90deg,var(--accent),var(--green));border-radius:10px;transition:width .3s; }
+.progress-label { font-size:11px;color:var(--muted); }
+.progress-count { font-size:22px;font-weight:800;color:var(--text);margin-bottom:2px; }
+.as-row { display:flex;align-items:center;gap:8px;font-size:11px;margin-bottom:4px; }
+.as-dot { width:7px;height:7px;border-radius:50%;background:var(--dim);flex-shrink:0; }
+.as-dot.done { background:var(--green); }
+.as-name { color:var(--muted);flex:1; }
+.conn-row { font-size:11px;color:var(--muted);display:flex;gap:8px;align-items:flex-start; }
+.conn-dir { color:var(--dim);flex-shrink:0;width:48px; }
+.report-box { background:rgba(108,142,247,.06);border:1px solid rgba(108,142,247,.2);border-radius:10px;padding:14px 16px; }
+.report-title { font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--accent);margin-bottom:8px; }
+.report-step { font-size:11px;color:var(--muted);margin-bottom:6px;display:flex;gap:8px; }
+.report-step-num { color:var(--accent);font-weight:700;flex-shrink:0; }
+
+.explore-section { margin-bottom:32px; }
+.explore-header { display:flex;align-items:center;gap:12px;padding:12px 16px;background:rgba(251,191,36,.04);border:1px solid rgba(251,191,36,.2);border-radius:10px 10px 0 0;border-bottom:none; }
+.explore-header .label { font-size:12px;font-weight:700;color:var(--yellow); }
+.explore-header .sublabel { font-size:11px;color:var(--muted);margin-left:auto; }
+.explore-body { padding:14px 16px;background:rgba(251,191,36,.02);border:1px solid rgba(251,191,36,.2);border-radius:0 0 10px 10px;display:flex;flex-direction:column;gap:10px; }
+.explore-item { font-size:12px;color:var(--muted);line-height:1.6;padding-left:14px;position:relative; }
+.explore-item::before { content:'';position:absolute;left:0;top:7px;width:5px;height:5px;border-radius:50%;background:var(--yellow); }
+.explore-item strong { color:var(--text); }
+.explore-item code { font-size:10px;color:var(--accent2);background:var(--surface2);padding:1px 5px;border-radius:3px; }
+
+.warn-box { background:rgba(251,191,36,.06);border:1px solid rgba(251,191,36,.2);border-radius:8px;padding:12px 16px;margin-bottom:14px; }
+.warn-title { font-size:11px;font-weight:800;color:var(--yellow);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px; }
+.warn-body { font-size:12px;color:var(--muted);line-height:1.7; }
+.warn-body strong { color:var(--text); }
+</style>
+</head>
+<body>
+
+<nav>
+  <span class="brand">ProOps2026</span>
+  <a href="#concept">Mental Model</a>
+  <a href="#chain">Discovery</a>
+  <a href="#artifact">Artifacts</a>
+  <a href="#interview">IQ</a>
+  <a href="#done">Done</a>
+  <div class="spacer"></div>
+  <span class="badge">Week 4 · Day 19</span>
+</nav>
+
+<div class="layout">
+<div class="main">
+
+  <!-- HEADER -->
+  <div class="day-header">
+    <div class="day-meta">
+      <span class="day-pill">Week 4 · Day 19</span>
+      <span class="day-tag">Hands-On</span>
+    </div>
+    <div class="day-title">Terraform + Ansible — Your First Infrastructure as Code</div>
+    <div class="day-question">Yesterday's deploy script changed infrastructure manually, step by step. What if the infrastructure itself — the EC2 instances, security groups, networking — could be declared in a file, version-controlled, and reproduced exactly from scratch in 90 seconds?</div>
+    <div class="day-why">
+      <strong>Bash scripts describe a procedure. Terraform describes a desired state.</strong> The difference is enormous in production: a script run twice can create duplicate resources, leave orphans, and leave you guessing what exists. Terraform's state file tracks every resource it manages — <code>terraform plan</code> shows you exactly what will change before anything happens. Ansible fills the other half: once Terraform provisions the machine, Ansible configures what runs on it (packages, files, services). Together they replace the AWS console click-ops that was your workflow on Day 11 — and they run the same way on your laptop, in CI, and in a teammate's environment.
+    </div>
+  </div>
+
+  <!-- THE RULE -->
+  <div class="rule-banner">
+    <div class="rule-banner-title">The mental split that drives the day</div>
+    <div class="rule-banner-body"><strong>Terraform</strong> answers: "what infrastructure exists?" (EC2, VPC, security groups, EKS clusters). <strong>Ansible</strong> answers: "what is installed and running on it?" (nginx, Docker, app config files). Bash handles the glue between them. You will use all three; the skill is knowing which one to reach for first.</div>
+  </div>
+
+  <!-- CONCEPT: TWO-TOOL MODEL -->
+  <div class="section-block" id="concept">
+    <div class="sec-label">The two-tool mental model</div>
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:18px 20px;">
+      <div style="font-size:13px;color:var(--muted);line-height:1.7;margin-bottom:14px;">Day 11 you built an EC2 instance by clicking the console + running AWS CLI commands. Those actions are not reproducible — a teammate can't run them from your notes. Today you write files instead. Both tools use declarative configuration; the difference is <em>what</em> they declare.</div>
+      <div class="two-col">
+        <div class="model-card">
+          <div class="model-label">Tool 1</div>
+          <div class="model-title" style="color:var(--accent);">Terraform</div>
+          <div class="model-row">Declares <strong>infrastructure</strong> — VMs, networks, DNS, clusters</div>
+          <div class="model-row">HashiCorp Configuration Language (HCL) — human-readable</div>
+          <div class="model-row">Tracks state in <code>terraform.tfstate</code></div>
+          <div class="model-row">Core loop: <code>init</code> → <code>plan</code> → <code>apply</code> → <code>destroy</code></div>
+          <div class="model-row">Plan = built-in <code>--dry-run</code>. Always run plan first.</div>
+          <div class="model-row">Idempotent by design — running twice changes nothing if state matches</div>
+        </div>
+        <div class="model-card">
+          <div class="model-label">Tool 2</div>
+          <div class="model-title" style="color:var(--accent2);">Ansible</div>
+          <div class="model-row">Declares <strong>configuration</strong> — packages, files, services, users</div>
+          <div class="model-row">YAML playbooks + inventory of hosts</div>
+          <div class="model-row">Agentless — connects over SSH, no daemon on the target</div>
+          <div class="model-row">Core files: <code>playbook.yml</code>, <code>inventory.ini</code></div>
+          <div class="model-row">Runs on Linux/macOS control node — <strong>use WSL2 on Windows</strong></div>
+          <div class="model-row">Idempotent tasks — running twice installs nothing new if already present</div>
+        </div>
+      </div>
+      <div style="margin-top:14px;padding:10px 14px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;font-size:12px;color:var(--muted);line-height:1.7;">
+        <strong style="color:var(--text);">Typical flow on a new server:</strong><br>
+        <span style="font-family:'Cascadia Code','Fira Code',monospace;font-size:11px;color:var(--accent2);">terraform apply</span> → EC2 created, IP output → <span style="font-family:'Cascadia Code','Fira Code',monospace;font-size:11px;color:var(--accent2);">ansible-playbook playbook.yml -i inventory.ini</span> → nginx installed + running → your app is live.
+      </div>
+    </div>
+  </div>
+
+  <!-- COST WARNING -->
+  <div class="warn-box">
+    <div class="warn-title">Cost safety — read before touching AWS</div>
+    <div class="warn-body">All EC2 instances in today's lab use <strong>t3.micro</strong> (Free Tier eligible). Set a phone alarm before <code>terraform apply</code> — <strong>run <code>terraform destroy</code> at end of session</strong>. Unlike Day 16, Terraform tracks every resource it created. <code>terraform destroy</code> removes all of them in one command. Verify with <code style="font-size:11px;">aws ec2 describe-instances --query 'Reservations[].Instances[?State.Name!=`terminated`]'</code> after destroy.</div>
+  </div>
+
+  <!-- DISCOVERY CHAIN -->
+  <div class="section-block" id="chain">
+    <div class="sec-label">Discovery chain — 8 questions</div>
+    <div class="chain">
+
+      <!-- Q1 WHY IaC -->
+      <div class="chain-item" onclick="toggleChain(this,0)">
+        <div class="chain-num">1</div>
+        <div>
+          <div class="chain-q">What problem does IaC solve? Compare three ways to create an EC2 instance — console click, AWS CLI script, Terraform — and explain what makes only the third one "infrastructure as code".</div>
+          <div class="chain-prompt">Explain the IaC problem to me from first principles:
+
+(1) Console clicks: I created EC2 instances on Days 6, 11, 16 by clicking in the AWS console.
+What are the three specific problems with this approach that affect a team environment?
+(declarative vs procedural, reproducibility, drift)
+
+(2) Bash/AWS CLI scripts (like what I built on Day 18):
+I can write `aws ec2 run-instances ...` in a script. Is this IaC? Why or why not?
+What happens if I run the script twice?
+
+(3) Terraform main.tf:
+What is the difference between describing WHAT to do (imperative) vs WHAT should exist (declarative)?
+How does Terraform's state file solve the "run twice" problem that Bash can't?
+
+(4) The drift problem: a teammate manually resizes an EC2 instance in the console after Terraform created it.
+What does `terraform plan` show next time it runs?
+What happens when `terraform apply` runs?
+This is called "configuration drift" — why is detecting it automatically valuable?
+
+(5) Walk through the terraform core loop:
+init → what does it download and why?
+plan → what does it compare and output?
+apply → what does it change and record?
+destroy → what does it read to know what to delete?</div>
+          <div class="chain-hint">The key insight: Bash describes <em>steps</em>. Terraform describes the <em>end state</em>. Steps are hard to diff, hard to audit, and dangerous to re-run. End-state files version like source code and show exactly what changed between runs.</div>
+        </div>
+      </div>
+
+      <!-- Q2 FIRST main.tf -->
+      <div class="chain-item" onclick="toggleChain(this,1)">
+        <div class="chain-num">2</div>
+        <div>
+          <div class="chain-q">Write <code>iac/terraform/main.tf</code> that creates a single t3.micro EC2 instance with your Owner + project tags. Run <code>terraform init</code> and <code>terraform plan</code> — walk through the plan output.</div>
+          <div class="chain-prompt">Help me write my first main.tf and understand every line:
+
+(1) Provider block — why Terraform needs it:
+terraform {
+  required_providers {
+    aws = { source = "hashicorp/aws", version = "~> 5.0" }
+  }
+}
+provider "aws" { region = "ap-northeast-1" }
+
+What does `terraform init` download? Where does it put it? What is .terraform.lock.hcl?
+
+(2) Data source — look up the latest Amazon Linux 2023 AMI instead of hardcoding an AMI ID:
+data "aws_ami" "amazon_linux" {
+  most_recent = true
+  owners      = ["amazon"]
+  filter { name = "name", values = ["al2023-ami-*-x86_64"] }
+  filter { name = "virtualization-type", values = ["hvm"] }
+}
+Why is a data source better than a hardcoded AMI ID?
+
+(3) Resource block:
+resource "aws_instance" "app" {
+  ami           = data.aws_ami.amazon_linux.id
+  instance_type = "t3.micro"
+  tags = {
+    Name    = "proops2026-day19"
+    Owner   = "your_name"
+    Project = "proops2026"
+    Day     = "19"
+  }
+}
+
+(4) Output block — so I can see the public IP after apply:
+output "instance_public_ip" {
+  value = aws_instance.app.public_ip
+}
+
+(5) Run terraform plan. Explain the output:
+- What does `+` mean? What does `-` mean? What does `~` mean?
+- What does "1 to add, 0 to change, 0 to destroy" mean?
+- Why should I always read the plan before apply?
+
+After understanding, save this file to iac/terraform/main.tf.</div>
+          <div class="chain-hint">A data source reads existing AWS state (like <code>aws describe-images</code>) and makes the result available in your config. A resource creates or manages AWS state. Never hardcode AMI IDs — they change per region and when Amazon releases patches.</div>
+          <div class="chain-note">Add <code style="font-size:11px;">.terraform/</code>, <code style="font-size:11px;">terraform.tfstate</code>, <code style="font-size:11px;">terraform.tfstate.backup</code>, and <code style="font-size:11px;">*.tfvars</code> to .gitignore before the first commit. The state file can contain secrets and is never committed to git.</div>
+        </div>
+      </div>
+
+      <!-- Q3 STATE FILE -->
+      <div class="chain-item" onclick="toggleChain(this,2)">
+        <div class="chain-num">3</div>
+        <div>
+          <div class="chain-q">What is <code>terraform.tfstate</code>? Open it after your first <code>terraform apply</code>. What does it contain? Why would losing it be a serious problem?</div>
+          <div class="chain-prompt">Explain the state file to me deeply:
+
+(1) What is in terraform.tfstate?
+Open it with `cat terraform.tfstate | python3 -m json.tool | head -60`.
+What resource types, IDs, and attributes does it track?
+Is the instance_id in there? The private IP? The AMI ID?
+
+(2) What does Terraform do with the state file on the next `terraform plan`?
+Walk through: it reads state → calls AWS API to get current real state → diffs the two.
+What is "state drift" — when the state file disagrees with what AWS actually has?
+
+(3) What happens if you delete terraform.tfstate and run terraform plan?
+(Answer: Terraform thinks nothing exists, plans to CREATE everything from scratch, which would create duplicate EC2 instances.)
+This is a real production incident pattern. How do teams prevent it?
+
+(4) Three state file rules:
+Rule 1: Never commit terraform.tfstate to git (it contains resource IDs, may contain secrets).
+Rule 2: In production, store state remotely (S3 backend + DynamoDB lock). Why locking?
+Rule 3: Never edit the state file manually. Use `terraform state` commands.
+
+(5) The S3 backend (concept only — don't implement today):
+terraform {
+  backend "s3" {
+    bucket         = "my-tfstate-bucket"
+    key            = "proops2026/terraform.tfstate"
+    region         = "ap-northeast-1"
+    dynamodb_table = "terraform-locks"
+  }
+}
+Why DynamoDB for locks? (Prevent two engineers from running apply simultaneously.)
+
+Save a summary of these rules in memory/iac-basics.md — state section.</div>
+          <div class="chain-hint">The state file is Terraform's memory. Without it, Terraform is blind to what it already created. In production, losing the state file = losing control of your infrastructure. Remote backends (S3) + locking (DynamoDB) prevent both loss and corruption.</div>
+        </div>
+      </div>
+
+      <!-- Q4 VARIABLES -->
+      <div class="chain-item" onclick="toggleChain(this,3)">
+        <div class="chain-num">4</div>
+        <div>
+          <div class="chain-q">Extract <code>instance_type</code>, <code>region</code>, and your name into Terraform variables with defaults. Test overriding instance_type at the command line without editing main.tf.</div>
+          <div class="chain-prompt">Refactor main.tf with proper variable declarations:
+
+(1) variables.tf — separate file for variable declarations:
+variable "aws_region" {
+  description = "AWS region"
+  type        = string
+  default     = "ap-northeast-1"
+}
+variable "instance_type" {
+  description = "EC2 instance type"
+  type        = string
+  default     = "t3.micro"
+}
+variable "owner_name" {
+  description = "Your trainee ID (e.g. quyet_nc)"
+  type        = string
+}
+
+(2) Reference variables in main.tf:
+provider "aws" { region = var.aws_region }
+resource "aws_instance" "app" {
+  instance_type = var.instance_type
+  tags = { Owner = var.owner_name }
+}
+
+(3) terraform.tfvars — supply default values without editing code:
+owner_name    = "your_name_here"
+instance_type = "t3.micro"
+Why is terraform.tfvars gitignored? (May contain account IDs, environment names.)
+
+(4) Override at CLI: `terraform plan -var instance_type=t3.nano`
+Watch the plan show the change from t3.micro to t3.nano.
+Don't apply this — it's just to show the override works.
+
+(5) Three variable input methods and their priority (highest to lowest):
+   CLI -var flag > terraform.tfvars > environment variables TF_VAR_* > default in variable block
+Why does priority order matter in CI/CD environments?
+
+Save the variable pattern in memory/iac-basics.md.</div>
+          <div class="chain-hint">Variables make your Terraform modules reusable. A module with hardcoded region and instance type is a script with extra steps. A module with proper variables can be used for dev, staging, and prod by changing a single <code>.tfvars</code> file.</div>
+        </div>
+      </div>
+
+      <!-- Q5 APPLY AND DESTROY -->
+      <div class="chain-item" onclick="toggleChain(this,4)">
+        <div class="chain-num">5</div>
+        <div>
+          <div class="chain-q">Run <code>terraform apply</code>. Verify the EC2 instance appears in the AWS console with your tags. Then understand what <code>terraform destroy</code> does — and why it's safer than manual deletion.</div>
+          <div class="chain-prompt">Guided apply + verify + understand destroy:
+
+(1) Apply:
+terraform apply
+When it asks "Do you want to perform these actions?" — read the plan summary again.
+Type "yes" only after reading it. This is the one place where Terraform slows you down intentionally.
+
+(2) Verify (after apply completes):
+- Check the output: `instance_public_ip = "x.x.x.x"`
+- AWS console: EC2 → Instances → filter by tag Owner=your_name → verify state=running, tags correct
+- CLI: `aws ec2 describe-instances --filters "Name=tag:Owner,Values=your_name" --query 'Reservations[].Instances[].[InstanceId,State.Name,Tags]'`
+
+(3) Run terraform plan again — on already-created infrastructure:
+What does the output say? Why "No changes"?
+This proves idempotency — running apply twice creates nothing new.
+
+(4) Now understand destroy:
+terraform destroy --target aws_instance.app
+Or full destroy: terraform destroy
+What does Terraform read to know what to delete? (the state file)
+What does the plan section show before it deletes?
+
+(5) Why destroy is safer than manual console deletion:
+- Terraform reads the state, deletes in dependency order (e.g., removes SG only after instance is terminated)
+- After destroy, state file is cleared — no orphan state records
+- Compare to Day 16: you manually deleted ELBs, EBS volumes, NAT gateways one by one. Destroy automates all of that.
+
+DO run destroy at end of today's session. Phone alarm rule still applies.</div>
+          <div class="chain-hint">After <code>terraform apply</code>, never manually delete a resource in the console. If you do, the state file still thinks it exists, and the next plan will show no changes — even though the resource is gone. Always manage Terraform-created resources through Terraform.</div>
+          <div class="chain-note">Set a phone alarm for the end of your session. Run <code>terraform destroy</code> before logging off. Verify with AWS CLI that no instances are running. t3.micro costs ~$0.01/hr — small, but left running for a week = $1.68, and more importantly it's a habit you must build before managing production infra.</div>
+        </div>
+      </div>
+
+      <!-- Q6 ANSIBLE INTRO -->
+      <div class="chain-item" onclick="toggleChain(this,5)">
+        <div class="chain-num">6</div>
+        <div>
+          <div class="chain-q">What is Ansible? How does it differ from Terraform? Set up Ansible in WSL2, write an inventory file pointing at your EC2 instance, and verify you can ping it.</div>
+          <div class="chain-prompt">Ansible intro — concepts first, then hands-on:
+
+(1) The mental model:
+Terraform: I want an EC2 instance to exist. (Infrastructure provisioning)
+Ansible: I want nginx installed and running on that EC2 instance. (Configuration management)
+Both are declarative and idempotent. The split: Terraform manages AWS objects, Ansible manages OS and software.
+
+(2) Key concepts:
+- Inventory: a file listing the hosts Ansible should manage (IP addresses or hostnames)
+- Playbook: a YAML file describing what to do on those hosts (tasks in order)
+- Task: one action (install nginx, copy a file, start a service)
+- Handler: a task that only runs when notified (e.g., restart nginx only if its config changed)
+- Module: the built-in action verb — `apt`, `yum`, `copy`, `service`, `template`
+- Agentless: Ansible SSHes in; nothing installed on the target machine
+
+(3) Install Ansible in WSL2 (Ubuntu):
+sudo apt update && sudo apt install -y ansible
+ansible --version
+
+(4) Inventory file (iac/ansible/inventory.ini):
+[webservers]
+ec2-day19 ansible_host=<YOUR_EC2_PUBLIC_IP> ansible_user=ec2-user ansible_ssh_private_key_file=~/.ssh/your-key.pem
+
+(5) Connection test (verify SSH works before writing a single playbook):
+ansible webservers -i inventory.ini -m ping
+Expected output: ec2-day19 | SUCCESS => { "ping": "pong" }
+If this fails, fix SSH before moving to Q7. Common causes:
+  - Security Group blocks port 22 → add inbound SSH rule
+  - Wrong ansible_user (Amazon Linux 2023 = ec2-user, Ubuntu = ubuntu)
+  - Key permissions: `chmod 400 ~/.ssh/your-key.pem`</div>
+          <div class="chain-hint">Ansible is Linux/macOS only — it must run from WSL2 on Windows. The control node is your laptop (via WSL2); the managed node is the EC2 instance. No Ansible daemon runs on EC2 — it's pure SSH.</div>
+        </div>
+      </div>
+
+      <!-- Q7 FIRST PLAYBOOK -->
+      <div class="chain-item" onclick="toggleChain(this,6)">
+        <div class="chain-num">7</div>
+        <div>
+          <div class="chain-q">Write <code>iac/ansible/playbook.yml</code> that installs nginx on the EC2 instance, starts it, and verifies the service is running. Run it and check the result.</div>
+          <div class="chain-prompt">First Ansible playbook — structure and execution:
+
+(1) The anatomy of a playbook:
+---
+- name: Configure web server           # play name
+  hosts: webservers                     # which inventory group
+  become: true                          # sudo
+  tasks:
+    - name: Install nginx
+      ansible.builtin.yum:
+        name: nginx
+        state: present                  # present = installed; absent = removed
+
+    - name: Start and enable nginx
+      ansible.builtin.service:
+        name: nginx
+        state: started                  # started = running now
+        enabled: true                   # enabled = starts on reboot
+      notify: verify nginx running
+
+    - name: Add a custom welcome page
+      ansible.builtin.copy:
+        content: "<h1>ProOps2026 Day 19 — Ansible configured this</h1>"
+        dest: /usr/share/nginx/html/index.html
+        mode: "0644"
+
+  handlers:
+    - name: verify nginx running
+      ansible.builtin.uri:
+        url: "http://localhost"
+        status_code: 200
+
+(2) Run it:
+ansible-playbook iac/ansible/playbook.yml -i iac/ansible/inventory.ini
+
+Read the output: TASK lines show each step. `ok` = already correct. `changed` = made a change. `failed` = error.
+
+(3) Idempotency proof — run it again:
+ansible-playbook iac/ansible/playbook.yml -i iac/ansible/inventory.ini
+All tasks should show `ok` (not `changed`) — nothing was changed because the state already matched.
+This is the idempotency guarantee: "bring this system to this state". If it's already there, do nothing.
+
+(4) Verify from your machine:
+curl http://<EC2_PUBLIC_IP>
+Expected: the HTML page you wrote in the copy task.
+
+(5) Note for Amazon Linux 2023: use `dnf` instead of `yum`:
+ansible.builtin.dnf:
+  name: nginx
+  state: present
+If yum fails, switch to dnf.
+
+Save this playbook to iac/ansible/playbook.yml.</div>
+          <div class="chain-hint"><code>state: present</code> = idempotent install. <code>state: latest</code> = always upgrade. Use <code>present</code> for production stability — you want to know exactly which version is running. Use <code>latest</code> only when you explicitly want upgrades.</div>
+        </div>
+      </div>
+
+      <!-- Q8 MEMORY FILE -->
+      <div class="chain-item" onclick="toggleChain(this,7)">
+        <div class="chain-num">8</div>
+        <div>
+          <div class="chain-q">Write <code>memory/iac-basics.md</code> — the reference file your agent will read at session start for all future IaC work. It must capture the two-tool mental model, commands, state file rules, and today's real errors.</div>
+          <div class="chain-prompt">Help me write memory/iac-basics.md. Structure:
+
+1. The Two-Tool Rule (3 sentences max)
+   Terraform manages WHAT infrastructure exists (EC2, VPC, SG, EKS).
+   Ansible manages WHAT is installed and running on it (packages, files, services).
+   Bash handles glue between the two.
+
+2. Terraform Core Commands
+   terraform init     — download provider plugins, create .terraform/
+   terraform plan     — diff desired state (main.tf) vs current state (tfstate + AWS API). Always run first.
+   terraform apply    — execute the plan. Type "yes" only after reading the plan summary.
+   terraform destroy  — delete all managed resources. Always verify with AWS CLI after.
+   terraform state list — show all resources in the state file
+   terraform output   — show output values
+
+3. State File Rules (non-negotiable)
+   - Never commit terraform.tfstate to git
+   - Never edit it manually
+   - In production: S3 backend + DynamoDB lock
+   - After losing state: `terraform import` to re-link existing resources (painful — prevention is better)
+
+4. Gitignore for Terraform
+   .terraform/
+   terraform.tfstate
+   terraform.tfstate.backup
+   *.tfvars
+   .terraform.lock.hcl    (optional — some teams commit this)
+
+5. Ansible Core Concepts
+   inventory.ini — list of hosts + connection vars
+   playbook.yml  — ordered list of plays → tasks
+   ansible -m ping → test SSH connectivity before running playbooks
+   state: present (idempotent install), state: absent (remove), state: started (service running)
+   become: true → sudo on remote host
+   Run: ansible-playbook playbook.yml -i inventory.ini
+
+6. Decision Table: Terraform vs Ansible vs Bash
+   Create EC2 instance        → Terraform
+   Install nginx on EC2       → Ansible
+   Deploy app with git pull   → Bash (or Ansible)
+   Create EKS cluster         → Terraform
+   Configure K8s app          → kubectl (or Ansible)
+   One-off AWS query          → AWS CLI / Bash
+
+7. Today's Errors + Fixes (fill with your own from the session)
+   [Error 1]: ...
+   Fix: ...
+
+Format: short bullets and code blocks. No prose paragraphs.</div>
+          <div class="chain-hint">The decision table in section 6 is the most valuable part of this memory file. When a future task arrives, your agent reads this table and immediately knows which tool to use. Trainees who skip this end up running Terraform for things Bash handles in 2 lines, or writing Bash for things Terraform does in 4 lines of HCL.</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ARTIFACTS -->
+  <div class="section-block" id="artifact">
+    <div class="sec-label">Artifacts</div>
+    <div class="artifact-card">
+      <div class="artifact-head">
+        <div class="artifact-title">Terraform Configuration</div>
+        <div class="artifact-file">iac/terraform/main.tf</div>
+      </div>
+      <div class="artifact-body">
+        <div class="artifact-row"><div class="ar-dot"></div><div class="ar-text"><strong>Provider + data source</strong> — AWS provider pinned, AMI looked up dynamically (not hardcoded).</div></div>
+        <div class="artifact-row"><div class="ar-dot"></div><div class="ar-text"><strong>Variables</strong> — <code>instance_type</code>, <code>aws_region</code>, <code>owner_name</code> declared in variables.tf with defaults.</div></div>
+        <div class="artifact-row"><div class="ar-dot"></div><div class="ar-text"><strong>EC2 resource</strong> — t3.micro, Owner + Project + Day tags, references the AMI data source.</div></div>
+        <div class="artifact-row"><div class="ar-dot"></div><div class="ar-text"><strong>Output</strong> — <code>instance_public_ip</code> printed after apply.</div></div>
+        <div class="artifact-row"><div class="ar-dot"></div><div class="ar-text"><strong>Lifecycle verified</strong> — <code>plan</code> → <code>apply</code> → idempotency rerun → <code>destroy</code> all run and confirmed.</div></div>
+        <div class="artifact-fail"><strong>Weak signals:</strong> Hardcoded AMI ID (breaks cross-region). No variables.tf (hardcoded region in provider). No output block (can't get the IP without console). terraform.tfstate committed to git.</div>
+      </div>
+    </div>
+    <div class="artifact-card">
+      <div class="artifact-head">
+        <div class="artifact-title">Ansible Playbook</div>
+        <div class="artifact-file">iac/ansible/playbook.yml</div>
+      </div>
+      <div class="artifact-body">
+        <div class="artifact-row"><div class="ar-dot"></div><div class="ar-text"><strong>Inventory file</strong> — <code>iac/ansible/inventory.ini</code> with correct <code>ansible_host</code>, <code>ansible_user</code>, <code>ansible_ssh_private_key_file</code>.</div></div>
+        <div class="artifact-row"><div class="ar-dot"></div><div class="ar-text"><strong>Ping verified</strong> — <code>ansible webservers -m ping</code> returned SUCCESS before running the playbook.</div></div>
+        <div class="artifact-row"><div class="ar-dot"></div><div class="ar-text"><strong>Three tasks</strong> — install nginx, start + enable service, write custom index.html.</div></div>
+        <div class="artifact-row"><div class="ar-dot"></div><div class="ar-text"><strong>Idempotency confirmed</strong> — second run shows all <code>ok</code>, no <code>changed</code>.</div></div>
+        <div class="artifact-row"><div class="ar-dot"></div><div class="ar-text"><strong>Curl verified</strong> — <code>curl http://&lt;EC2_IP&gt;</code> returns the custom page from the copy task.</div></div>
+        <div class="artifact-fail"><strong>Weak signals:</strong> No inventory file (runs against localhost by accident). Using <code>state: latest</code> on nginx (upgrades on every run — not idempotent). Not using <code>become: true</code> (package install fails without sudo). Commits <code>inventory.ini</code> with real IP + key path (security issue).</div>
+      </div>
+    </div>
+    <div class="artifact-card">
+      <div class="artifact-head">
+        <div class="artifact-title">IaC Memory File</div>
+        <div class="artifact-file">memory/iac-basics.md</div>
+      </div>
+      <div class="artifact-body">
+        <div class="artifact-row"><div class="ar-dot"></div><div class="ar-text"><strong>Two-tool rule</strong> — Terraform/Ansible/Bash decision in 3 sentences, always at the top.</div></div>
+        <div class="artifact-row"><div class="ar-dot"></div><div class="ar-text"><strong>Core commands</strong> — Terraform loop (init → plan → apply → destroy) + Ansible equivalents.</div></div>
+        <div class="artifact-row"><div class="ar-dot"></div><div class="ar-text"><strong>State file rules</strong> — what it is, why it's dangerous, what to gitignore, production backend pattern.</div></div>
+        <div class="artifact-row"><div class="ar-dot"></div><div class="ar-text"><strong>Decision table</strong> — 6-row table: task → which tool.</div></div>
+        <div class="artifact-row"><div class="ar-dot"></div><div class="ar-text"><strong>Today's errors</strong> — your specific failures and fixes from the session, not generic blog content.</div></div>
+        <div class="artifact-fail"><strong>Weak signals:</strong> Only Terraform, no Ansible section. No state file rules. Decision table missing — just prose descriptions. Errors section generic (not from today's session).</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- INTERVIEW QUESTIONS -->
+  <div class="iq-section" id="interview">
+    <div class="iq-header">
+      <div class="iq-title">Interview Questions</div>
+      <div class="iq-subtitle">Click when you can answer without notes.</div>
+    </div>
+    <div class="iq-body">
+      <div class="iq-item" onclick="toggleIQ(this)"><div class="iq-q"><span class="iq-num">Q1</span><span class="iq-text">What is the difference between declarative IaC (Terraform) and imperative scripting (Bash)? Give a one-sentence example of each for creating an EC2 instance.</span><span class="iq-check">&#10003;</span></div></div>
+      <div class="iq-item" onclick="toggleIQ(this)"><div class="iq-q"><span class="iq-num">Q2</span><span class="iq-text">What is <code>terraform.tfstate</code>? What happens to your infrastructure management if you delete it? Three rules for handling it safely in production.</span><span class="iq-check">&#10003;</span></div></div>
+      <div class="iq-item" onclick="toggleIQ(this)"><div class="iq-q"><span class="iq-num">Q3</span><span class="iq-text"><code>terraform plan</code> vs <code>terraform apply</code> — what does each command do? Why should you always run plan before apply?</span><span class="iq-check">&#10003;</span></div></div>
+      <div class="iq-item" onclick="toggleIQ(this)"><div class="iq-q"><span class="iq-num">Q4</span><span class="iq-text">Terraform vs Ansible: which tool do you use to create an EC2 instance? Which tool do you use to install nginx on it? Why is the split made there?</span><span class="iq-check">&#10003;</span></div></div>
+      <div class="iq-item" onclick="toggleIQ(this)"><div class="iq-q"><span class="iq-num">Q5</span><span class="iq-text">A teammate manually resized an EC2 instance in the AWS console after Terraform created it. What happens the next time <code>terraform plan</code> runs? What happens when <code>terraform apply</code> runs?</span><span class="iq-check">&#10003;</span></div></div>
+      <div class="iq-item" onclick="toggleIQ(this)"><div class="iq-q"><span class="iq-num">Q6</span><span class="iq-text">What is an Ansible inventory? What is a playbook? What does "agentless" mean in the context of Ansible?</span><span class="iq-check">&#10003;</span></div></div>
+      <div class="iq-item" onclick="toggleIQ(this)"><div class="iq-q"><span class="iq-num">Q7</span><span class="iq-text">You run an Ansible playbook that installs nginx and it shows <code>changed=1</code>. You run it again immediately and it shows <code>changed=0</code>. Why? What property of Ansible makes this happen?</span><span class="iq-check">&#10003;</span></div></div>
+      <div class="iq-item" onclick="toggleIQ(this)"><div class="iq-q"><span class="iq-num">Q8</span><span class="iq-text">Name three files that should always be in <code>.gitignore</code> for a Terraform project and explain why each one must not be committed.</span><span class="iq-check">&#10003;</span></div></div>
+    </div>
+  </div>
+
+  <!-- DONE CRITERIA -->
+  <div class="section-block" id="done">
+    <div class="sec-label">Done criteria</div>
+    <div class="criteria">
+      <div class="crit" onclick="toggleCrit(this)"><div class="crit-box"><span class="crit-check">&#10003;</span></div><div class="crit-text"><code style="font-size:11px;color:var(--accent2);">iac/terraform/main.tf</code> + <code>variables.tf</code> written — AMI via data source, variables for instance_type + region + owner.</div></div>
+      <div class="crit" onclick="toggleCrit(this)"><div class="crit-box"><span class="crit-check">&#10003;</span></div><div class="crit-text"><code style="font-size:11px;color:var(--accent2);">terraform plan</code> output read and understood — <code>+</code> / <code>-</code> / <code>~</code> symbols explained.</div></div>
+      <div class="crit" onclick="toggleCrit(this)"><div class="crit-box"><span class="crit-check">&#10003;</span></div><div class="crit-text"><code style="font-size:11px;color:var(--accent2);">terraform apply</code> run — EC2 instance created, verified in AWS console with correct Owner + Project tags.</div></div>
+      <div class="crit" onclick="toggleCrit(this)"><div class="crit-box"><span class="crit-check">&#10003;</span></div><div class="crit-text">Idempotency verified — second <code>terraform apply</code> shows "No changes".</div></div>
+      <div class="crit" onclick="toggleCrit(this)"><div class="crit-box"><span class="crit-check">&#10003;</span></div><div class="crit-text"><code style="font-size:11px;color:var(--accent2);">.gitignore</code> updated — <code>terraform.tfstate</code>, <code>.terraform/</code>, <code>*.tfvars</code> all excluded.</div></div>
+      <div class="crit" onclick="toggleCrit(this)"><div class="crit-box"><span class="crit-check">&#10003;</span></div><div class="crit-text"><code style="font-size:11px;color:var(--accent2);">ansible -m ping</code> returns SUCCESS against EC2 instance before writing any playbook.</div></div>
+      <div class="crit" onclick="toggleCrit(this)"><div class="crit-box"><span class="crit-check">&#10003;</span></div><div class="crit-text"><code style="font-size:11px;color:var(--accent2);">iac/ansible/playbook.yml</code> run — nginx installed, service started, custom index.html served, <code>curl http://&lt;EC2_IP&gt;</code> returns 200.</div></div>
+      <div class="crit" onclick="toggleCrit(this)"><div class="crit-box"><span class="crit-check">&#10003;</span></div><div class="crit-text">Ansible idempotency verified — second playbook run shows all <code>ok</code>, no <code>changed</code>.</div></div>
+      <div class="crit" onclick="toggleCrit(this)"><div class="crit-box"><span class="crit-check">&#10003;</span></div><div class="crit-text"><code style="font-size:11px;color:var(--accent2);">terraform destroy</code> run — EC2 gone, verified with AWS CLI. Phone alarm honored.</div></div>
+      <div class="crit" onclick="toggleCrit(this)"><div class="crit-box"><span class="crit-check">&#10003;</span></div><div class="crit-text"><code style="font-size:11px;color:var(--accent2);">memory/iac-basics.md</code> written — two-tool rule, commands, state rules, decision table, today's real errors.</div></div>
+      <div class="crit" onclick="toggleCrit(this)"><div class="crit-box"><span class="crit-check">&#10003;</span></div><div class="crit-text">Git commit pushed: <code style="font-size:11px;color:var(--accent2);">Day 19 — Terraform + Ansible: first main.tf + playbook.yml + iac-basics.md</code></div></div>
+    </div>
+  </div>
+
+  <!-- EXPLORE FURTHER -->
+  <div class="explore-section">
+    <div class="explore-header">
+      <span class="label">Explore further</span>
+      <span class="sublabel">Only after all done criteria checked &#10003;</span>
+    </div>
+    <div class="explore-body">
+      <div style="font-size:11px;color:var(--dim);margin-bottom:4px;">Optional. These concepts appear in Week 5 CI/CD work and Day 20 artifact review.</div>
+      <div class="explore-item"><strong>Remote state with S3.</strong> Ask Claude: <em>"Help me configure a Terraform S3 backend for my state file. What S3 bucket settings prevent accidental deletion? What DynamoDB table schema does the lock mechanism need? Show me the backend block."</em></div>
+      <div class="explore-item"><strong>Terraform outputs as Ansible inputs.</strong> Ask Claude: <em>"Show me how to pass the EC2 public IP from <code>terraform output instance_public_ip</code> into the Ansible inventory automatically using a Bash wrapper script. This is the Terraform→Ansible glue pattern used in real pipelines."</em></div>
+      <div class="explore-item"><strong>Ansible roles.</strong> Ask Claude: <em>"Refactor my playbook into an Ansible role at <code>iac/ansible/roles/webserver/</code>. Explain the role directory structure (tasks/main.yml, handlers/main.yml, defaults/main.yml, files/, templates/). When do tasks become a role?"</em></div>
+      <div class="explore-item"><strong>Terraform modules.</strong> Ask Claude: <em>"Extract my EC2 resource into a reusable Terraform module at <code>iac/terraform/modules/ec2-instance/</code>. Call it from my root main.tf with <code>module.app = { source = ... }</code>. What are the three files every Terraform module must have?"</em></div>
+    </div>
+  </div>
+
+</div><!-- /main -->
+
+<!-- SIDEBAR -->
+<div class="sidebar">
+  <div class="widget">
+    <div class="widget-title">Progress — Day 19</div>
+    <div class="progress-count" id="d19-count">0 / 8</div>
+    <div style="margin-bottom:8px;"><div class="progress-bar"><div class="progress-fill" id="d19-fill" style="width:0%"></div></div><div class="progress-label" id="d19-label">Discovery chain</div></div>
+  </div>
+  <div class="widget">
+    <div class="widget-title">Today's Artifacts</div>
+    <div class="as-row"><div class="as-dot" id="d19-tf"></div><div class="as-name">iac/terraform/main.tf</div></div>
+    <div class="as-row"><div class="as-dot" id="d19-vars"></div><div class="as-name">iac/terraform/variables.tf</div></div>
+    <div class="as-row"><div class="as-dot" id="d19-pb"></div><div class="as-name">iac/ansible/playbook.yml</div></div>
+    <div class="as-row"><div class="as-dot" id="d19-mem"></div><div class="as-name">memory/iac-basics.md</div></div>
+  </div>
+  <div class="widget" style="background:rgba(248,113,113,.04);border-color:rgba(248,113,113,.2);">
+    <div class="widget-title" style="color:var(--red);">Cost alarm</div>
+    <div style="font-size:11px;color:var(--muted);line-height:1.6;">Set a phone alarm before <code style="font-size:10px;">terraform apply</code>. Run <code style="font-size:10px;">terraform destroy</code> at end of session. Verify with AWS CLI.</div>
+  </div>
+  <div class="widget" style="background:rgba(108,142,247,.04);border-color:rgba(108,142,247,.2);">
+    <div class="widget-title" style="color:var(--accent);">The two-tool rule</div>
+    <div style="font-size:11px;color:var(--muted);line-height:1.8;font-family:'Cascadia Code','Fira Code',monospace;">
+      Create EC2 → Terraform<br>
+      Install nginx → Ansible<br>
+      Deploy app → Bash<br>
+      Create EKS → Terraform<br>
+      Configure pods → kubectl
+    </div>
+  </div>
+  <div class="widget">
+    <div class="widget-title">Connects To</div>
+    <div style="display:flex;flex-direction:column;gap:6px;">
+      <div class="conn-row"><span class="conn-dir">&larr; Day 11</span><span style="font-size:11px;color:var(--muted);">EC2 you created by hand — now declared in 20 lines of HCL</span></div>
+      <div class="conn-row"><span class="conn-dir">&larr; Day 18</span><span style="font-size:11px;color:var(--muted);">Bash scripts — Terraform replaces the infra portion</span></div>
+      <div class="conn-row"><span class="conn-dir">&rarr; Day 20</span><span style="font-size:11px;color:var(--muted);">Mid-point review — iac-basics.md is a required artifact</span></div>
+      <div class="conn-row"><span class="conn-dir">&rarr; Day 24</span><span style="font-size:11px;color:var(--muted);">GitHub Actions — <code>terraform apply</code> runs in CI</span></div>
+    </div>
+  </div>
+  <div class="report-box">
+    <div class="report-title">End-of-day report</div>
+    <div class="report-step"><span class="report-step-num">1.</span> Run <code style="font-size:10px;color:var(--accent);">terraform destroy</code> — verify clean</div>
+    <div class="report-step"><span class="report-step-num">2.</span> Fill daily log + context block</div>
+    <div class="report-step"><span class="report-step-num">3.</span> git commit + push <code style="font-size:10px;color:var(--accent);">iac/</code> + <code style="font-size:10px;color:var(--accent);">memory/</code></div>
+    <div class="report-step"><span class="report-step-num">4.</span> Paste <code style="font-size:10px;color:var(--accent);">=== Day 19 |</code> to trainer channel</div>
+    <div style="margin-top:8px;padding:6px 8px;background:rgba(52,211,153,.06);border:1px solid rgba(52,211,153,.2);border-radius:5px;font-size:10px;color:var(--green);line-height:1.5;">Include: <code>terraform plan</code> output snippet + <code>ansible-playbook</code> run output showing changed=1 first run, changed=0 second run.</div>
+  </div>
+</div>
+
+</div><!-- /layout -->
+
+<script>
+const done = new Array(8).fill(false);
+function toggleChain(el, i) {
+  done[i] = !done[i];
+  el.classList.toggle('done', done[i]);
+  const n = done.filter(Boolean).length;
+  document.getElementById('d19-count').textContent = n + ' / 8';
+  document.getElementById('d19-fill').style.width = (n/8*100) + '%';
+  const lbl = ['Keep going','Keep going','Terraform basics done','Terraform basics done','Halfway','Ansible next','Almost there','Done!'];
+  document.getElementById('d19-label').textContent = n === 0 ? 'Discovery chain' : lbl[n-1];
+  if (n >= 3) document.getElementById('d19-tf').classList.add('done');
+  if (n >= 4) document.getElementById('d19-vars').classList.add('done');
+  if (n >= 7) document.getElementById('d19-pb').classList.add('done');
+  if (n >= 8) document.getElementById('d19-mem').classList.add('done');
+}
+function toggleIQ(el) { el.classList.toggle('answered'); }
+function toggleCrit(el) { el.classList.toggle('done'); }
+</script>
+</body>
+</html>

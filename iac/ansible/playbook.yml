@@ -1,0 +1,71 @@
+---
+# =============================================================================
+# playbook.yml — cấu hình web server trên EC2
+# =============================================================================
+# Chạy: ansible-playbook playbook.yml -i inventory.ini
+#
+# Ansible đọc file này từ trên xuống dưới.
+# Mỗi "- name:" là một play hoặc task. Thứ tự quan trọng.
+
+- name: Configure web server
+  hosts: webservers        # phải khớp với tên group trong inventory.ini
+  become: true             # chạy tasks với sudo (ec2-user → root)
+
+  tasks:
+
+    # ------------------------------------------------------------------
+    # TASK 1: Cài nginx
+    # Module: ansible.builtin.dnf (Amazon Linux 2023 dùng dnf, không phải yum)
+    # state: present = "đảm bảo nginx được cài"
+    #   - Nếu chưa cài → cài → output: changed
+    #   - Nếu đã cài   → không làm gì → output: ok
+    # ------------------------------------------------------------------
+    - name: Install nginx
+      ansible.builtin.dnf:
+        name: nginx
+        state: present
+
+    # ------------------------------------------------------------------
+    # TASK 2: Start và enable nginx
+    # state: started  = đang chạy ngay bây giờ
+    # enabled: true   = tự start khi EC2 reboot
+    # notify: chỉ gọi handler "verify nginx running" nếu task này CHANGED
+    # ------------------------------------------------------------------
+    - name: Start and enable nginx
+      ansible.builtin.service:
+        name: nginx
+        state: started
+        enabled: true
+      notify: verify nginx running
+
+    # ------------------------------------------------------------------
+    # TASK 3: Ghi custom welcome page
+    # Module: ansible.builtin.copy
+    # content: nội dung file (inline string)
+    # dest:    đường dẫn trên EC2
+    # mode:    file permissions (0644 = owner read/write, others read-only)
+    # ------------------------------------------------------------------
+    - name: Add a custom welcome page
+      ansible.builtin.copy:
+        content: |
+          <html>
+          <body>
+          <h1>ProOps2026 Day 19</h1>
+          <p>Ansible configured this — not a human clicking buttons.</p>
+          </body>
+          </html>
+        dest: /usr/share/nginx/html/index.html
+        mode: "0644"
+
+  # --------------------------------------------------------------------
+  # HANDLERS: chỉ chạy khi được notify — và chỉ chạy SAU KHI tất cả tasks xong
+  # Nếu "Start and enable nginx" không changed → handler không chạy
+  # Nếu playbook chạy lần 2 và nginx đã started → task = ok → handler không chạy
+  # --------------------------------------------------------------------
+  handlers:
+    - name: verify nginx running
+      ansible.builtin.uri:
+        url: "http://localhost"
+        status_code: 200
+      # uri module chạy trên EC2 (localhost = EC2 tự curl chính nó)
+      # Đây xác nhận nginx nhận request trước khi playbook kết thúc
