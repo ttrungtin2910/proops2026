@@ -588,3 +588,135 @@ openssl s_client -connect app.example.com:443 -servername app.example.com </dev/
 curl -sv -o /dev/null -w "\nStatus: %{http_code} | DNS: %{time_namelookup}s | Connect: %{time_connect}s | TLS: %{time_appconnect}s | Total: %{time_total}s\n" \
   https://app.example.com
 ```
+
+---
+
+## 6. Container Networking
+
+Container networking breaks the L3–L4 assumptions in §1–§5 because each container gets its own network namespace. The hostname `localhost` inside container A means **container A's own loopback** — not the host, not container B. This is the single most common misconfiguration when moving from bare-metal to containers.
+
+### Docker Bridge — How Containers Resolve Each Other
+
+Docker creates a virtual bridge (`docker0` by default). User-defined networks (everything in Compose) get their own bridge with built-in DNS. That DNS resolver maps container names to private IPs automatically.
+
+```
+Host machine
+  ├── docker0 (172.17.0.0/16) — default bridge
+  │     └── containers here can reach each other by IP only, NOT by name
+  │
+  └── proops2026_default (custom bridge, created by Compose)
+        ├── kafka:9092        172.20.0.2   ← resolves by service name "kafka"
+        ├── milvus:19530      172.20.0.3   ← resolves by service name "milvus"
+        ├── redis:6379        172.20.0.4   ← resolves by service name "redis"
+        ├── mongodb:27017     172.20.0.5   ← resolves by service name "mongodb"
+        └── qna-agent:8000    172.20.0.6   ← resolves by service name "qna-agent"
+```
+
+**Rule:** Never use `localhost` to reach a sibling container. Use the Compose service name.
+
+```yaml
+# WRONG — qna-agent trying to reach Kafka
+environment:
+  KAFKA_BOOTSTRAP_SERVERS: "localhost:9092"   # ← reaches qna-agent's own loopback
+
+# CORRECT
+environment:
+  KAFKA_BOOTSTRAP_SERVERS: "kafka:9092"       # ← Docker DNS resolves "kafka" to container IP
+```
+
+This was the real Day 09 mistake: `localhost:9092` → connection refused → changed to `kafka:9092` → works.
+
+### Inspect Docker Networks
+
+```bash
+# List all networks on the host
+docker network ls
+
+# See which containers are on a network and their IPs
+docker network inspect proops2026_default
+# Look for: "Containers": { "<id>": { "Name": "kafka", "IPv4Address": "172.20.0.2/16" } }
+
+# From inside a container — test name resolution
+docker exec -it qna-agent sh
+ping kafka            # should resolve to 172.20.x.x
+nc -zv kafka 9092     # TCP connectivity test
+```
+
+### Real RAG Stack Hostnames (Day 09 docker-compose.yaml)
+
+| Calling service | Dependency hostname | Port | Protocol |
+|-----------------|--------------------:|------|----------|
+| hook-gateway | `kafka` | 9092 | Kafka producer |
+| qna-agent | `kafka` | 9092 | Kafka consumer |
+| qna-agent | `milvus` | 19530 | gRPC |
+| qna-agent | `redis` | 6379 | TCP |
+| qna-agent | `mongodb` | 27017 | TCP |
+| websocket-responder | `kafka` | 9092 | Kafka consumer |
+| hook-gateway (external) | exposed as `hook-gateway` | 8080 | HTTP |
+
+None of these use `localhost` or an IP. All use the service name from `services:` in `docker-compose.yaml`.
+
+### Kubernetes CoreDNS — Fully Qualified Service Names
+
+K8s runs CoreDNS as the cluster DNS resolver. Every Service gets an automatic DNS name:
+
+```
+<service-name>.<namespace>.svc.cluster.local
+```
+
+From within the **same namespace**, the short name resolves:
+
+```bash
+# Inside qna-agent pod (namespace: default)
+nslookup kafka
+# Resolves to: kafka.default.svc.cluster.local → ClusterIP of kafka Service
+```
+
+From a **different namespace**, you must use the full name:
+
+```bash
+nslookup kafka.default.svc.cluster.local
+```
+
+**Real RAG stack K8s DNS names (all in `default` namespace, cluster `project-tin-lab`):**
+
+| Service | Short name | Full FQDN | Port |
+|---------|------------|-----------|------|
+| Kafka | `kafka` | `kafka.default.svc.cluster.local` | 9092 |
+| Milvus | `milvus` | `milvus.default.svc.cluster.local` | 19530 |
+| Redis (Helm) | `my-redis-master` | `my-redis-master.default.svc.cluster.local` | 6379 |
+| hook-gateway | `hook-gateway` | `hook-gateway.default.svc.cluster.local` | 8080 |
+| qna-agent | `qna-agent` | `qna-agent.default.svc.cluster.local` | 8000 |
+| websocket-responder | `websocket-responder` | `websocket-responder.default.svc.cluster.local` | 8001 |
+
+### DNS Comparison: Three Environments
+
+| Environment | How service A reaches service B | Resolver |
+|-------------|--------------------------------|----------|
+| Docker Compose | `b` (service name from `services:`) | Docker internal DNS on bridge |
+| K8s same namespace | `b` or `b.default.svc.cluster.local` | CoreDNS |
+| K8s different namespace | `b.<namespace>.svc.cluster.local` | CoreDNS |
+| Bare EC2 | Private IP or Route 53 private zone or `/etc/hosts` | System resolver |
+
+### Debug Container-to-Container Connectivity
+
+```bash
+# Docker Compose: can container A reach container B?
+docker exec -it qna-agent sh
+ping kafka                        # DNS resolution test — should return 172.20.x.x
+nc -zv kafka 9092                 # TCP port test
+curl http://hook-gateway:8080/health
+
+# K8s: can pod A reach service B?
+kubectl exec -it <pod-name> -- sh
+nslookup kafka.default.svc.cluster.local    # CoreDNS resolution
+nc -zv kafka 9092                            # TCP via short name
+curl http://hook-gateway:8080/health
+
+# K8s: confirm CoreDNS is running
+kubectl get pods -n kube-system -l k8s-app=kube-dns
+
+# K8s: check if service has Endpoints (pods actually behind it)
+kubectl get endpoints kafka
+# If ENDPOINTS shows "<none>": pods not matching Service selector → label mismatch
+```

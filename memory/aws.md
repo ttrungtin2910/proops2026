@@ -796,6 +796,86 @@ aws ec2 describe-addresses \
 
 ---
 
+## 6. Day 06 Lab — Real Infrastructure (ap-northeast-2)
+
+This section overlays the real resource IDs from the Day 06 practice lab. Use these whenever diagnosing issues from that session — never use the placeholder IDs in §1–§5 above.
+
+### VPC Architecture
+
+```
+Region:  ap-northeast-2 (Seoul)
+Account: 905418181527
+
+VPC: vpc-09c073830f75e7a64  (10.11.0.0/16)
+  ├── Public Subnet:    subnet-0de3436b0b604076c  (10.11.0.0/24)   → rtb-052544a20e06010db → IGW
+  ├── Private Subnet:   subnet-0b968a05d1abf68f5  (10.11.11.0/24)  → rtb-099967d29949f4f44 → NAT GW
+  └── Database Subnet:  subnet-04e1733dedbd958bd  (10.11.20.0/24)  → rtb-099967d29949f4f44 → NAT GW
+```
+
+### EC2 Instances
+
+| Name | ID | Private IP | Public IP | Key Pair |
+|------|----|------------|-----------|----------|
+| tin-tt-public-ec2 | `i-04c1bb7b517ec5d15` | 10.11.0.146 | 54.180.20.245 | tin-tt-public-kp |
+| tin-tt-private-ec2 | `i-034ba398acaa183b5` | 10.11.11.113 | — | tin-tt-private-kp |
+| tin-tt-database-ec2 | `i-0b4bdc16b9362565e` | 10.11.20.6 | — | tin-tt-database-kp |
+| tin-tt-openvpn | `i-033b9183661bdf6cd` | 10.11.0.151 | 43.203.11.48 | tin-tt-openvpn-kp |
+
+Key PEM file location: `C:\Users\admin\Downloads\tin-tt-openvpn-kp.pem`
+
+### Networking Resources
+
+| Resource | ID | Notes |
+|----------|----|-------|
+| NAT Gateway | `nat-046fd70f043e6e452` | In public subnet, $0.045/hr |
+| EIP for NAT | `eipalloc-0b5b9f9acfec1caae` | Attached to NAT GW |
+| EIP for OpenVPN | `43.203.11.48` | Attached to tin-tt-openvpn |
+| OpenVPN SG | `sg-07b030604bb741cf4` | UDP 1194, TCP 943/443/22 |
+| S3 VPC Endpoint | `vpce-05c7652532228797f` | Free Gateway EP, attached to both route tables |
+
+### S3 Buckets
+
+| Bucket | Type | Status |
+|--------|------|--------|
+| `tin-tt-public-assets` | Public | `Principal:*` GetObject policy, `test.txt` uploaded |
+| `tin-tt-private-assets` | Private | Policy with `aws:SourceVpc` condition — see self-lockout gotcha below |
+
+### Tag Policy — Required on Every Resource
+
+```
+Owner = tin_tt
+Email = ttrungtin.work@gmail.com
+```
+
+The `trainee-tag-enforcement` IAM policy denies any resource-creating action that omits these two tags. Affects: `ec2:RunInstances`, `ec2:CreateKeyPair`, `ec2:AllocateAddress`, `ec2:CreateSecurityGroup`, etc.
+
+```bash
+# Correct form — always include --tag-specifications
+aws ec2 create-key-pair \
+  --key-name tin-tt-mykey \
+  --tag-specifications 'ResourceType=key-pair,Tags=[
+    {Key=Name,Value=tin-tt-mykey},
+    {Key=Owner,Value=tin_tt},
+    {Key=Email,Value=ttrungtin.work@gmail.com}
+  ]'
+```
+
+### IAM Error — Day 06
+
+`ec2:CreateKeyPair` was denied: `"An error occurred (UnauthorizedOperation): ... because no identity-based policy allows the ec2:CreateKeyPair action"`. Root cause: key pair creation request had no `--tag-specifications` — `trainee-tag-enforcement` policy blocked it. Fixed by adding tags to the CLI call.
+
+Same error pattern applies to any create action — check tags first before debugging IAM policies.
+
+### S3 Self-Lockout Gotcha
+
+Applied `Deny s3:*` to `tin-tt-private-assets` before uploading any test file. Result: locked out of both data operations AND management operations (`PutBucketPolicy`, `DeleteBucketPolicy`). Explicit Deny beats all Allow policies — including `AdministratorAccess` (no exception except root).
+
+**Recovery path:** SSH into `tin-tt-public-ec2` (54.180.20.245) → run `aws s3api delete-bucket-policy --bucket tin-tt-private-assets`. Traffic path: EC2 private IP → VPC Gateway Endpoint `vpce-05c7652532228797f` → S3. Source is the VPC → `aws:SourceVpc: vpc-09c073830f75e7a64` → Deny condition does not match → allowed.
+
+**Lesson:** Never write `Deny s3:*`. Scope Deny to read-only actions only (`s3:GetObject`, `s3:ListBucket`). Always keep `PutBucketPolicy` and `DeleteBucketPolicy` unrestricted so you can recover.
+
+---
+
 ## Common Gotchas
 
 - **`aws s3 cp` with trailing slash does not rename:** `aws s3 cp app.json s3://bucket/config/` uploads the object as `config/app.json`, not `config/`. Always specify the full key when the destination filename must differ from the source.

@@ -95,11 +95,13 @@ Use `envFrom` for all-or-nothing injection; use `valueFrom` when you need to ren
 
 **Prerequisites:** RBAC enabled (on by default). For real protection: etcd encryption-at-rest configured, or an external secret store (Vault, AWS Secrets Manager, Azure Key Vault via CSI driver).
 
-> **CORRECTION — MEMORIZE THIS:**
+> **CORRECTION — MEMORIZE THIS (Q14 quiz miss — I answered about CPU requests instead):**
 > **Secrets are NOT encrypted by default — base64 is encoding, not encryption.**
-> Anyone with `kubectl get secret` + `base64 -d` reads the value in one command.
-> Access control is enforced by RBAC and (optionally) etcd encryption-at-rest.
-> "Encrypted in Kubernetes" is a false claim. It is how real clusters get owned.
+> One command to decode any Secret value — no key required:
+> `kubectl get secret web-secret -o jsonpath='{.data.DB_PASSWORD}' | base64 -d`
+> → outputs `supersecret` in plain text. Anyone with `kubectl get secret` RBAC permission can do this.
+> Real protection = (1) RBAC: restrict who can `get secret`; (2) etcd encryption-at-rest — **off by default**, must be explicitly configured by cluster admin.
+> "Encrypted in Kubernetes" is a false claim until etcd encryption is enabled.
 
 ```yaml
 # Secret — values are base64-encoded (echo -n "value" | base64)
@@ -182,6 +184,23 @@ spec:
 ```bash
 kubectl get hpa -w
 # TARGETS shows <unknown>/70% if metrics-server is missing
+```
+
+**When TARGETS shows `<unknown>/70%` — exact diagnostic sequence (Q15 quiz miss):**
+
+```bash
+# Step 1: kubectl top pods   ← THIS is the diagnostic command, not kubectl get deployment
+kubectl top pods
+# If metrics-server running:   shows CPU/memory per pod
+# If metrics-server missing:   error: Metrics API not available  ← root cause confirmed
+
+# Step 2: fix it
+minikube addons enable metrics-server   # minikube
+# or: helm install metrics-server metrics-server/metrics-server  # EKS
+
+# WRONG command for this problem:
+# kubectl get deployment web -o yaml   ← shows Deployment spec only
+#                                         tells you nothing about metric collection
 ```
 
 ---
