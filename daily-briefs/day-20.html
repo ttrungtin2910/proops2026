@@ -1,0 +1,502 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Day 20 — Mid-Point Review: Artifact Quality Gate · ProOps2026</title>
+<style>
+:root {
+  --bg:#0b0d14; --surface:#13161f; --surface2:#1c2030; --border:#252a3a;
+  --accent:#6c8ef7; --accent2:#a78bfa;
+  --green:#34d399; --yellow:#fbbf24; --orange:#fb923c;
+  --red:#f87171; --teal:#22d3ee; --blue:#60a5fa;
+  --text:#e8edf5; --muted:#7c87a0; --dim:#3a4258;
+}
+* { box-sizing:border-box; margin:0; padding:0; }
+body { background:var(--bg); color:var(--text); font-family:'Segoe UI',system-ui,sans-serif; font-size:15px; line-height:1.6; }
+
+nav { background:var(--surface);border-bottom:1px solid var(--border);padding:0 32px;height:50px;display:flex;align-items:center;gap:6px;position:sticky;top:0;z-index:200; }
+nav .brand { font-weight:800;font-size:14px;color:var(--accent);margin-right:12px; }
+nav a { color:var(--muted);text-decoration:none;font-size:12px;font-weight:600;padding:5px 12px;border-radius:6px;transition:all .15s;white-space:nowrap; }
+nav a:hover { color:var(--text);background:var(--surface2); }
+nav .spacer { flex:1; }
+nav .badge { background:rgba(248,113,113,.12);border:1px solid rgba(248,113,113,.25);color:var(--red);font-size:11px;font-weight:700;padding:3px 12px;border-radius:20px; }
+
+.layout { display:grid;grid-template-columns:1fr 280px;gap:32px;max-width:1180px;margin:0 auto;padding:40px 32px; }
+.main { min-width:0; }
+.sidebar { position:sticky;top:70px;height:fit-content;display:flex;flex-direction:column;gap:14px; }
+
+.day-header { margin-bottom:32px; }
+.day-meta { display:flex;align-items:center;gap:10px;margin-bottom:12px; }
+.day-pill { font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;padding:3px 12px;border-radius:20px;background:rgba(248,113,113,.12);border:1px solid rgba(248,113,113,.25);color:var(--red); }
+.day-tag { font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;padding:3px 12px;border-radius:20px;background:rgba(251,191,36,.08);border:1px solid rgba(251,191,36,.2);color:var(--yellow); }
+.day-title { font-size:28px;font-weight:800;letter-spacing:-.4px;margin-bottom:8px; }
+.day-question { font-size:15px;color:var(--accent2);font-style:italic;border-left:3px solid var(--accent2);padding-left:14px;margin-bottom:16px;line-height:1.6; }
+.day-why { font-size:13px;color:var(--muted);line-height:1.7;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:14px 16px; }
+.day-why strong { color:var(--text); }
+
+.section-block { margin-bottom:36px; }
+.sec-label { font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:var(--dim);margin-bottom:14px;display:flex;align-items:center;gap:10px; }
+.sec-label::after { content:'';flex:1;height:1px;background:var(--border); }
+
+.cheat-banner { background:linear-gradient(135deg,rgba(248,113,113,.08),rgba(251,146,60,.05));border:2px solid rgba(248,113,113,.4);border-radius:12px;padding:18px 22px;margin-bottom:28px; }
+.cheat-banner-title { font-size:13px;font-weight:800;color:var(--red);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:10px;display:flex;align-items:center;gap:8px; }
+.cheat-banner-title::before { content:'⚠';font-size:16px;color:var(--red); }
+.cheat-banner-body { font-size:13px;color:var(--text);line-height:1.7; }
+.cheat-banner-body strong { color:var(--yellow); }
+.cheat-banner-body code { font-size:11px;color:var(--red);background:rgba(248,113,113,.08);border:1px solid rgba(248,113,113,.2);padding:1px 6px;border-radius:4px; }
+.cheat-rules { margin-top:12px;padding:12px 14px;background:var(--surface);border:1px solid var(--border);border-radius:8px;display:flex;flex-direction:column;gap:8px; }
+.cheat-rule { display:flex;gap:10px;font-size:12px;color:var(--muted);line-height:1.6; }
+.cheat-rule-num { color:var(--red);font-weight:800;flex-shrink:0;font-family:'Cascadia Code','Fira Code',monospace; }
+.cheat-rule strong { color:var(--text); }
+
+.phase-card { background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:16px; }
+.phase-head { padding:16px 20px;background:var(--surface2);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:14px; }
+.phase-num { width:38px;height:38px;border-radius:50%;background:rgba(108,142,247,.12);border:2px solid rgba(108,142,247,.3);color:var(--accent);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:800;flex-shrink:0; }
+.phase-title { font-size:15px;font-weight:700;color:var(--text);flex:1; }
+.phase-time { font-size:11px;font-weight:700;color:var(--accent);background:rgba(108,142,247,.08);border:1px solid rgba(108,142,247,.25);padding:3px 10px;border-radius:20px;font-family:'Cascadia Code','Fira Code',monospace; }
+.phase-locked { font-size:10px;font-weight:800;color:var(--red);background:rgba(248,113,113,.08);border:1px solid rgba(248,113,113,.25);padding:3px 10px;border-radius:20px;text-transform:uppercase;letter-spacing:1px; }
+.phase-body { padding:18px 22px; }
+.phase-goal { font-size:12px;color:var(--accent2);font-style:italic;margin-bottom:14px;border-left:2px solid var(--accent2);padding-left:12px;line-height:1.6; }
+.phase-step { display:flex;gap:12px;margin-bottom:10px;font-size:12.5px;color:var(--muted);line-height:1.7; }
+.phase-step:last-child { margin-bottom:0; }
+.phase-step-num { color:var(--accent);font-weight:700;flex-shrink:0;font-family:'Cascadia Code','Fira Code',monospace;font-size:11px;background:rgba(108,142,247,.08);border:1px solid rgba(108,142,247,.2);padding:1px 7px;border-radius:4px;height:fit-content;margin-top:2px; }
+.phase-step strong { color:var(--text); }
+.phase-step code { font-size:11px;color:var(--accent2);background:var(--surface2);border:1px solid var(--border);padding:1px 6px;border-radius:4px; }
+.phase-deliverable { margin-top:14px;padding:10px 14px;background:rgba(52,211,153,.06);border:1px solid rgba(52,211,153,.25);border-radius:7px;font-size:12px;color:var(--text);line-height:1.6; }
+.phase-deliverable strong { color:var(--green); }
+.phase-deliverable code { font-size:11px;color:var(--green);background:var(--surface);border:1px solid rgba(52,211,153,.2);padding:1px 6px;border-radius:4px; }
+.phase-anticheat { margin-top:10px;padding:10px 14px;background:rgba(248,113,113,.05);border:1px solid rgba(248,113,113,.2);border-radius:7px;font-size:11.5px;color:var(--muted);line-height:1.6; }
+.phase-anticheat strong { color:var(--red); }
+
+.audit-table { background:var(--surface);border:1px solid var(--border);border-radius:10px;overflow:hidden;overflow-x:auto;margin-bottom:14px; }
+.audit-table table { width:100%;border-collapse:collapse;font-size:12px; }
+.audit-table th { text-align:left;background:var(--surface2);color:var(--text);font-weight:700;padding:10px 12px;border-bottom:1px solid var(--border);font-size:10.5px;text-transform:uppercase;letter-spacing:.6px; }
+.audit-table td { padding:9px 12px;border-bottom:1px solid var(--border);color:var(--muted);line-height:1.5;vertical-align:top; }
+.audit-table tr:last-child td { border-bottom:none; }
+.audit-table td.file { font-family:'Cascadia Code','Fira Code',monospace;font-size:11px;color:var(--accent2);width:24%; }
+.audit-table td.day { color:var(--accent);font-weight:700;font-family:'Cascadia Code','Fira Code',monospace;font-size:11px;width:6%;text-align:center; }
+.audit-table td.evidence { color:var(--text);font-size:11.5px;width:50%; }
+.audit-table td.score { color:var(--green);font-weight:700;font-family:'Cascadia Code','Fira Code',monospace;font-size:11px;width:8%;text-align:center; }
+.audit-table td.must { font-size:11px;color:var(--red);width:12%; }
+
+.quiz-section { background:var(--surface);border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:16px; }
+.quiz-head { padding:14px 18px;background:rgba(251,191,36,.06);border-bottom:1px solid rgba(251,191,36,.25);display:flex;align-items:center;gap:10px; }
+.quiz-head-title { font-size:13px;font-weight:700;color:var(--yellow);flex:1; }
+.quiz-head-count { font-size:11px;font-weight:700;color:var(--yellow);background:rgba(251,191,36,.1);padding:3px 10px;border-radius:20px;font-family:'Cascadia Code','Fira Code',monospace; }
+.quiz-body { padding:14px 18px;display:flex;flex-direction:column;gap:6px; }
+.quiz-item { display:flex;gap:10px;padding:8px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:7px;font-size:12px;color:var(--text);line-height:1.6;cursor:pointer;transition:border-color .15s; }
+.quiz-item:hover { border-color:rgba(251,191,36,.35); }
+.quiz-item.answered { border-color:rgba(52,211,153,.3);background:rgba(52,211,153,.03); }
+.quiz-item.answered .quiz-q { color:var(--muted);text-decoration:line-through;text-decoration-color:var(--dim); }
+.quiz-num { color:var(--yellow);font-weight:800;font-family:'Cascadia Code','Fira Code',monospace;font-size:11px;flex-shrink:0;width:32px; }
+.quiz-q { flex:1; }
+.quiz-q code { font-size:10.5px;color:var(--accent2);background:var(--bg);border:1px solid var(--border);padding:0 5px;border-radius:3px; }
+
+.rubric-grid { display:grid;grid-template-columns:1fr 1fr;gap:12px; }
+.rubric-card { background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px 16px; }
+.rubric-title { font-size:12px;font-weight:700;color:var(--text);margin-bottom:8px;display:flex;align-items:center;gap:8px; }
+.rubric-pts { font-size:10px;font-weight:800;color:var(--accent);background:rgba(108,142,247,.08);border:1px solid rgba(108,142,247,.25);padding:1px 7px;border-radius:4px;font-family:'Cascadia Code','Fira Code',monospace; }
+.rubric-row { font-size:11.5px;color:var(--muted);line-height:1.7;padding-left:14px;position:relative;margin-bottom:4px; }
+.rubric-row::before { content:'·';position:absolute;left:0;color:var(--dim); }
+.rubric-row strong { color:var(--text); }
+.rubric-pass { font-size:10.5px;color:var(--green);margin-top:8px;padding-top:8px;border-top:1px solid var(--border); }
+.rubric-fail { font-size:10.5px;color:var(--red);margin-top:4px; }
+
+.criteria { display:flex;flex-direction:column;gap:8px; }
+.crit { display:flex;gap:10px;align-items:flex-start;padding:11px 14px;background:var(--surface);border:1px solid var(--border);border-radius:8px;font-size:12px;cursor:pointer;transition:border-color .15s; }
+.crit:hover { border-color:rgba(52,211,153,.3); }
+.crit.done { border-color:rgba(52,211,153,.35);background:rgba(52,211,153,.03); }
+.crit-box { width:16px;height:16px;border-radius:4px;border:1.5px solid var(--border);flex-shrink:0;margin-top:1px;display:flex;align-items:center;justify-content:center;transition:all .15s; }
+.crit.done .crit-box { background:var(--green);border-color:var(--green); }
+.crit-check { color:#0b0d14;font-size:10px;font-weight:900;display:none; }
+.crit.done .crit-check { display:block; }
+.crit-text { color:var(--muted);line-height:1.55;flex:1; }
+.crit.done .crit-text { color:var(--dim); }
+.crit-text strong { color:var(--text); }
+.crit-text code { font-size:11px;color:var(--accent2);background:var(--surface2);border:1px solid var(--border);padding:1px 5px;border-radius:3px; }
+.crit-evidence { font-size:10.5px;color:var(--yellow);margin-top:4px;line-height:1.5; }
+
+.widget { background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px; }
+.widget-title { font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--dim);margin-bottom:12px; }
+.progress-bar { height:5px;background:var(--surface2);border-radius:10px;overflow:hidden;margin-bottom:6px; }
+.progress-fill { height:100%;background:linear-gradient(90deg,var(--accent),var(--green));border-radius:10px;transition:width .3s; }
+.progress-label { font-size:11px;color:var(--muted); }
+.progress-count { font-size:22px;font-weight:800;color:var(--text);margin-bottom:2px; }
+.as-row { display:flex;align-items:center;gap:8px;font-size:11px;margin-bottom:5px; }
+.as-dot { width:7px;height:7px;border-radius:50%;background:var(--dim);flex-shrink:0; }
+.as-dot.done { background:var(--green); }
+.as-name { color:var(--muted);flex:1; }
+.as-name strong { color:var(--text); }
+
+.outcome-card { background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px 16px; }
+.outcome-row { display:flex;gap:10px;font-size:11px;color:var(--muted);line-height:1.7;margin-bottom:6px; }
+.outcome-row:last-child { margin-bottom:0; }
+.outcome-bar { width:34px;font-weight:800;font-family:'Cascadia Code','Fira Code',monospace;flex-shrink:0; }
+.outcome-bar.green { color:var(--green); }
+.outcome-bar.yellow { color:var(--yellow); }
+.outcome-bar.red { color:var(--red); }
+.outcome-text strong { color:var(--text); }
+
+.mentor-box { background:rgba(167,139,250,.06);border:1px solid rgba(167,139,250,.25);border-radius:10px;padding:14px 16px; }
+.mentor-title { font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--accent2);margin-bottom:8px; }
+.mentor-step { font-size:11px;color:var(--muted);margin-bottom:6px;display:flex;gap:8px;line-height:1.6; }
+.mentor-step-num { color:var(--accent2);font-weight:700;flex-shrink:0; }
+
+.report-box { background:rgba(108,142,247,.06);border:1px solid rgba(108,142,247,.2);border-radius:10px;padding:14px 16px; }
+.report-title { font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--accent);margin-bottom:8px; }
+.report-step { font-size:11px;color:var(--muted);margin-bottom:6px;display:flex;gap:8px; }
+.report-step-num { color:var(--accent);font-weight:700;flex-shrink:0; }
+</style>
+</head>
+<body>
+
+<nav>
+  <span class="brand">ProOps2026</span>
+  <a href="#rules">Rules</a>
+  <a href="#phase1">Phase 1</a>
+  <a href="#phase2">Phase 2</a>
+  <a href="#phase3">Phase 3</a>
+  <a href="#phase4">Phase 4</a>
+  <a href="#rubric">Rubric</a>
+  <a href="#done">Done</a>
+  <div class="spacer"></div>
+  <span class="badge">Day 20 · GATE</span>
+</nav>
+
+<div class="layout">
+<div class="main">
+
+  <!-- HEADER -->
+  <div class="day-header">
+    <div class="day-meta">
+      <span class="day-pill">Week 4 · Day 20</span>
+      <span class="day-tag">Mid-Point Review · Quality Gate</span>
+    </div>
+    <div class="day-title">Mid-Point Review — Artifact Quality Gate</div>
+    <div class="day-question">You completed Days 1–19. You have 16 memory files, working manifests, deploy scripts, and a Terraform module. Has the knowledge actually moved into your head — or only into your files? Today proves which one.</div>
+    <div class="day-why">
+      Day 20 is the gate between Weeks 1–4 (foundations) and Weeks 5–8 (CI/CD, observability, graduation). <strong>Knowledge gaps after this point compound</strong> — every CI/CD pipeline you build assumes Docker, K8s, Helm. Every observability dashboard assumes you can read Pod logs. The K8s knowledge map showed that some trainees finished Days 12–15 without understanding what a Deployment is. This day catches that — for K8s and for everything else. The output of today is not "I passed"; it is an honest map of what you know vs what you have a file for. Surfacing a real gap today is worth more than hiding one.
+    </div>
+  </div>
+
+  <!-- ANTI-CHEAT BANNER -->
+  <div class="cheat-banner" id="rules">
+    <div class="cheat-banner-title">Day 20 ground rules — read before starting</div>
+    <div class="cheat-banner-body">
+      Today is a <strong>self-audit + mentor verification</strong>, not a learning day. The point is to <strong>find your real gaps</strong>, not to perform competence. We have already calibrated the rubric against the assignments — generic agent output, copy-paste content, and "I checked the box" answers are easy to spot. Surface a gap honestly today and you get full credit for the row. Hide a gap and get caught in Phase 3 (live drill with mentor) and you lose the row plus a flag.
+    </div>
+    <div class="cheat-rules">
+      <div class="cheat-rule"><span class="cheat-rule-num">R1</span><div><strong>No Claude during Phase 2 (closed-book quiz) and Phase 3 (live drill).</strong> Open a fresh document. No memory files open. No tabs to your repo. Phone face down. <code>kubectl</code> and shell are allowed in Phase 3 only.</div></div>
+      <div class="cheat-rule"><span class="cheat-rule-num">R2</span><div><strong>Memory files must reference YOUR specific project.</strong> Real service names, real error messages you encountered, commit hashes from your repo. Generic content fails the rubric. We will diff against your <code>git log</code>.</div></div>
+      <div class="cheat-rule"><span class="cheat-rule-num">R3</span><div><strong>Phase 3 is live with the mentor on screenshare.</strong> Failure scenario assigned at session start — you do not know which one in advance. 15 minutes to diagnose using only kubectl/docker/aws CLI. No Claude, no Google, no notes.</div></div>
+      <div class="cheat-rule"><span class="cheat-rule-num">R4</span><div><strong>Random spot-check in 1-on-1.</strong> Mentor will pick 5 questions from the 30-question quiz at random and ask you to re-answer in conversation. If your written answers do not match your spoken ones, the row is voided.</div></div>
+      <div class="cheat-rule"><span class="cheat-rule-num">R5</span><div><strong>Honest gap = full credit.</strong> The rubric explicitly rewards "I cannot answer this; my memory file is generic." A surfaced gap with a Week-5 remediation plan = full row. A hidden gap = -2 plus a flag.</div></div>
+    </div>
+  </div>
+
+  <!-- PHASE 1: SELF-AUDIT -->
+  <div class="section-block" id="phase1">
+    <div class="sec-label">Phase 1 — Artifact self-audit</div>
+    <div class="phase-card">
+      <div class="phase-head">
+        <div class="phase-num">1</div>
+        <div class="phase-title">Audit every memory file you have produced — score each one against the rubric</div>
+        <div class="phase-time">90 min</div>
+      </div>
+      <div class="phase-body">
+        <div class="phase-goal">For each artifact below, find evidence in your repo that it meets the rubric. If you cannot find evidence, mark it as a gap and schedule remediation. No fudging.</div>
+        <div class="phase-step"><span class="phase-step-num">1</span><div>Open the table below. For each row, navigate to the file in your repo. Run <code>wc -l [file]</code> and <code>git log --oneline [file]</code>. Note the actual line count and last meaningful commit.</div></div>
+        <div class="phase-step"><span class="phase-step-num">2</span><div>For each row, find the <strong>specific evidence</strong> required (e.g., for kubernetes-core.md: a YAML manifest you actually applied, a real failure you hit and the kubectl command that found it). Generic definitions copied from docs do not count.</div></div>
+        <div class="phase-step"><span class="phase-step-num">3</span><div>Score each row honestly: <strong>2/2</strong> = file present and contains specific evidence. <strong>1/2</strong> = file present but generic content / missing project-specific references. <strong>0/2</strong> = file missing or template-only.</div></div>
+        <div class="phase-step"><span class="phase-step-num">4</span><div>For every <strong>1/2 or 0/2</strong>, add a row to <code>memory/gap-analysis.md</code>: file → which section is weak → what specific content needs to be added → which week you will fix it.</div></div>
+        <div class="phase-deliverable"><strong>Deliverable:</strong> <code>memory/day-20-audit.md</code> — the filled-in audit table with your honest scores, total score (max 32), and a "weakest 3 files" list with remediation plan.</div>
+        <div class="phase-anticheat"><strong>How we check:</strong> mentor opens your repo, runs <code>wc -l</code> on every memory file, greps for project-specific terms (your service names from DOP-001, your real Pod names from daily logs, your commit hashes). A file claiming "DONE 2/2" with only generic content drops to 0/2 and triggers a flag.</div>
+      </div>
+    </div>
+
+    <!-- AUDIT TABLE -->
+    <div class="audit-table">
+      <table>
+        <thead>
+          <tr><th>File</th><th>Day</th><th>Specific evidence required</th><th>Must</th><th>Score</th></tr>
+        </thead>
+        <tbody>
+          <tr><td class="file">memory/software-architecture.md</td><td class="day">2</td><td class="evidence">Architecture decisions for YOUR mock project (services, data model, communication pattern). Not generic monolith-vs-microservice content.</td><td class="must">YOUR project</td><td class="score">__/2</td></tr>
+          <tr><td class="file">memory/git.md</td><td class="day">3</td><td class="evidence">Branch strategy your group actually uses. At least 1 real merge conflict you resolved. Real branch names from your repo.</td><td class="must">Real branches</td><td class="score">__/2</td></tr>
+          <tr><td class="file">memory/networking-basics.md</td><td class="day">3</td><td class="evidence">Container networking section (Layer 5+) added in Day 9 audit. Real service-to-service hostnames from your stack.</td><td class="must">Layer 5</td><td class="score">__/2</td></tr>
+          <tr><td class="file">memory/linux-basics.md</td><td class="day">4</td><td class="evidence">5 required sections. Commands you actually used during Days 6/11/16, not curated reference material.</td><td class="must">Used commands</td><td class="score">__/2</td></tr>
+          <tr><td class="file">memory/cloud-concepts.md</td><td class="day">5</td><td class="evidence">Comparison of AZ/region with the choice you made for your EC2 on Day 11. Real region you used.</td><td class="must">Real region</td><td class="score">__/2</td></tr>
+          <tr><td class="file">memory/aws.md</td><td class="day">6</td><td class="evidence">VPC/subnet/SG you actually built. Real Elastic IP. Real S3 bucket name. Real IAM error you hit.</td><td class="must">Real VPC IDs</td><td class="score">__/2</td></tr>
+          <tr><td class="file">memory/docker.md</td><td class="day">7,9</td><td class="evidence">5 Compose sections (added Day 9). Real container names from your stack. The 3 Compose errors you hit on Day 9.</td><td class="must">Real errors</td><td class="score">__/2</td></tr>
+          <tr><td class="file">memory/orchestration.md</td><td class="day">11</td><td class="evidence">Swarm vs Compose vs K8s comparison table. Real Swarm replica failure + recovery time you observed.</td><td class="must">Real recovery time</td><td class="score">__/2</td></tr>
+          <tr><td class="file">memory/kubernetes-core.md</td><td class="day">12</td><td class="evidence">Pod/Deployment/Service relationship diagram. Liveness vs readiness with reasoning. 4-step diagnostic. <strong>Status-to-command table you used on YOUR real CrashLoopBackOff.</strong></td><td class="must">Real failure</td><td class="score">__/2</td></tr>
+          <tr><td class="file">memory/kubernetes-advanced.md</td><td class="day">13</td><td class="evidence">Ingress / ConfigMap / Secret / HPA. <strong>Base64 ≠ encryption explicitly noted.</strong> Real HPA scale event observed (e.g., 2→3 replicas).</td><td class="must">Real HPA event</td><td class="score">__/2</td></tr>
+          <tr><td class="file">memory/kubernetes-project.md</td><td class="day">14</td><td class="evidence">Service table with YOUR actual service names. K8s DNS pattern. 5-layer apply order. <strong>3+ real failures + fixes from your deploy.</strong></td><td class="must">YOUR services</td><td class="score">__/2</td></tr>
+          <tr><td class="file">memory/helm-basics.md</td><td class="day">15</td><td class="evidence">Chart/Release/Repository defined non-circularly. Install workflow. <strong>Project's installed charts table</strong> — release name + service hostname + what it provides.</td><td class="must">Installed charts</td><td class="score">__/2</td></tr>
+          <tr><td class="file">memory/eks-practice.md</td><td class="day">16</td><td class="evidence">Full EKS lifecycle (create→deploy→curl→delete). Cost-stack section. <strong>Skip-list of expensive resources.</strong> 3+ real errors fixed.</td><td class="must">Cost stack + errors</td><td class="score">__/2</td></tr>
+          <tr><td class="file">memory/bash-scripting.md</td><td class="day">17</td><td class="evidence">6 patterns: set -euo pipefail, input validation, conditionals, stdout/stderr, functions, PATH hygiene. Working healthcheck.sh as proof.</td><td class="must">healthcheck.sh</td><td class="score">__/2</td></tr>
+          <tr><td class="file">scripts/deploy.sh + log-monitor.sh</td><td class="day">18</td><td class="evidence">Both scripts shellcheck-clean. <code>--dry-run</code> implemented. Idempotency check (.last-deploy). Cron-safe PATH.</td><td class="must">shellcheck clean</td><td class="score">__/2</td></tr>
+          <tr><td class="file">memory/iac-basics.md + main.tf + playbook.yml</td><td class="day">19</td><td class="evidence">Two-tool rule. Decision table. Real <code>terraform plan/apply/destroy</code> output. Idempotency proof. Today's specific errors.</td><td class="must">Real plan output</td><td class="score">__/2</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div style="font-size:11px;color:var(--muted);margin-top:8px;line-height:1.6;">Total possible: <strong style="color:var(--green);">32 / 32</strong>. Pass threshold for Phase 1: <strong style="color:var(--accent);">22+</strong>. Anything below 22 means a serious week-5 remediation plan, not a pass.</div>
+  </div>
+
+  <!-- PHASE 2: CLOSED-BOOK QUIZ -->
+  <div class="section-block" id="phase2">
+    <div class="sec-label">Phase 2 — Closed-book quiz</div>
+    <div class="phase-card">
+      <div class="phase-head">
+        <div class="phase-num">2</div>
+        <div class="phase-title">30 questions across Days 6–19. No Claude. No memory files. No notes. 90 seconds each.</div>
+        <div class="phase-time">45 min</div>
+        <div class="phase-locked">Closed-Book</div>
+      </div>
+      <div class="phase-body">
+        <div class="phase-goal">Open a single file: <code>memory/day-20-quiz.md</code>. Type your answer for each question in the order below. If you do not know an answer, write <code>GAP — I cannot answer this.</code> An honest GAP is worth +1; a wrong answer that looks confident is worth -1.</div>
+        <div class="phase-step"><span class="phase-step-num">1</span><div>Close all memory files, all browser tabs, all Claude sessions. Open ONLY <code>memory/day-20-quiz.md</code> and a timer.</div></div>
+        <div class="phase-step"><span class="phase-step-num">2</span><div>Set timer to 45 minutes. Answer all 30 questions in writing. ~90 seconds per question. If stuck after 90s, write <code>GAP</code> and move on.</div></div>
+        <div class="phase-step"><span class="phase-step-num">3</span><div>When timer ends, stop. Save and commit immediately: <code>git commit -m "Day 20 — closed-book quiz"</code>. The commit timestamp is your honesty signature.</div></div>
+        <div class="phase-step"><span class="phase-step-num">4</span><div>Now (and only now) reopen your memory files. Score yourself: <strong>1 point</strong> per correct answer, <strong>+1</strong> per honest GAP, <strong>-1</strong> per wrong-but-confident answer. Max 30, no negative cap.</div></div>
+        <div class="phase-deliverable"><strong>Deliverable:</strong> <code>memory/day-20-quiz.md</code> with answers + self-score + 3 weakest concepts identified.</div>
+        <div class="phase-anticheat"><strong>How we check:</strong> mentor will pick 5 questions at random in 1-on-1 and ask you to re-answer verbally. If your spoken answer disagrees with your written one, the written answer is voided.</div>
+      </div>
+    </div>
+
+    <!-- 30 QUESTIONS -->
+    <div class="quiz-section">
+      <div class="quiz-head">
+        <div class="quiz-head-title">Closed-book quiz — Day 6 to Day 19</div>
+        <div class="quiz-head-count">30 questions</div>
+      </div>
+      <div class="quiz-body">
+        <div class="quiz-item" onclick="toggleQuiz(this)"><span class="quiz-num">Q1</span><span class="quiz-q">Difference between a Docker image and a Docker container? When does a container exit with code <code>0</code> vs <code>137</code>?</span></div>
+        <div class="quiz-item" onclick="toggleQuiz(this)"><span class="quiz-num">Q2</span><span class="quiz-q">Why use multi-stage Dockerfile builds? Give one concrete benefit beyond "smaller image".</span></div>
+        <div class="quiz-item" onclick="toggleQuiz(this)"><span class="quiz-num">Q3</span><span class="quiz-q">Difference between <code>docker compose down</code> and <code>docker compose stop</code>. Which one removes named volumes?</span></div>
+        <div class="quiz-item" onclick="toggleQuiz(this)"><span class="quiz-num">Q4</span><span class="quiz-q">Container A in your Compose stack cannot reach container B by hostname <code>b</code>. Three things you check, in order.</span></div>
+        <div class="quiz-item" onclick="toggleQuiz(this)"><span class="quiz-num">Q5</span><span class="quiz-q">In AWS, what is the difference between an Internet Gateway and a NAT Gateway? Which one allows a private-subnet EC2 to reach the internet?</span></div>
+        <div class="quiz-item" onclick="toggleQuiz(this)"><span class="quiz-num">Q6</span><span class="quiz-q">Why should you almost never create a Pod directly in production? What does a Deployment give you that a bare Pod does not?</span></div>
+        <div class="quiz-item" onclick="toggleQuiz(this)"><span class="quiz-num">Q7</span><span class="quiz-q">A Pod shows <code>CrashLoopBackOff</code>. The first three commands you run, in order, and one unique signal each one reveals.</span></div>
+        <div class="quiz-item" onclick="toggleQuiz(this)"><span class="quiz-num">Q8</span><span class="quiz-q">Pod is <code>0/1 READY</code> but the container is running. Which probe is failing, what is K8s doing right now, and how is that different from a failing liveness probe?</span></div>
+        <div class="quiz-item" onclick="toggleQuiz(this)"><span class="quiz-num">Q9</span><span class="quiz-q">The four Service types. Which one for: internal database, public API in AWS, exposing a dev service from minikube?</span></div>
+        <div class="quiz-item" onclick="toggleQuiz(this)"><span class="quiz-num">Q10</span><span class="quiz-q">Deployment with <code>replicas: 10</code>. <code>maxUnavailable: 25%</code>, <code>maxSurge: 25%</code>. Maximum Pods alive during a rolling update? Minimum ready?</span></div>
+        <div class="quiz-item" onclick="toggleQuiz(this)"><span class="quiz-num">Q11</span><span class="quiz-q">A new version is crashing 5 minutes after deploy. Exact commands to roll back. How does K8s know what to roll back to?</span></div>
+        <div class="quiz-item" onclick="toggleQuiz(this)"><span class="quiz-num">Q12</span><span class="quiz-q">Why is <code>kubectl apply</code> idempotent but <code>kubectl create</code> is not? When does the difference matter?</span></div>
+        <div class="quiz-item" onclick="toggleQuiz(this)"><span class="quiz-num">Q13</span><span class="quiz-q">Difference between an Ingress resource and an Ingress controller. Can you have one without the other?</span></div>
+        <div class="quiz-item" onclick="toggleQuiz(this)"><span class="quiz-num">Q14</span><span class="quiz-q">"K8s Secrets are encrypted." What do you correct, and what is actually protecting the value in a default cluster?</span></div>
+        <div class="quiz-item" onclick="toggleQuiz(this)"><span class="quiz-num">Q15</span><span class="quiz-q">HPA shows <code>TARGETS: unknown/70%</code>. Most likely cause? What command confirms it?</span></div>
+        <div class="quiz-item" onclick="toggleQuiz(this)"><span class="quiz-num">Q16</span><span class="quiz-q">HPA vs Cluster Autoscaler. One failure mode each one solves and the other cannot.</span></div>
+        <div class="quiz-item" onclick="toggleQuiz(this)"><span class="quiz-num">Q17</span><span class="quiz-q">Compose service A talks to B by hostname <code>b</code>. K8s hostname for A → B in same namespace? In different namespace?</span></div>
+        <div class="quiz-item" onclick="toggleQuiz(this)"><span class="quiz-num">Q18</span><span class="quiz-q">You updated a ConfigMap with <code>kubectl apply</code>. Pod still has old value. Exact command to fix it.</span></div>
+        <div class="quiz-item" onclick="toggleQuiz(this)"><span class="quiz-num">Q19</span><span class="quiz-q">A Pod is in <code>CreateContainerConfigError</code>. Most likely cause? First command to confirm?</span></div>
+        <div class="quiz-item" onclick="toggleQuiz(this)"><span class="quiz-num">Q20</span><span class="quiz-q">Difference between a Helm chart, a Helm release, and a Helm repository.</span></div>
+        <div class="quiz-item" onclick="toggleQuiz(this)"><span class="quiz-num">Q21</span><span class="quiz-q">After <code>helm install my-redis bitnami/redis</code>, how do you find the hostname your application uses to connect?</span></div>
+        <div class="quiz-item" onclick="toggleQuiz(this)"><span class="quiz-num">Q22</span><span class="quiz-q">Does <code>helm rollback</code> rewrite history or create a new revision? What does <code>helm history</code> show after?</span></div>
+        <div class="quiz-item" onclick="toggleQuiz(this)"><span class="quiz-num">Q23</span><span class="quiz-q">Why does Redis (or Postgres) use a StatefulSet rather than a Deployment? What does StatefulSet give you?</span></div>
+        <div class="quiz-item" onclick="toggleQuiz(this)"><span class="quiz-num">Q24</span><span class="quiz-q">Day 16 — full EKS lifecycle. Three resources you must verify are gone after <code>eksctl delete cluster</code> to confirm zero orphans.</span></div>
+        <div class="quiz-item" onclick="toggleQuiz(this)"><span class="quiz-num">Q25</span><span class="quiz-q"><code>tail -f</code> vs <code>tail -F</code>. Which one breaks first in production and why?</span></div>
+        <div class="quiz-item" onclick="toggleQuiz(this)"><span class="quiz-num">Q26</span><span class="quiz-q">A bash script works in your shell but fails when run via cron. Two most common causes? How do you simulate cron's environment locally?</span></div>
+        <div class="quiz-item" onclick="toggleQuiz(this)"><span class="quiz-num">Q27</span><span class="quiz-q">Why is <code>--dry-run</code> non-negotiable for any production-changing script? What's the implementation pattern that makes it reliable?</span></div>
+        <div class="quiz-item" onclick="toggleQuiz(this)"><span class="quiz-num">Q28</span><span class="quiz-q">What is <code>terraform.tfstate</code>? What happens to your infrastructure management if you delete it?</span></div>
+        <div class="quiz-item" onclick="toggleQuiz(this)"><span class="quiz-num">Q29</span><span class="quiz-q">Terraform vs Ansible: which tool to create an EC2 instance, which to install nginx on it, why split there?</span></div>
+        <div class="quiz-item" onclick="toggleQuiz(this)"><span class="quiz-num">Q30</span><span class="quiz-q">Three files always in <code>.gitignore</code> for a Terraform project. Why each one must not be committed.</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- PHASE 3: LIVE FAILURE DRILL -->
+  <div class="section-block" id="phase3">
+    <div class="sec-label">Phase 3 — Live failure drill (with mentor)</div>
+    <div class="phase-card">
+      <div class="phase-head">
+        <div class="phase-num">3</div>
+        <div class="phase-title">Mentor presents a broken environment. You diagnose live on screenshare. 15 minutes.</div>
+        <div class="phase-time">30 min slot</div>
+        <div class="phase-locked">Live</div>
+      </div>
+      <div class="phase-body">
+        <div class="phase-goal">This is the cheat-killer. You cannot ask Claude. You cannot read your memory file mid-session. You either have the muscle memory or you don't — and that is exactly what we need to know to plan Week 5 for you.</div>
+        <div class="phase-step"><span class="phase-step-num">1</span><div>Book a 30-minute slot with the mentor in the cohort calendar. <strong>Bring your own cluster (minikube + your project deployed)</strong> or use the shared scenario environment if your cluster is gone.</div></div>
+        <div class="phase-step"><span class="phase-step-num">2</span><div>At session start, mentor draws ONE scenario from the basket: <strong>broken Pod</strong> (CrashLoopBackOff / 0/1 READY / Pending), <strong>broken Service</strong> (selector mismatch / endpoints empty), <strong>broken Ingress</strong> (404 / 502 / wrong path), <strong>broken Helm release</strong> (PVC pending / wrong override / failed upgrade), <strong>broken Terraform state</strong> (drift / orphan / missing variable).</div></div>
+        <div class="phase-step"><span class="phase-step-num">3</span><div>You get 15 minutes to diagnose. <strong>Allowed:</strong> kubectl/helm/docker/aws/terraform CLI, your terminal history. <strong>Not allowed:</strong> Claude, Google, your memory files, your daily logs. Verbalize what you are looking for at each step ("now I'm checking events because describe didn't show probe failures").</div></div>
+        <div class="phase-step"><span class="phase-step-num">4</span><div>At end of 15 min, mentor asks: (a) what is the root cause, (b) what is the fix, (c) which memory file should already cover this. If your memory file does cover it but you didn't reach for it — that's a "knowledge in file but not in head" gap.</div></div>
+        <div class="phase-step"><span class="phase-step-num">5</span><div>Mentor scores: <strong>3/3</strong> = found root cause + fix in time. <strong>2/3</strong> = found root cause but not the fix. <strong>1/3</strong> = made progress but did not isolate. <strong>0/3</strong> = lost. <strong>+1 bonus</strong> if you correctly named which memory file covers this.</div></div>
+        <div class="phase-deliverable"><strong>Deliverable:</strong> <code>memory/day-20-drill.md</code> — write up the scenario you got, your diagnostic path (every command you ran), what you found, what you missed, and the fix. Mentor co-signs the score.</div>
+        <div class="phase-anticheat"><strong>Why this is hard to fake:</strong> the scenario is randomly assigned at session start. The 15-minute clock + screenshare + no-Claude rule means trainees who copy-pasted memory files are visibly stuck. Trainees who ran the deliberate failure drills on Days 12–19 walk through this in 5 minutes.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- PHASE 4: GAP CONSOLIDATION + INDEX -->
+  <div class="section-block" id="phase4">
+    <div class="sec-label">Phase 4 — Gap consolidation + memory INDEX</div>
+    <div class="phase-card">
+      <div class="phase-head">
+        <div class="phase-num">4</div>
+        <div class="phase-title">Build the consolidated memory package + Week-5 remediation plan</div>
+        <div class="phase-time">60 min</div>
+      </div>
+      <div class="phase-body">
+        <div class="phase-goal">Tie all 16 memory files together into one INDEX your agent can load at session start. Add every gap you surfaced today to gap-analysis.md with a concrete fix date.</div>
+        <div class="phase-step"><span class="phase-step-num">1</span><div>Create or rewrite <code>memory/INDEX.md</code> — one row per memory file: filename, what it covers in one sentence, your Day-20 score, status (PASS / NEEDS WORK / GAP). The INDEX is what your agent reads first.</div></div>
+        <div class="phase-step"><span class="phase-step-num">2</span><div>Update <code>memory/gap-analysis.md</code>: every <strong>1/2 or 0/2</strong> from Phase 1, every <strong>GAP</strong> from Phase 2, every miss from Phase 3 — each becomes a row. Columns: file/concept → why weak → specific fix → target date in Week 5–6.</div></div>
+        <div class="phase-step"><span class="phase-step-num">3</span><div>For your weakest 3 areas: rewrite the relevant memory file section in your own words. Reference YOUR project specifics (service names, real errors, commit hashes). Push the rewrites today.</div></div>
+        <div class="phase-step"><span class="phase-step-num">4</span><div>Final commit: <code>git commit -m "Day 20 — mid-point gate: audit + quiz + drill + INDEX"</code>. Push to hub repo.</div></div>
+        <div class="phase-deliverable"><strong>Deliverables:</strong> <code>memory/INDEX.md</code> (16-row table with self-scores), <code>memory/gap-analysis.md</code> (updated with Day 20 gaps + Week 5–6 fix plan), <code>memory/day-20-audit.md</code>, <code>memory/day-20-quiz.md</code>, <code>memory/day-20-drill.md</code>.</div>
+        <div class="phase-anticheat"><strong>How we check:</strong> mentor reads INDEX → opens 3 random files → checks they match the score in INDEX → checks gap-analysis rows have specific dates, not "soon" or "TBD". Generic gap rows fail the rubric.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- RUBRIC -->
+  <div class="section-block" id="rubric">
+    <div class="sec-label">Scoring rubric (published — same one mentor uses)</div>
+    <div class="rubric-grid">
+      <div class="rubric-card">
+        <div class="rubric-title">Phase 1 — Self-audit <span class="rubric-pts">32 pts</span></div>
+        <div class="rubric-row">2 pts × 16 files: file present + project-specific evidence</div>
+        <div class="rubric-row">1 pt: file present but generic content</div>
+        <div class="rubric-row">0 pts: missing or template-only</div>
+        <div class="rubric-pass">Pass: ≥22/32. Fail (Week 5 catchup): &lt;22.</div>
+      </div>
+      <div class="rubric-card">
+        <div class="rubric-title">Phase 2 — Closed-book quiz <span class="rubric-pts">30 pts</span></div>
+        <div class="rubric-row">+1 per correct answer (30 questions)</div>
+        <div class="rubric-row"><strong>+1 per honest GAP — surfacing a real gap is rewarded</strong></div>
+        <div class="rubric-row">-1 per wrong-but-confident answer</div>
+        <div class="rubric-pass">Pass: ≥20. Strong: ≥25. &lt;15 = serious week-5 attention needed.</div>
+      </div>
+      <div class="rubric-card">
+        <div class="rubric-title">Phase 3 — Live failure drill <span class="rubric-pts">3 pts</span></div>
+        <div class="rubric-row">3: root cause + fix + named the memory file in 15 min</div>
+        <div class="rubric-row">2: root cause but not fix in time</div>
+        <div class="rubric-row">1: progress but not isolated</div>
+        <div class="rubric-row">0: lost</div>
+        <div class="rubric-pass">Pass: ≥2. This phase carries weight — it is the cheat-resistant test.</div>
+      </div>
+      <div class="rubric-card">
+        <div class="rubric-title">Phase 4 — INDEX + gap-analysis <span class="rubric-pts">10 pts</span></div>
+        <div class="rubric-row">3: INDEX has all 16 rows with honest self-scores</div>
+        <div class="rubric-row">3: gap-analysis rows have specific dates and concrete fixes</div>
+        <div class="rubric-row">4: weakest 3 sections rewritten with project-specific content</div>
+        <div class="rubric-pass">Pass: ≥7. Generic "I'll fix it next week" rows = 0.</div>
+      </div>
+    </div>
+    <div style="margin-top:14px;padding:12px 16px;background:var(--surface);border:1px solid var(--border);border-radius:8px;">
+      <div style="font-size:12px;color:var(--text);line-height:1.7;"><strong style="color:var(--green);">Total: 75 pts.</strong> Pass = <strong style="color:var(--accent);">≥51 (68%)</strong>. Below 51 → Week 5 starts with personalized catchup, not new material. Above 65 → strong, Week 5 proceeds normally.</div>
+    </div>
+  </div>
+
+  <!-- DONE CRITERIA -->
+  <div class="section-block" id="done">
+    <div class="sec-label">Done criteria — all evidence-based</div>
+    <div class="criteria">
+      <div class="crit" onclick="toggleCrit(this)"><div class="crit-box"><span class="crit-check">&#10003;</span></div><div class="crit-text"><code>memory/day-20-audit.md</code> committed — 16 rows scored honestly, total /32, weakest 3 files identified.<div class="crit-evidence">Evidence: file exists + line count > 40 + at least 3 rows scored 0/2 or 1/2 (perfect 32/32 with no gaps surfaced is itself a gap).</div></div></div>
+      <div class="crit" onclick="toggleCrit(this)"><div class="crit-box"><span class="crit-check">&#10003;</span></div><div class="crit-text"><code>memory/day-20-quiz.md</code> committed within 45 min of opening — 30 answers, self-score, weakest 3 concepts.<div class="crit-evidence">Evidence: <code>git log --pretty=format:"%h %ai %s" memory/day-20-quiz.md</code> shows commits ≤45 min apart.</div></div></div>
+      <div class="crit" onclick="toggleCrit(this)"><div class="crit-box"><span class="crit-check">&#10003;</span></div><div class="crit-text">30-min mentor slot booked + <code>memory/day-20-drill.md</code> co-signed by mentor.<div class="crit-evidence">Evidence: file ends with mentor's name + score from Phase 3.</div></div></div>
+      <div class="crit" onclick="toggleCrit(this)"><div class="crit-box"><span class="crit-check">&#10003;</span></div><div class="crit-text"><code>memory/INDEX.md</code> updated — 16 rows, each with file + 1-line description + Day-20 score + status.<div class="crit-evidence">Evidence: <code>wc -l memory/INDEX.md</code> ≥ 30; rows reference real filenames.</div></div></div>
+      <div class="crit" onclick="toggleCrit(this)"><div class="crit-box"><span class="crit-check">&#10003;</span></div><div class="crit-text"><code>memory/gap-analysis.md</code> updated — every Phase-1 1/2 or 0/2, every Phase-2 GAP, every Phase-3 miss has a row with a specific Week-5 or Week-6 fix date.<div class="crit-evidence">Evidence: every row has a date (YYYY-MM-DD), not "soon" or "TBD".</div></div></div>
+      <div class="crit" onclick="toggleCrit(this)"><div class="crit-box"><span class="crit-check">&#10003;</span></div><div class="crit-text">Weakest 3 memory file sections rewritten in your own words, referencing YOUR project (service names, real errors, real commit hashes). Pushed to hub repo.<div class="crit-evidence">Evidence: <code>git diff HEAD~5 memory/</code> shows substantive rewrites (not just whitespace), with project-specific terms.</div></div></div>
+      <div class="crit" onclick="toggleCrit(this)"><div class="crit-box"><span class="crit-check">&#10003;</span></div><div class="crit-text">Final commit pushed: <code>Day 20 — mid-point gate: audit + quiz + drill + INDEX</code>. Trainee channel report posted.<div class="crit-evidence">Evidence: <code>=== Day 20 |</code> message in your channel + git remote shows commit.</div></div></div>
+      <div class="crit" onclick="toggleCrit(this)"><div class="crit-box"><span class="crit-check">&#10003;</span></div><div class="crit-text">Total Day-20 score ≥ 51/75. If &lt;51, you are NOT done — your Week 5 starts with catchup, scheduled today.<div class="crit-evidence">Evidence: mentor confirms in 1-on-1 spot-check before clearing the gate.</div></div></div>
+    </div>
+  </div>
+
+  <!-- MENTOR VERIFICATION -->
+  <div class="section-block">
+    <div class="sec-label">After you submit — what the mentor does</div>
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px 20px;">
+      <div style="font-size:12.5px;color:var(--muted);line-height:1.8;">
+        <strong style="color:var(--text);">Step 1.</strong> Mentor opens your hub repo and runs <code>wc -l memory/*.md</code>. Files claimed at "DONE 2/2" with &lt;30 lines or generic content drop to 1/2 or 0/2 automatically.<br>
+        <strong style="color:var(--text);">Step 2.</strong> Mentor greps every memory file for project-specific terms (service names from your DOP-001, real Pod names from daily logs, commit hashes referenced in failure sections). Memory files with zero project-specific hits drop one tier.<br>
+        <strong style="color:var(--text);">Step 3.</strong> Mentor reads <code>memory/day-20-quiz.md</code> and picks 5 random questions. In a 15-min spot-check call, asks you to re-answer verbally. Mismatched answers void the row.<br>
+        <strong style="color:var(--text);">Step 4.</strong> Mentor verifies <code>memory/day-20-drill.md</code> matches the live session — your terminal commands should be in the file in the order you ran them.<br>
+        <strong style="color:var(--text);">Step 5.</strong> Mentor records final score in <code>tracking/reviews/day-20/[trainee].md</code>. Below 51 = mandatory Week 5 catchup plan. Above 65 = clear pass, Week 5 proceeds with new material.
+      </div>
+    </div>
+  </div>
+
+</div><!-- /main -->
+
+<!-- SIDEBAR -->
+<div class="sidebar">
+  <div class="widget">
+    <div class="widget-title">Day 20 — Phase progress</div>
+    <div class="progress-count" id="d20-count">0 / 4</div>
+    <div style="margin-bottom:8px;"><div class="progress-bar"><div class="progress-fill" id="d20-fill" style="width:0%"></div></div><div class="progress-label" id="d20-label">Not started</div></div>
+  </div>
+  <div class="widget">
+    <div class="widget-title">Today's deliverables</div>
+    <div class="as-row"><div class="as-dot" id="d20-audit"></div><div class="as-name"><strong>memory/day-20-audit.md</strong></div></div>
+    <div class="as-row"><div class="as-dot" id="d20-quiz"></div><div class="as-name"><strong>memory/day-20-quiz.md</strong></div></div>
+    <div class="as-row"><div class="as-dot" id="d20-drill"></div><div class="as-name"><strong>memory/day-20-drill.md</strong></div></div>
+    <div class="as-row"><div class="as-dot" id="d20-index"></div><div class="as-name"><strong>memory/INDEX.md</strong></div></div>
+    <div class="as-row"><div class="as-dot" id="d20-gap"></div><div class="as-name"><strong>memory/gap-analysis.md</strong></div></div>
+    <div class="as-row"><div class="as-dot" id="d20-rewrite"></div><div class="as-name">3 weakest sections rewritten</div></div>
+  </div>
+  <div class="widget" style="background:rgba(248,113,113,.04);border-color:rgba(248,113,113,.25);">
+    <div class="widget-title" style="color:var(--red);">Honesty rule</div>
+    <div style="font-size:11.5px;color:var(--muted);line-height:1.7;"><strong style="color:var(--text);">Surfacing a gap = full credit.</strong> Hiding a gap that is then caught in Phase 3 = the row is voided <em>and</em> a flag is filed. Today is for finding gaps, not performing.</div>
+  </div>
+  <div class="outcome-card">
+    <div class="widget-title">Score → Week 5 plan</div>
+    <div class="outcome-row"><span class="outcome-bar green">65+</span><span class="outcome-text">Strong. Week 5 proceeds normally with CI/CD focus.</span></div>
+    <div class="outcome-row"><span class="outcome-bar green">51–64</span><span class="outcome-text">Pass. Week 5 normal but you address top 3 gaps in parallel.</span></div>
+    <div class="outcome-row"><span class="outcome-bar yellow">35–50</span><span class="outcome-text">Conditional. Mon–Tue of Week 5 = catchup before resuming.</span></div>
+    <div class="outcome-row"><span class="outcome-bar red">&lt;35</span><span class="outcome-text"><strong>Fail.</strong> Full week of catchup before any new material. L1 flag.</span></div>
+  </div>
+  <div class="mentor-box">
+    <div class="mentor-title">Mentor verification</div>
+    <div class="mentor-step"><span class="mentor-step-num">1.</span> Open repo, run <code style="font-size:10px;color:var(--accent2);">wc -l memory/*.md</code></div>
+    <div class="mentor-step"><span class="mentor-step-num">2.</span> Grep for project-specific terms (service names, real errors)</div>
+    <div class="mentor-step"><span class="mentor-step-num">3.</span> 5 random questions from quiz — verbal re-answer</div>
+    <div class="mentor-step"><span class="mentor-step-num">4.</span> Verify drill commands match terminal log</div>
+    <div class="mentor-step"><span class="mentor-step-num">5.</span> Record score in <code style="font-size:10px;color:var(--accent2);">tracking/reviews/day-20/</code></div>
+  </div>
+  <div class="report-box">
+    <div class="report-title">End-of-day report</div>
+    <div class="report-step"><span class="report-step-num">1.</span> Push all 5 deliverables + rewrites</div>
+    <div class="report-step"><span class="report-step-num">2.</span> Post <code style="font-size:10px;color:var(--accent);">=== Day 20 |</code> with: total score, weakest 3 areas, Week-5 plan</div>
+    <div class="report-step"><span class="report-step-num">3.</span> Confirm mentor 1-on-1 slot booked</div>
+    <div style="margin-top:8px;padding:6px 8px;background:rgba(52,211,153,.06);border:1px solid rgba(52,211,153,.2);border-radius:5px;font-size:10px;color:var(--green);line-height:1.5;">Be honest about score. The number is for planning Week 5 — not for showing off. A 35 with an honest plan beats a 70 that falls apart in CI/CD week.</div>
+  </div>
+</div>
+
+</div><!-- /layout -->
+
+<script>
+const phases = new Array(4).fill(false);
+function setPhase(i, val) {
+  phases[i] = val;
+  const n = phases.filter(Boolean).length;
+  document.getElementById('d20-count').textContent = n + ' / 4';
+  document.getElementById('d20-fill').style.width = (n/4*100) + '%';
+  const labels = ['Not started','Phase 1 done','Phase 2 done — quiz committed','Phase 3 done — drill scored','Gate cleared'];
+  document.getElementById('d20-label').textContent = labels[n];
+}
+function toggleQuiz(el) {
+  el.classList.toggle('answered');
+  const total = document.querySelectorAll('.quiz-item').length;
+  const done = document.querySelectorAll('.quiz-item.answered').length;
+  if (done >= 25 && !phases[1]) setPhase(1, true);
+  if (done < 25 && phases[1]) setPhase(1, false);
+}
+function toggleCrit(el) {
+  el.classList.toggle('done');
+  const dots = ['d20-audit','d20-quiz','d20-drill','d20-index','d20-gap','d20-rewrite'];
+  const crits = document.querySelectorAll('.crit');
+  crits.forEach((c, i) => {
+    if (i < dots.length) {
+      const dot = document.getElementById(dots[i]);
+      if (c.classList.contains('done')) dot.classList.add('done');
+      else dot.classList.remove('done');
+    }
+  });
+  const allDone = Array.from(crits).every(c => c.classList.contains('done'));
+  if (allDone) setPhase(3, true);
+}
+</script>
+</body>
+</html>
